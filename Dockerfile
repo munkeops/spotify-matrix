@@ -31,12 +31,16 @@ COPY spotify_matrix.py requirements.txt ./
 RUN poetry config virtualenvs.in-project true \
     && poetry install --only main --no-ansi
 
-RUN git clone --depth 1 https://github.com/hzeller/rpi-rgb-led-matrix /tmp/rpi-rgb-led-matrix \
-    && cd /tmp/rpi-rgb-led-matrix/bindings/python \
-    && MATRIX_PYTHON="$(cd /app && poetry env info --executable)" \
-    && make build-python PYTHON="${MATRIX_PYTHON}" \
-    && make install-python PYTHON="${MATRIX_PYTHON}" \
-    && rm -rf /tmp/rpi-rgb-led-matrix
+RUN PILLOW_VERSION="$(poetry run python -c 'import PIL; print(PIL.__version__)')" \
+    && mkdir -p /tmp/pillow-src \
+    && poetry run pip download --no-binary=:all: --no-deps "Pillow==${PILLOW_VERSION}" -d /tmp/pillow-src \
+    && tar -xf /tmp/pillow-src/pillow-*.tar.gz -C /tmp/pillow-src \
+    && PILLOW_HEADER="$(find /tmp/pillow-src -name Imaging.h | head -n 1)" \
+    && test -n "${PILLOW_HEADER}" \
+    && PILLOW_INCLUDE="$(dirname "${PILLOW_HEADER}")" \
+    && echo "Using Pillow ${PILLOW_VERSION} header path: ${PILLOW_INCLUDE}" \
+    && CFLAGS="-I${PILLOW_INCLUDE}" poetry run pip install --no-cache-dir git+https://github.com/hzeller/rpi-rgb-led-matrix \
+    && rm -rf /tmp/pillow-src
 
 RUN mkdir -p /app/data
 
