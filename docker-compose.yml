@@ -1,0 +1,15 @@
+services:
+  spotify-matrix:
+    build: .
+    container_name: spotify-matrix
+    privileged: true
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      SPOTIFY_MATRIX_DATA_DIR: /app/data
+      SPOTIFY_MATRIX_CONFIG: /app/data/config.json
+      SPOTIFY_TOKEN_CACHE: /app/data/spotify_token.json
+    volumes:
+      - ./data:/app/data

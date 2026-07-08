@@ -7,6 +7,7 @@ from io import BytesIO
 import json
 import os
 import secrets
+import sys
 import threading
 import time
 import urllib.parse
@@ -32,6 +33,8 @@ AUTH_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 SCOPE = "user-read-currently-playing"
+DEFAULT_CONFIG_PATH = Path(os.environ.get("SPOTIFY_MATRIX_CONFIG", "data/config.json"))
+DEFAULT_TOKEN_CACHE = Path(os.environ.get("SPOTIFY_TOKEN_CACHE", "data/spotify_token.json"))
 
 
 @dataclass
@@ -90,6 +93,96 @@ def http_request(
 def raise_http_error(response: HttpResponse, context: str) -> None:
     body = response.body.decode("utf-8", errors="replace")
     raise RuntimeError(f"{context} failed with HTTP {response.status}: {body}")
+
+
+def load_json_config(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+
+    with path.open("r", encoding="utf-8") as config_file:
+        config = json.load(config_file)
+
+    if not isinstance(config, dict):
+        raise RuntimeError(f"Config file {path} must contain a JSON object.")
+    return config
+
+
+def get_nested(config: dict[str, Any], section: str, name: str) -> Any:
+    value = config.get(section, {})
+    if isinstance(value, dict):
+        return value.get(name)
+    return None
+
+
+def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> None:
+    matrix_fields = {
+        "rows": int,
+        "cols": int,
+        "chainLength": int,
+        "parallel": int,
+        "brightness": int,
+        "gpioSlowdown": int,
+        "hardwareMapping": str,
+        "pwmBits": int,
+        "limitRefreshRateHz": int,
+        "pollSeconds": float,
+        "fps": float,
+        "rpm": float,
+        "noHardwarePulse": bool,
+    }
+    attr_names = {
+        "chainLength": "chain_length",
+        "gpioSlowdown": "gpio_slowdown",
+        "hardwareMapping": "hardware_mapping",
+        "pwmBits": "pwm_bits",
+        "limitRefreshRateHz": "limit_refresh_rate_hz",
+        "pollSeconds": "poll_seconds",
+        "noHardwarePulse": "no_hardware_pulse",
+    }
+    cli_flags = {
+        "rows": ("--rows",),
+        "cols": ("--cols",),
+        "chainLength": ("--chain-length",),
+        "parallel": ("--parallel",),
+        "brightness": ("--brightness",),
+        "gpioSlowdown": ("--gpio-slowdown",),
+        "hardwareMapping": ("--hardware-mapping",),
+        "pwmBits": ("--pwm-bits",),
+        "limitRefreshRateHz": ("--limit-refresh-rate-hz",),
+        "pollSeconds": ("--poll-seconds",),
+        "fps": ("--fps",),
+        "rpm": ("--rpm",),
+        "noHardwarePulse": ("--no-hardware-pulse",),
+    }
+
+    for config_name, caster in matrix_fields.items():
+        if any(flag in sys.argv[1:] for flag in cli_flags[config_name]):
+            continue
+        value = get_nested(config, "matrix", config_name)
+        if value is None:
+            continue
+        attr_name = attr_names.get(config_name, config_name)
+        setattr(args, attr_name, caster(value))
+
+
+def spotify_credentials(config: dict[str, Any]) -> tuple[str | None, str | None, str]:
+    client_id = (
+        get_nested(config, "spotify", "clientId")
+        or get_nested(config, "spotify", "client_id")
+        or os.environ.get("SPOTIFY_CLIENT_ID")
+    )
+    client_secret = (
+        get_nested(config, "spotify", "clientSecret")
+        or get_nested(config, "spotify", "client_secret")
+        or os.environ.get("SPOTIFY_CLIENT_SECRET")
+    )
+    redirect_uri = (
+        get_nested(config, "spotify", "redirectUri")
+        or get_nested(config, "spotify", "redirect_uri")
+        or os.environ.get("SPOTIFY_REDIRECT_URI")
+        or "http://127.0.0.1:8888/callback"
+    )
+    return client_id, client_secret, str(redirect_uri)
 
 
 class SpotifyClient:
@@ -522,22 +615,25 @@ def run(args: argparse.Namespace) -> None:
         return
 
     load_dotenv()
+    config = load_json_config(args.config_path)
+    apply_config_defaults(args, config)
 
-    client_id = os.environ.get("SPOTIFY_CLIENT_ID")
-    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET")
-    redirect_uri = os.environ.get("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8888/callback")
+    client_id, client_secret, redirect_uri = spotify_credentials(config)
 
     missing = [
         name
         for name, value in (
-            ("SPOTIFY_CLIENT_ID", client_id),
-            ("SPOTIFY_CLIENT_SECRET", client_secret),
-            ("SPOTIFY_REDIRECT_URI", redirect_uri),
+            ("Spotify Client ID", client_id),
+            ("Spotify Client Secret", client_secret),
+            ("Spotify Redirect URI", redirect_uri),
         )
         if not value
     ]
     if missing:
-        raise SystemExit(f"Missing required environment values: {', '.join(missing)}")
+        raise SystemExit(
+            "Missing required Spotify configuration values: "
+            f"{', '.join(missing)}. Add them through the setup UI or environment."
+        )
 
     spotify = SpotifyClient(
         client_id=client_id or "",
@@ -650,7 +746,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--poll-seconds", type=positive_float, default=2.0)
     parser.add_argument("--fps", type=positive_float, default=20.0)
     parser.add_argument("--rpm", type=positive_float, default=20.0)
-    parser.add_argument("--token-cache", type=Path, default=Path(".cache/spotify_token.json"))
+    parser.add_argument("--config-path", type=Path, default=DEFAULT_CONFIG_PATH)
+    parser.add_argument("--token-cache", type=Path, default=DEFAULT_TOKEN_CACHE)
     parser.add_argument("--mock-output", type=Path, help="Write the current frame PNG instead of using RGB matrix hardware.")
     parser.add_argument("--preview-frames", type=Path, help="Render sample spinning-album-art disk frames and exit.")
     parser.add_argument("--auth-only", action="store_true", help="Authorize Spotify, cache the token, and exit without using the matrix.")

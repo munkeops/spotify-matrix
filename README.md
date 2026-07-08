@@ -1,78 +1,122 @@
 # Spotify Matrix
 
-Shows the current Spotify album art on a 64x64 RGB matrix as a circular record. The album art is the record surface itself: it is cropped to a disk, spun while Spotify reports playback as active, and left stopped at the current angle when paused.
+Shows the current Spotify album art on a 64x64 RGB matrix as a circular record. The album art is cropped to a disk, spun while Spotify reports playback as active, and left stopped at the current angle when paused.
 
-This uses Spotify's Web API `currently-playing` endpoint, not the browser-only Web Playback SDK. The first run opens Spotify OAuth, then the script stores a refresh token in `.cache/spotify_token.json`.
+The project now uses a Python-only stack:
 
-## Files
+- FastAPI setup service in `src/`
+- Static HTML/CSS/JS UI in `public/`
+- Python OAuth helper in `scripts/oauth_helper.py`
+- Runtime display script in `spotify_matrix.py`
+- TOML service config in `configs/base_config.toml`
 
-- `spotify_matrix.py` - Pi runtime script.
-- `.env` - local Spotify credentials, ignored by Git.
-- `.env.example` - template for recreating local config.
-- `requirements.txt` - Python dependencies, excluding the hardware-specific RGB matrix bindings.
+## Layout
 
-## Raspberry Pi setup
-
-Install the RGB matrix Python bindings from the `hzeller/rpi-rgb-led-matrix` project for your HAT/wiring, then install this project's dependencies:
-
-```bash
-python3 -m venv .venv --system-site-packages
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-The `--system-site-packages` flag is useful if the `rgbmatrix` bindings were installed system-wide.
-
-This install sometimes crashes the raspberry pi zero, I had to do some fancy workarounds. Might be easier to use a pi with more memory!
-
-## Spotify setup
-
-In the Spotify developer dashboard, make sure this redirect URI is allowlisted exactly:
+This repo follows the service structure used by the synthesis Python repos:
 
 ```text
-http://127.0.0.1:8888/callback
+configs/
+  base_config.toml
+src/
+  main.py
+  server.py
+  api/http/rest/
+  domain/models/
+  domain/services/
+  utils/
+public/
+scripts/
 ```
 
-For a headless Pi, forward the callback port from your computer:
+Runtime secrets are stored under `data/`, which is ignored by Git:
+
+- `data/config.json` - Spotify credentials and matrix settings.
+- `data/spotify_token.json` - Spotify access and refresh token.
+
+## Hardware feasibility
+
+Docker deployment is possible on Raspberry Pi, but HUB75 matrix output needs direct GPIO access. The Compose service uses `privileged: true` and host networking for that reason.
+
+Pi 3/4/5-class hardware should be viable. Pi Zero and other low-memory boards can be fragile because the RGB matrix bindings compile native code and the runtime rotates album art continuously. Panel compatibility still depends on the panel, HAT wiring, `hardwareMapping`, `gpioSlowdown`, scan pattern, and refresh settings.
+
+## Spotify auth without router port forwarding
+
+Spotify requires HTTPS redirect URIs except explicit loopback IPs such as `http://127.0.0.1:PORT/callback`; `localhost` is not accepted for newly validated apps. This repo avoids router port forwarding by doing OAuth on your laptop:
+
+1. Add this loopback redirect URI in the Spotify developer dashboard:
+
+   ```text
+   http://127.0.0.1/callback
+   ```
+
+2. Open the Pi setup UI from your laptop:
+
+   ```text
+   http://raspberrypi.local:3000
+   ```
+
+3. Save the Spotify Client ID and Client Secret.
+4. Click **Create Pairing Token**.
+5. Run the displayed Python helper command on your laptop:
+
+   ```bash
+   python scripts/oauth_helper.py --pi http://raspberrypi.local:3000 --pairing-token <token>
+   ```
+
+The helper opens Spotify in your laptop browser, receives the callback on `127.0.0.1`, exchanges the code for tokens, and posts the refresh token back to the Pi over your LAN.
+
+## Docker deployment on Pi
+
+Install Docker and Docker Compose on the Pi, then run:
 
 ```bash
-ssh -L 8888:127.0.0.1:8888 pi@raspberrypi.local
+docker compose up --build
 ```
 
-Then run the script on the Pi and open the printed authorization URL in your local browser.
+The FastAPI setup UI listens on port `3000`.
 
-## Run
+The container installs `rpi-rgb-led-matrix` from the upstream GitHub repository during build, so the Pi needs network access for the first build.
 
-This is the working command to run the script on your raspberry pi:
+## Local development
+
+Install dependencies with Poetry:
 
 ```bash
-sudo -E .venv/bin/python spotify_matrix.py \
-  --rows 64 \
-  --cols 64 \
-  --chain-length 1 \
-  --parallel 1 \
-  --gpio-slowdown 4 \
-  --no-hardware-pulse \
-  --hardware-mapping adafruit-hat
+poetry install
 ```
 
-Useful hardware options:
+Or with pip:
 
 ```bash
-sudo -E .venv/bin/python spotify_matrix.py \
-  --hardware-mapping regular \
-  --gpio-slowdown 2 \
-  --brightness 65
+python -m pip install -r requirements.txt
 ```
 
-For a non-Pi test that writes one PNG frame instead of using matrix hardware:
+Start the FastAPI setup service:
 
 ```bash
-python spotify_matrix.py --mock-output /tmp/spotify-matrix-frame.png --once
+poetry run python -m src.main
 ```
 
-To verify the album art is what spins on the disk, render four local preview frames:
+Run the Python renderer without matrix hardware:
 
 ```bash
-python spotify_matrix.py --preview-frames /tmp/spotify-matrix-preview
+python spotify_matrix.py --mock-output data/frame.png --once
 ```
+
+Render local preview frames:
+
+```bash
+python spotify_matrix.py --preview-frames data/preview
+```
+
+## Legacy env support
+
+The Python runtime still accepts environment variables if `data/config.json` is missing:
+
+```text
+SPOTIFY_CLIENT_ID=your_client_id
+SPOTIFY_CLIENT_SECRET=your_client_secret
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:8888/callback
+```
+
+Direct auth through `spotify_matrix.py --auth-only` still works for local loopback redirects, but the FastAPI setup UI plus laptop helper is the recommended no-port-forwarding path.
