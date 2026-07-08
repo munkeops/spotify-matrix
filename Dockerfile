@@ -31,9 +31,12 @@ COPY spotify_matrix.py requirements.txt ./
 RUN poetry config virtualenvs.in-project true \
     && poetry install --only main --no-ansi
 
-RUN PIL_INCLUDE="$(poetry run python -c 'import pathlib, PIL; print(pathlib.Path(PIL.__file__).parent)')" \
-    && echo "Using Pillow include path: ${PIL_INCLUDE}" \
-    && CFLAGS="-I${PIL_INCLUDE}" poetry run pip install --no-cache-dir git+https://github.com/hzeller/rpi-rgb-led-matrix
+RUN git clone --depth 1 https://github.com/hzeller/rpi-rgb-led-matrix /tmp/rpi-rgb-led-matrix \
+    && cd /tmp/rpi-rgb-led-matrix/bindings/python \
+    && MATRIX_PYTHON="$(cd /app && poetry env info --executable)" \
+    && make build-python PYTHON="${MATRIX_PYTHON}" \
+    && make install-python PYTHON="${MATRIX_PYTHON}" \
+    && rm -rf /tmp/rpi-rgb-led-matrix
 
 RUN mkdir -p /app/data
 
