@@ -109,6 +109,28 @@ Save the same HTTPS callback in the setup UI's Redirect URI field, then click **
 
 The laptop helper flow remains available for local setup without a domain.
 
+## Portainer
+
+The Compose file also includes Portainer CE behind an optional `admin` profile. Start it with:
+
+```bash
+docker compose --profile admin up -d portainer
+```
+
+Then open:
+
+```text
+http://raspberrypi.local:9000
+```
+
+or:
+
+```text
+https://raspberrypi.local:9443
+```
+
+Portainer state is stored in the named Docker volume `portainer_data`. The service mounts `/var/run/docker.sock` so it can manage containers on the Pi.
+
 ## Local development
 
 Install dependencies with Poetry:
