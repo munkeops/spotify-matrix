@@ -79,6 +79,36 @@ The FastAPI setup UI listens on port `3000`.
 
 The container installs `rpi-rgb-led-matrix` from the upstream GitHub repository during build, so the Pi needs network access for the first build.
 
+## Cloudflare Tunnel
+
+The Compose file includes a `cloudflared` sidecar. In Cloudflare Zero Trust, create a tunnel and configure the public hostname to forward to:
+
+```text
+http://localhost:3000
+```
+
+On the Pi, save the tunnel token in a local `.env` file:
+
+```bash
+CLOUDFLARED_TOKEN=your_cloudflare_tunnel_token
+```
+
+Then start both containers:
+
+```bash
+docker compose --profile tunnel up -d --build
+```
+
+For full container-managed Spotify OAuth, add this HTTPS callback to the Spotify developer dashboard, replacing the hostname with your Cloudflare hostname:
+
+```text
+https://spotify-matrix.example.com/api/auth/callback
+```
+
+Save the same HTTPS callback in the setup UI's Redirect URI field, then click **Open Spotify Login**. Spotify will redirect back through Cloudflare to `/api/auth/callback`, and the refresh token will be saved under `data/spotify_token.json`.
+
+The laptop helper flow remains available for local setup without a domain.
+
 ## Local development
 
 Install dependencies with Poetry:

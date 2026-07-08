@@ -42,9 +42,10 @@
             <input name="redirectUri" autocomplete="off" required>
           </label>
           <div class="actions">
+            <button type="button" id="directAuthButton">Open Spotify Login</button>
             <button type="button" id="pairButton">Create Pairing Token</button>
           </div>
-          <pre class="command" id="pairCommand">Save Spotify credentials, then create a pairing token.</pre>
+          <pre class="command" id="pairCommand">For Cloudflare/domain auth, save an HTTPS redirect URI ending in /api/auth/callback, then open Spotify Login. For local setup, create a pairing token.</pre>
         </form>
 
         <form class="panel" id="matrixForm">

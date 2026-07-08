@@ -1,6 +1,7 @@
 const configForm = document.querySelector("#configForm");
 const matrixForm = document.querySelector("#matrixForm");
 const pairButton = document.querySelector("#pairButton");
+const directAuthButton = document.querySelector("#directAuthButton");
 const pairCommand = document.querySelector("#pairCommand");
 const startButton = document.querySelector("#startButton");
 const stopButton = document.querySelector("#stopButton");
@@ -123,6 +124,14 @@ pairButton.addEventListener("click", async () => {
   const session = await api("/api/auth/session", { method: "POST", body: "{}" });
   const origin = window.location.origin;
   setMessage(session.command.replace(`http://<pi-host>:${window.location.port || 3000}`, origin));
+});
+
+directAuthButton.addEventListener("click", async () => {
+  await api("/api/config", {
+    method: "POST",
+    body: JSON.stringify(collectConfig())
+  });
+  window.location.href = "/api/auth/login";
 });
 
 startButton.addEventListener("click", async () => {
