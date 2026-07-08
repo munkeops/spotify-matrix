@@ -29,10 +29,13 @@ COPY src ./src
 COPY spotify_matrix.py requirements.txt ./
 
 RUN poetry config virtualenvs.in-project true \
-    && poetry install --only main --no-ansi \
-    && PIL_INCLUDE="$(poetry run python -c 'import pathlib, PIL; print(pathlib.Path(PIL.__file__).parent)')" \
-    && CFLAGS="-I${PIL_INCLUDE}" poetry run pip install --no-cache-dir git+https://github.com/hzeller/rpi-rgb-led-matrix \
-    && mkdir -p /app/data
+    && poetry install --only main --no-ansi
+
+RUN PIL_INCLUDE="$(poetry run python -c 'import pathlib, PIL; print(pathlib.Path(PIL.__file__).parent)')" \
+    && echo "Using Pillow include path: ${PIL_INCLUDE}" \
+    && CFLAGS="-I${PIL_INCLUDE}" poetry run pip install --no-cache-dir git+https://github.com/hzeller/rpi-rgb-led-matrix
+
+RUN mkdir -p /app/data
 
 ENV PYTHONPATH=/app
 

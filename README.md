@@ -33,6 +33,8 @@ Runtime secrets are stored under `data/`, which is ignored by Git:
 - `data/config.json` - Spotify credentials and matrix settings.
 - `data/spotify_token.json` - Spotify access and refresh token.
 
+The Dockerfile keeps the base Python dependency install and the `rpi-rgb-led-matrix` native binding install in separate layers. If the matrix binding fails to compile, rebuilds can reuse the Poetry dependency layer while debugging the native build step.
+
 ## Hardware feasibility
 
 Docker deployment is possible on Raspberry Pi, but HUB75 matrix output needs direct GPIO access. The Compose service uses `privileged: true` and host networking for that reason.
