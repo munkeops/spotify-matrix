@@ -97,6 +97,13 @@ Start the FastAPI setup service:
 poetry run python -m src.main
 ```
 
+On Raspberry Pi OS releases that only ship Python 3.13, use the same Poetry environment:
+
+```bash
+poetry env use python3
+poetry install --only main
+```
+
 Run the Python renderer without matrix hardware:
 
 ```bash
