@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class SpotifyConfig(BaseModel):
     clientId: str = ""
     clientSecret: str = ""
-    redirectUri: str = "http://127.0.0.1/callback"
+    redirectUri: str = "http://127.0.0.1:8888/callback"
 
 
 class MatrixConfig(BaseModel):

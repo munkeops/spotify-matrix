@@ -34,7 +34,7 @@ function fillForms(config) {
   currentConfig = config;
   configForm.clientId.value = config.spotify.clientId || "";
   configForm.clientSecret.value = config.spotify.clientSecret || "";
-  configForm.redirectUri.value = config.spotify.redirectUri || "http://127.0.0.1/callback";
+  configForm.redirectUri.value = config.spotify.redirectUri || "http://127.0.0.1:8888/callback";
 
   for (const [key, value] of Object.entries(config.matrix)) {
     if (matrixForm[key]) {

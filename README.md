@@ -48,7 +48,7 @@ Spotify requires HTTPS redirect URIs except explicit loopback IPs such as `http:
 1. Add this loopback redirect URI in the Spotify developer dashboard:
 
    ```text
-   http://127.0.0.1/callback
+   http://127.0.0.1:8888/callback
    ```
 
 2. Open the Pi setup UI from your laptop:

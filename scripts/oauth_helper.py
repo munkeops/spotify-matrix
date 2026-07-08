@@ -52,7 +52,7 @@ def exchange_token(client_id: str, client_secret: str, redirect_uri: str, code: 
 
 
 class CallbackServer:
-    def __init__(self, expected_state: str) -> None:
+    def __init__(self, expected_state: str, port: int) -> None:
         self.expected_state = expected_state
         self.code: str | None = None
         self.error: str | None = None
@@ -87,7 +87,7 @@ class CallbackServer:
             def log_message(self, format: str, *args: Any) -> None:
                 return
 
-        self.server = HTTPServer(("127.0.0.1", 0), Handler)
+        self.server = HTTPServer(("127.0.0.1", port), Handler)
         self.redirect_uri = f"http://127.0.0.1:{self.server.server_port}/callback"
 
     def wait_for_code(self) -> str:
@@ -110,12 +110,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Pair Spotify OAuth with a Spotify Matrix Pi.")
     parser.add_argument("--pi", required=True, help="Pi setup UI URL, for example http://raspberrypi.local:3000")
     parser.add_argument("--pairing-token", required=True)
+    parser.add_argument("--callback-port", type=int, default=8888)
     args = parser.parse_args()
 
     pi_url = args.pi.rstrip("/")
     session = request_json(f"{pi_url}/api/auth/session/{urllib.parse.quote(args.pairing_token)}")
     state = secrets.token_urlsafe(18)
-    callback = CallbackServer(state)
+    callback = CallbackServer(state, args.callback_port)
     auth_query = urllib.parse.urlencode(
         {
         'client_id': session['clientId'],
