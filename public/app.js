@@ -1,7 +1,9 @@
 const configForm = document.querySelector("#configForm");
+const displayForm = document.querySelector("#displayForm");
 const matrixForm = document.querySelector("#matrixForm");
 const pairButton = document.querySelector("#pairButton");
 const directAuthButton = document.querySelector("#directAuthButton");
+const uploadImageButton = document.querySelector("#uploadImageButton");
 const pairCommand = document.querySelector("#pairCommand");
 const startButton = document.querySelector("#startButton");
 const stopButton = document.querySelector("#stopButton");
@@ -36,6 +38,11 @@ function fillForms(config) {
   configForm.clientId.value = config.spotify.clientId || "";
   configForm.clientSecret.value = config.spotify.clientSecret || "";
   configForm.redirectUri.value = config.spotify.redirectUri || "http://127.0.0.1:8888/callback";
+  displayForm.displayMode.value = config.runtime.displayMode || (config.runtime.testPattern ? "test_pattern" : "spotify");
+  displayForm.weatherLocation.value = config.weather?.location || "";
+  displayForm.weatherTemperature.value = config.weather?.temperature || "";
+  displayForm.weatherCondition.value = config.weather?.condition || "";
+  displayForm.calendarTitle.value = config.calendar?.title || "";
 
   for (const [key, value] of Object.entries(config.matrix)) {
     if (matrixForm[key]) {
@@ -47,7 +54,7 @@ function fillForms(config) {
     }
   }
   matrixForm.mockOutput.value = config.runtime.mockOutput || "";
-  matrixForm.testPattern.checked = Boolean(config.runtime.testPattern);
+  matrixForm.testPattern.checked = displayForm.displayMode.value === "test_pattern" || Boolean(config.runtime.testPattern);
 }
 
 function collectConfig() {
@@ -73,8 +80,19 @@ function collectConfig() {
       rpm: matrixForm.rpm.value
     },
     runtime: {
+      displayMode: displayForm.displayMode.value,
       mockOutput: matrixForm.mockOutput.value,
-      testPattern: matrixForm.testPattern.checked
+      testPattern: displayForm.displayMode.value === "test_pattern",
+      imagePath: currentConfig?.runtime?.imagePath || ""
+    },
+    weather: {
+      location: displayForm.weatherLocation.value,
+      temperature: displayForm.weatherTemperature.value,
+      condition: displayForm.weatherCondition.value
+    },
+    calendar: {
+      title: displayForm.calendarTitle.value,
+      timezone: currentConfig?.calendar?.timezone || "local"
     }
   };
 }
@@ -103,7 +121,7 @@ async function refreshStatus() {
   statusDot.className = `status-dot ${status.configured ? "ok" : "bad"}`;
   statusTitle.textContent = status.configured ? "Ready" : "Setup needed";
   statusText.textContent = status.configured
-    ? "Spotify credentials and token are ready."
+    ? `${displayForm.displayMode.options[displayForm.displayMode.selectedIndex].text} mode is ready.`
     : `Missing: ${status.missing.join(", ")}`;
 
   tokenState.textContent = status.token.present
@@ -118,7 +136,37 @@ async function refreshStatus() {
 }
 
 configForm.addEventListener("submit", saveConfig);
+displayForm.addEventListener("submit", saveConfig);
 matrixForm.addEventListener("submit", saveConfig);
+
+displayForm.displayMode.addEventListener("change", () => {
+  matrixForm.testPattern.checked = displayForm.displayMode.value === "test_pattern";
+});
+
+matrixForm.testPattern.addEventListener("change", () => {
+  displayForm.displayMode.value = matrixForm.testPattern.checked ? "test_pattern" : "spotify";
+});
+
+uploadImageButton.addEventListener("click", async () => {
+  const file = displayForm.displayImage.files[0];
+  if (!file) {
+    setMessage("Choose an image file first.");
+    return;
+  }
+  const response = await fetch("/api/display/image", {
+    method: "POST",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || payload.detail || payload.message || "Image upload failed");
+  }
+  await refreshConfig();
+  displayForm.displayMode.value = "image";
+  setMessage(`Image uploaded to ${payload.imagePath}. Save or start the matrix in image mode.`);
+  await refreshStatus();
+});
 
 pairButton.addEventListener("click", async () => {
   const session = await api("/api/auth/session", { method: "POST", body: "{}" });

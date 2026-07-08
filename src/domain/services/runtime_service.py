@@ -98,6 +98,18 @@ class RuntimeService:
             str(matrix.fps),
             "--rpm",
             str(matrix.rpm),
+            "--display-mode",
+            "test_pattern" if config.runtime.testPattern else config.runtime.displayMode,
+            "--image-path",
+            config.runtime.imagePath,
+            "--weather-location",
+            config.weather.location,
+            "--weather-temperature",
+            config.weather.temperature,
+            "--weather-condition",
+            config.weather.condition,
+            "--calendar-title",
+            config.calendar.title,
             "--no-browser",
         ]
         if matrix.noHardwarePulse:

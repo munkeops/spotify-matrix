@@ -32,6 +32,7 @@ Runtime secrets are stored under `data/`, which is ignored by Git:
 
 - `data/config.json` - Spotify credentials and matrix settings.
 - `data/spotify_token.json` - Spotify access and refresh token.
+- `data/uploaded_image.png` - Optional image used by uploaded image display mode.
 
 The Dockerfile keeps the base Python dependency install and the `rpi-rgb-led-matrix` native binding install in separate layers. If the matrix binding fails to compile, rebuilds can reuse the Poetry dependency layer while debugging the native build step.
 
@@ -108,6 +109,18 @@ https://spotify-matrix.example.com/api/auth/callback
 Save the same HTTPS callback in the setup UI's Redirect URI field, then click **Open Spotify Login**. Spotify will redirect back through Cloudflare to `/api/auth/callback`, and the refresh token will be saved under `data/spotify_token.json`.
 
 The laptop helper flow remains available for local setup without a domain.
+
+## Display modes
+
+The setup UI can switch the matrix runtime between:
+
+- `Spotify` - album art record display using the saved Spotify token.
+- `Uploaded image` - static image saved under the persistent `data/` volume.
+- `Calendar` - local date and time display.
+- `Weather` - manually configured weather text.
+- `Test pattern` - moving color bars for panel checks.
+
+Weather mode is intentionally manual for now; adding a live weather provider requires choosing an API and storing its credential in the same persistent config flow.
 
 ## Portainer
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -30,14 +30,29 @@ class MatrixConfig(BaseModel):
 
 
 class RuntimeConfig(BaseModel):
+    displayMode: Literal["spotify", "image", "calendar", "weather", "test_pattern"] = "spotify"
     mockOutput: str = ""
     testPattern: bool = False
+    imagePath: str = ""
+
+
+class WeatherConfig(BaseModel):
+    location: str = ""
+    temperature: str = ""
+    condition: str = ""
+
+
+class CalendarConfig(BaseModel):
+    title: str = ""
+    timezone: str = "local"
 
 
 class AppConfig(BaseModel):
     spotify: SpotifyConfig = Field(default_factory=SpotifyConfig)
     matrix: MatrixConfig = Field(default_factory=MatrixConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
+    weather: WeatherConfig = Field(default_factory=WeatherConfig)
+    calendar: CalendarConfig = Field(default_factory=CalendarConfig)
 
 
 class TokenStatus(BaseModel):
@@ -98,6 +113,10 @@ class TokenRequest(BaseModel):
 class TokenSaveResponse(BaseModel):
     ok: bool
     token: TokenStatus
+
+
+class ImageUploadResponse(BaseModel):
+    imagePath: str
 
 
 class RuntimeActionResponse(BaseModel):

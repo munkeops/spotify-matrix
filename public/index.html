@@ -12,7 +12,7 @@
         <div>
           <p class="eyebrow">Raspberry Pi controller</p>
           <h1>Spotify Matrix</h1>
-          <p class="lede">Configure Spotify, pair OAuth from your laptop, and run the HUB75 display service from one local UI.</p>
+          <p class="lede">Configure display modes, Spotify auth, and the HUB75 runtime from one local UI.</p>
         </div>
         <div class="status-panel" id="statusPanel">
           <span class="status-dot" id="statusDot"></span>
@@ -24,6 +24,40 @@
       </section>
 
       <section class="grid">
+        <form class="panel" id="displayForm">
+          <div class="panel-heading">
+            <h2>Display</h2>
+            <button type="submit">Save</button>
+          </div>
+          <label>
+            Mode
+            <select name="displayMode">
+              <option value="spotify">Spotify</option>
+              <option value="image">Uploaded image</option>
+              <option value="calendar">Calendar</option>
+              <option value="weather">Weather</option>
+              <option value="test_pattern">Test pattern</option>
+            </select>
+          </label>
+          <label>
+            Upload image
+            <input name="displayImage" type="file" accept="image/*">
+          </label>
+          <button type="button" class="secondary" id="uploadImageButton">Upload Image</button>
+          <div class="split">
+            <label>Weather location <input name="weatherLocation" autocomplete="off"></label>
+            <label>Temperature <input name="weatherTemperature" autocomplete="off" placeholder="72F"></label>
+          </div>
+          <label>
+            Weather condition
+            <input name="weatherCondition" autocomplete="off" placeholder="Clear">
+          </label>
+          <label>
+            Calendar title
+            <input name="calendarTitle" autocomplete="off" placeholder="Today">
+          </label>
+        </form>
+
         <form class="panel" id="configForm">
           <div class="panel-heading">
             <h2>Spotify</h2>

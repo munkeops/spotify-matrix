@@ -164,6 +164,28 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         attr_name = attr_names.get(config_name, config_name)
         setattr(args, attr_name, caster(value))
 
+    runtime = config.get("runtime", {})
+    if isinstance(runtime, dict):
+        if "--display-mode" not in sys.argv[1:] and runtime.get("displayMode"):
+            args.display_mode = str(runtime["displayMode"])
+        if "--image-path" not in sys.argv[1:] and runtime.get("imagePath"):
+            args.image_path = str(runtime["imagePath"])
+        if runtime.get("testPattern"):
+            args.display_mode = "test_pattern"
+
+    weather = config.get("weather", {})
+    if isinstance(weather, dict):
+        if "--weather-location" not in sys.argv[1:]:
+            args.weather_location = str(weather.get("location") or args.weather_location)
+        if "--weather-temperature" not in sys.argv[1:]:
+            args.weather_temperature = str(weather.get("temperature") or args.weather_temperature)
+        if "--weather-condition" not in sys.argv[1:]:
+            args.weather_condition = str(weather.get("condition") or args.weather_condition)
+
+    calendar = config.get("calendar", {})
+    if isinstance(calendar, dict) and "--calendar-title" not in sys.argv[1:]:
+        args.calendar_title = str(calendar.get("title") or args.calendar_title)
+
 
 def spotify_credentials(config: dict[str, Any]) -> tuple[str | None, str | None, str]:
     client_id = (
@@ -564,6 +586,62 @@ def render_test_pattern(size: int, offset: int) -> Image.Image:
     return frame
 
 
+def render_centered_lines(size: int, lines: list[str], accent: tuple[int, int, int]) -> Image.Image:
+    frame = Image.new("RGB", (size, size), (0, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    font = ImageDraw.load_default()
+    clean_lines = [line for line in lines if line]
+    if not clean_lines:
+        clean_lines = ["--"]
+
+    line_height = 10
+    total_height = len(clean_lines) * line_height
+    y = max(1, (size - total_height) // 2)
+    for index, line in enumerate(clean_lines):
+        text = line[:12]
+        bbox = draw.textbbox((0, 0), text, font=font)
+        x = max(0, (size - (bbox[2] - bbox[0])) // 2)
+        color = accent if index == 0 else (230, 230, 220)
+        draw.text((x, y), text, fill=color, font=font)
+        y += line_height
+    return frame
+
+
+def render_calendar(size: int, title: str = "") -> Image.Image:
+    now = time.localtime()
+    return render_centered_lines(
+        size,
+        [
+            title or time.strftime("%a", now),
+            time.strftime("%b %d", now),
+            time.strftime("%I:%M", now).lstrip("0"),
+        ],
+        (110, 231, 168),
+    )
+
+
+def render_weather(size: int, location: str, temperature: str, condition: str) -> Image.Image:
+    return render_centered_lines(
+        size,
+        [
+            location or "Weather",
+            temperature or "--",
+            condition or "Set in UI",
+        ],
+        (96, 165, 250),
+    )
+
+
+def render_uploaded_image(path: str, size: int) -> Image.Image:
+    if not path:
+        return render_centered_lines(size, ["No image", "uploaded"], (248, 113, 113))
+    try:
+        with Image.open(path) as image:
+            return ImageOps.fit(image.convert("RGB"), (size, size), method=Image.Resampling.LANCZOS)
+    except Exception:
+        return render_centered_lines(size, ["Image", "failed"], (248, 113, 113))
+
+
 def poll_spotify(
     spotify: SpotifyClient,
     state: SharedPlaybackState,
@@ -618,6 +696,93 @@ def run(args: argparse.Namespace) -> None:
     config = load_json_config(args.config_path)
     apply_config_defaults(args, config)
 
+    if args.auth_only:
+        client_id, client_secret, redirect_uri = spotify_credentials(config)
+        missing = [
+            name
+            for name, value in (
+                ("Spotify Client ID", client_id),
+                ("Spotify Client Secret", client_secret),
+                ("Spotify Redirect URI", redirect_uri),
+            )
+            if not value
+        ]
+        if missing:
+            raise SystemExit(
+                "Missing required Spotify configuration values: "
+                f"{', '.join(missing)}. Add them through the setup UI or environment."
+            )
+        spotify = SpotifyClient(
+            client_id=client_id or "",
+            client_secret=client_secret or "",
+            redirect_uri=redirect_uri,
+            token_cache=args.token_cache,
+            open_browser=not args.no_browser,
+        )
+        spotify.authorize()
+        print(f"Spotify token cached at {args.token_cache}")
+        return
+
+    display: MatrixDisplay | MockDisplay
+    if args.mock_output:
+        display = MockDisplay(args.mock_output)
+    else:
+        display = MatrixDisplay(args)
+
+    size = min(args.rows, args.cols)
+
+    if args.display_mode == "test_pattern" or args.test_pattern:
+        try:
+            offset = 0
+            while True:
+                display.show(render_test_pattern(size, offset))
+                offset = (offset + 1) % size
+                time.sleep(1.0 / args.fps)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            display.clear()
+        return
+
+    if args.display_mode == "image":
+        try:
+            while True:
+                display.show(render_uploaded_image(args.image_path, size))
+                if args.once:
+                    break
+                time.sleep(1.0)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            display.clear()
+        return
+
+    if args.display_mode == "calendar":
+        try:
+            while True:
+                display.show(render_calendar(size, args.calendar_title))
+                if args.once:
+                    break
+                time.sleep(1.0)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            display.clear()
+        return
+
+    if args.display_mode == "weather":
+        try:
+            while True:
+                display.show(render_weather(size, args.weather_location, args.weather_temperature, args.weather_condition))
+                if args.once:
+                    break
+                time.sleep(30.0)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            display.clear()
+        return
+
     client_id, client_secret, redirect_uri = spotify_credentials(config)
 
     missing = [
@@ -642,32 +807,6 @@ def run(args: argparse.Namespace) -> None:
         token_cache=args.token_cache,
         open_browser=not args.no_browser,
     )
-
-    if args.auth_only:
-        spotify.authorize()
-        print(f"Spotify token cached at {args.token_cache}")
-        return
-
-    display: MatrixDisplay | MockDisplay
-    if args.mock_output:
-        display = MockDisplay(args.mock_output)
-    else:
-        display = MatrixDisplay(args)
-
-    size = min(args.rows, args.cols)
-
-    if args.test_pattern:
-        try:
-            offset = 0
-            while True:
-                display.show(render_test_pattern(size, offset))
-                offset = (offset + 1) % size
-                time.sleep(1.0 / args.fps)
-        except KeyboardInterrupt:
-            pass
-        finally:
-            display.clear()
-        return
 
     idle = render_idle(size)
     playback_state = SharedPlaybackState()
@@ -748,6 +887,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rpm", type=positive_float, default=20.0)
     parser.add_argument("--config-path", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--token-cache", type=Path, default=DEFAULT_TOKEN_CACHE)
+    parser.add_argument(
+        "--display-mode",
+        choices=("spotify", "image", "calendar", "weather", "test_pattern"),
+        default="spotify",
+        help="Matrix content mode.",
+    )
+    parser.add_argument("--image-path", default="", help="Image file to show in image display mode.")
+    parser.add_argument("--weather-location", default="", help="Weather mode location label.")
+    parser.add_argument("--weather-temperature", default="", help="Weather mode temperature label.")
+    parser.add_argument("--weather-condition", default="", help="Weather mode condition label.")
+    parser.add_argument("--calendar-title", default="", help="Calendar mode top-line label.")
     parser.add_argument("--mock-output", type=Path, help="Write the current frame PNG instead of using RGB matrix hardware.")
     parser.add_argument("--preview-frames", type=Path, help="Render sample spinning-album-art disk frames and exit.")
     parser.add_argument("--auth-only", action="store_true", help="Authorize Spotify, cache the token, and exit without using the matrix.")

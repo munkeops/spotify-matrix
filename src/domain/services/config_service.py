@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import os
 import time
+from io import BytesIO
 from pathlib import Path
 from typing import Any
+
+from PIL import Image
 
 from configs import base_config
 from src.domain.models.api_schemas import AppConfig, TokenStatus
@@ -56,13 +59,34 @@ class ConfigService:
 
     def missing_values(self, config: AppConfig) -> list[str]:
         missing = []
-        if not config.spotify.clientId:
-            missing.append("Spotify Client ID")
-        if not config.spotify.clientSecret:
-            missing.append("Spotify Client Secret")
-        if not self.token_status().hasRefreshToken:
-            missing.append("Spotify refresh token")
+        if config.runtime.testPattern:
+            return missing
+        if config.runtime.displayMode == "spotify":
+            if not config.spotify.clientId:
+                missing.append("Spotify Client ID")
+            if not config.spotify.clientSecret:
+                missing.append("Spotify Client Secret")
+            if not self.token_status().hasRefreshToken:
+                missing.append("Spotify refresh token")
+        if config.runtime.displayMode == "image" and not config.runtime.imagePath:
+            missing.append("Uploaded image")
         return missing
+
+    def save_display_image(self, content: bytes) -> str:
+        try:
+            image = Image.open(BytesIO(content)).convert("RGB")
+        except Exception as exc:
+            raise ValueError("Upload must be a readable image file.") from exc
+
+        target = self.data_dir / "uploaded_image.png"
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        image.save(target)
+
+        config = self.get_config()
+        config.runtime.imagePath = str(target)
+        config.runtime.displayMode = "image"
+        self.save_config(config)
+        return str(target)
 
     def _read_json(self, path: Path, fallback: Any) -> Any:
         try:
