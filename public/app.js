@@ -327,6 +327,8 @@ function fillForms(config) {
   });
   fillPanel(weatherPanel, {
     weatherLabel: config.weather?.label || "Local weather",
+    weatherPostalCode: config.weather?.postalCode || "",
+    weatherCountryCode: config.weather?.countryCode || "US",
     weatherLatitude: config.weather?.latitude ?? "",
     weatherLongitude: config.weather?.longitude ?? "",
     weatherTemperatureUnit: config.weather?.temperatureUnit || "fahrenheit",
@@ -383,6 +385,8 @@ function collectConfig(modeOverride = null) {
     },
     weather: {
       label: fieldValue(weatherPanel, "weatherLabel", "Local weather") || "Local weather",
+      postalCode: fieldValue(weatherPanel, "weatherPostalCode", ""),
+      countryCode: fieldValue(weatherPanel, "weatherCountryCode", "US"),
       latitude: fieldValue(weatherPanel, "weatherLatitude") === "" ? null : Number(fieldValue(weatherPanel, "weatherLatitude")),
       longitude: fieldValue(weatherPanel, "weatherLongitude") === "" ? null : Number(fieldValue(weatherPanel, "weatherLongitude")),
       temperatureUnit: fieldValue(weatherPanel, "weatherTemperatureUnit", "fahrenheit"),

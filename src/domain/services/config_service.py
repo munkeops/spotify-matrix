@@ -57,10 +57,9 @@ class ConfigService:
     def missing_values(self, config: AppConfig) -> list[str]:
         missing = []
         if config.display.mode == "weather":
-            if config.weather.latitude is None:
-                missing.append("Weather latitude")
-            if config.weather.longitude is None:
-                missing.append("Weather longitude")
+            has_coordinates = config.weather.latitude is not None and config.weather.longitude is not None
+            if not config.weather.postalCode and not has_coordinates:
+                missing.append("Weather ZIP/postal code or coordinates")
             return missing
         if config.display.mode != "spotify":
             return missing

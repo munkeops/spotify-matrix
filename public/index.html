@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260709f">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260709g">
   </head>
   <body>
     <main class="app-frame">
@@ -327,11 +327,13 @@
           <div class="weather-config-layout">
             <div class="form-grid weather-settings-grid">
               <label>Location label <input name="weatherLabel" placeholder="Home"></label>
-              <label>Latitude <input name="weatherLatitude" type="number" step="0.0001" placeholder="41.8781"></label>
-              <label>Longitude <input name="weatherLongitude" type="number" step="0.0001" placeholder="-87.6298"></label>
+              <label>ZIP / postal code <input name="weatherPostalCode" inputmode="text" placeholder="60601"></label>
+              <label>Country <select name="weatherCountryCode"><option value="US">United States</option><option value="CA">Canada</option><option value="GB">United Kingdom</option><option value="IN">India</option></select></label>
               <label>Temperature unit <select name="weatherTemperatureUnit"><option value="fahrenheit">Fahrenheit</option><option value="celsius">Celsius</option></select></label>
               <label>Face accessory <select name="weatherFaceAccessory"><option value="auto">Auto</option><option value="none">None</option><option value="sunglasses">Sunglasses</option><option value="umbrella">Umbrella</option></select></label>
               <label>Refresh minutes <input name="weatherRefreshMinutes" type="number" min="5" max="120" step="1"></label>
+              <label>Latitude override <input name="weatherLatitude" type="number" step="0.0001" placeholder="Optional"></label>
+              <label>Longitude override <input name="weatherLongitude" type="number" step="0.0001" placeholder="Optional"></label>
             </div>
             <div class="weather-preview-large" aria-hidden="true">
               <span class="weather-sun"></span>
@@ -357,6 +359,6 @@
       </form>
     </dialog>
 
-    <script src="/app.js?v=assistant-20260709f"></script>
+              <script src="/app.js?v=assistant-20260709g"></script>
   </body>
 </html>

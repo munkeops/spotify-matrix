@@ -53,6 +53,8 @@ class AgentConfig(BaseModel):
 
 class WeatherConfig(BaseModel):
     label: str = "Local weather"
+    postalCode: str = ""
+    countryCode: str = "US"
     latitude: float | None = None
     longitude: float | None = None
     temperatureUnit: Literal["fahrenheit", "celsius"] = "fahrenheit"

@@ -38,7 +38,7 @@ CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 SCOPE = "user-read-currently-playing"
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SPOTIFY_MATRIX_CONFIG", "data/config.json"))
 DEFAULT_TOKEN_CACHE = Path(os.environ.get("SPOTIFY_TOKEN_CACHE", "data/spotify_token.json"))
-WEATHER_SLIDE_SECONDS = 4
+WEATHER_SLIDE_SECONDS = 8
 
 
 @dataclass
@@ -227,6 +227,8 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
 
     weather_fields = {
         "label": ("weather_label", str),
+        "postalCode": ("weather_postal_code", str),
+        "countryCode": ("weather_country_code", str),
         "latitude": ("weather_latitude", float),
         "longitude": ("weather_longitude", float),
         "temperatureUnit": ("weather_temperature_unit", str),
@@ -235,6 +237,8 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
     }
     weather_flags = {
         "label": ("--weather-label",),
+        "postalCode": ("--weather-postal-code",),
+        "countryCode": ("--weather-country-code",),
         "latitude": ("--weather-latitude",),
         "longitude": ("--weather-longitude",),
         "temperatureUnit": ("--weather-temperature-unit",),
@@ -841,16 +845,45 @@ def weather_summary(code: int | None, precipitation: float, snowfall: float) -> 
     return "weather"
 
 
+def resolve_weather_location(args: argparse.Namespace) -> tuple[float, float, str]:
+    if args.weather_latitude is not None and args.weather_longitude is not None:
+        return args.weather_latitude, args.weather_longitude, args.weather_label
+    if not args.weather_postal_code:
+        raise RuntimeError("Weather mode needs a ZIP/postal code or latitude and longitude.")
+
+    country_code = (args.weather_country_code or "US").strip().lower()
+    postal_code = urllib.parse.quote(str(args.weather_postal_code).strip())
+    response = http_request(
+        "GET",
+        f"https://api.zippopotam.us/{country_code}/{postal_code}",
+        timeout=10,
+    )
+    if response.status != 200:
+        raise_http_error(response, "Postal code lookup")
+    payload = response.json()
+    places = payload.get("places") or []
+    if not places:
+        raise RuntimeError(f"No location found for postal code {args.weather_postal_code}.")
+    place = places[0]
+    latitude = float(place["latitude"])
+    longitude = float(place["longitude"])
+    label = args.weather_label
+    if label == "Local weather":
+        city = place.get("place name")
+        region = place.get("state abbreviation") or place.get("state")
+        label = ", ".join(part for part in (city, region) if part) or label
+    return latitude, longitude, label
+
+
 def fetch_weather(args: argparse.Namespace) -> WeatherState:
-    if args.weather_latitude is None or args.weather_longitude is None:
-        raise RuntimeError("Weather mode needs latitude and longitude.")
+    latitude, longitude, label = resolve_weather_location(args)
 
     response = http_request(
         "GET",
         "https://api.open-meteo.com/v1/forecast",
         params={
-            "latitude": str(args.weather_latitude),
-            "longitude": str(args.weather_longitude),
+            "latitude": str(latitude),
+            "longitude": str(longitude),
             "current": "temperature_2m,apparent_temperature,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,wind_speed_10m",
             "daily": "uv_index_max",
             "temperature_unit": args.weather_temperature_unit,
@@ -878,7 +911,7 @@ def fetch_weather(args: argparse.Namespace) -> WeatherState:
         snowfall=float(current.get("snowfall") or 0),
         cloud_cover=float(current.get("cloud_cover") or 0),
         wind_speed=float(current.get("wind_speed_10m") or 0),
-        label=args.weather_label,
+        label=label,
     )
     state.summary = weather_summary(state.weather_code, state.precipitation + state.rain, state.snowfall)
     try:
@@ -886,8 +919,8 @@ def fetch_weather(args: argparse.Namespace) -> WeatherState:
             "GET",
             "https://air-quality-api.open-meteo.com/v1/air-quality",
             params={
-                "latitude": str(args.weather_latitude),
-                "longitude": str(args.weather_longitude),
+                "latitude": str(latitude),
+                "longitude": str(longitude),
                 "current": "uv_index,us_aqi",
                 "timezone": "auto",
                 "forecast_days": "1",
@@ -1371,6 +1404,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--agent-face-style", choices=("classic", "wide", "sleepy", "happy", "cool"), default="classic")
     parser.add_argument("--agent-animation-speed", choices=("slow", "normal", "fast"), default="normal")
     parser.add_argument("--weather-label", default="Local weather")
+    parser.add_argument("--weather-postal-code", default="")
+    parser.add_argument("--weather-country-code", default="US")
     parser.add_argument("--weather-latitude", type=float)
     parser.add_argument("--weather-longitude", type=float)
     parser.add_argument("--weather-temperature-unit", choices=("fahrenheit", "celsius"), default="fahrenheit")
