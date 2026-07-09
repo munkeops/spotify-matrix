@@ -3,16 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Spotify Matrix Setup</title>
+    <title>Spotify Matrix</title>
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
     <main class="shell">
-      <section class="hero">
+      <section class="topbar">
         <div>
           <p class="eyebrow">Raspberry Pi controller</p>
           <h1>Spotify Matrix</h1>
-          <p class="lede">Configure display modes, Spotify auth, and the HUB75 runtime from one local UI.</p>
         </div>
         <div class="status-panel" id="statusPanel">
           <span class="status-dot" id="statusDot"></span>
@@ -23,122 +22,150 @@
         </div>
       </section>
 
-      <section class="grid">
-        <form class="panel" id="displayForm">
-          <div class="panel-heading">
-            <h2>Display</h2>
-            <button type="submit">Save</button>
-          </div>
-          <label>
-            Mode
-            <select name="displayMode">
-              <option value="spotify">Spotify</option>
-              <option value="image">Uploaded image</option>
-              <option value="calendar">Calendar</option>
-              <option value="weather">Weather</option>
-              <option value="test_pattern">Test pattern</option>
-            </select>
-          </label>
-          <label>
-            Upload image
-            <input name="displayImage" type="file" accept="image/*">
-          </label>
-          <button type="button" class="secondary" id="uploadImageButton">Upload Image</button>
-          <div class="split">
-            <label>Weather location <input name="weatherLocation" autocomplete="off"></label>
-            <label>Temperature <input name="weatherTemperature" autocomplete="off" placeholder="72F"></label>
-          </div>
-          <label>
-            Weather condition
-            <input name="weatherCondition" autocomplete="off" placeholder="Clear">
-          </label>
-          <label>
-            Calendar title
-            <input name="calendarTitle" autocomplete="off" placeholder="Today">
-          </label>
-        </form>
+      <section class="workspace">
+        <aside class="sidebar">
+          <button class="mode-tab active" type="button" data-mode="spotify">
+            <span>Spotify</span>
+            <small>Album art</small>
+          </button>
+          <button class="mode-tab" type="button" data-mode="image">
+            <span>Image</span>
+            <small>Upload file</small>
+          </button>
+          <button class="mode-tab" type="button" data-mode="calendar">
+            <span>Calendar</span>
+            <small>Date and time</small>
+          </button>
+          <button class="mode-tab" type="button" data-mode="weather">
+            <span>Weather</span>
+            <small>Quick text</small>
+          </button>
+          <button class="mode-tab" type="button" data-mode="test_pattern">
+            <span>Test</span>
+            <small>Panel check</small>
+          </button>
+        </aside>
 
-        <form class="panel" id="configForm">
-          <div class="panel-heading">
-            <h2>Spotify</h2>
-            <button type="submit">Save</button>
-          </div>
-          <label>
-            Client ID
-            <input name="clientId" autocomplete="off" required>
-          </label>
-          <label>
-            Client Secret
-            <input name="clientSecret" type="password" autocomplete="off" placeholder="Leave masked value to keep existing secret">
-          </label>
-          <label>
-            Redirect URI
-            <input name="redirectUri" autocomplete="off" required>
-          </label>
-          <div class="actions">
-            <button type="button" id="directAuthButton">Open Spotify Login</button>
-            <button type="button" id="pairButton">Create Pairing Token</button>
-          </div>
-          <pre class="command" id="pairCommand">For Cloudflare/domain auth, save an HTTPS redirect URI ending in /api/auth/callback, then open Spotify Login. For local setup, create a pairing token.</pre>
-        </form>
-
-        <form class="panel" id="matrixForm">
-          <div class="panel-heading">
-            <h2>Matrix</h2>
-            <button type="submit">Save</button>
-          </div>
-          <div class="split">
-            <label>Rows <input name="rows" type="number" min="1"></label>
-            <label>Cols <input name="cols" type="number" min="1"></label>
-          </div>
-          <div class="split">
-            <label>Chain <input name="chainLength" type="number" min="1"></label>
-            <label>Parallel <input name="parallel" type="number" min="1"></label>
-          </div>
-          <div class="split">
-            <label>Brightness <input name="brightness" type="number" min="1" max="100"></label>
-            <label>GPIO slowdown <input name="gpioSlowdown" type="number" min="0" max="10"></label>
-          </div>
-          <label>
-            Hardware mapping
-            <input name="hardwareMapping" autocomplete="off">
-          </label>
-          <div class="split">
-            <label>PWM bits <input name="pwmBits" type="number" min="1" max="11"></label>
-            <label>Refresh cap <input name="limitRefreshRateHz" type="number" min="1"></label>
-          </div>
-          <div class="split">
-            <label>Poll seconds <input name="pollSeconds" type="number" min="0.1" step="0.1"></label>
-            <label>FPS <input name="fps" type="number" min="1" step="0.1"></label>
-          </div>
-          <div class="split">
-            <label>RPM <input name="rpm" type="number" min="1" step="0.1"></label>
-            <label>Mock output <input name="mockOutput" placeholder="Optional PNG path"></label>
-          </div>
-          <label class="check">
-            <input name="noHardwarePulse" type="checkbox">
-            Disable hardware pulsing
-          </label>
-          <label class="check">
-            <input name="testPattern" type="checkbox">
-            Run test pattern
-          </label>
-        </form>
-
-        <section class="panel runtime-panel">
-          <div class="panel-heading">
-            <h2>Runtime</h2>
+        <section class="mode-surface">
+          <div class="mode-header">
+            <div>
+              <h2 id="modeTitle">Spotify</h2>
+              <p id="modeSubtitle">Album art record display</p>
+            </div>
             <span id="runtimePill" class="pill">Stopped</span>
           </div>
-          <div class="runtime-actions">
-            <button id="startButton" type="button">Start Matrix</button>
-            <button id="stopButton" type="button" class="secondary">Stop</button>
-          </div>
-          <dl>
-            <div><dt>Token</dt><dd id="tokenState">Unknown</dd></div>
-            <div><dt>Data</dt><dd id="dataDir">Unknown</dd></div>
-            <div><dt>Process</dt><dd id="processState">Unknown</dd></div>
-          </dl>
+
+          <section class="mode-panel active" data-panel="spotify">
+            <div class="form-grid">
+              <label>
+                Client ID
+                <input id="clientId" autocomplete="off">
+              </label>
+              <label>
+                Client Secret
+                <input id="clientSecret" type="password" autocomplete="off" placeholder="Leave masked value to keep existing secret">
+              </label>
+              <label class="wide">
+                Redirect URI
+                <input id="redirectUri" autocomplete="off">
+              </label>
+            </div>
+            <div class="actions">
+              <button type="button" id="directAuthButton">Open Spotify Login</button>
+              <button type="button" id="pairButton" class="secondary">Create Pairing Token</button>
+            </div>
+          </section>
+
+          <section class="mode-panel" data-panel="image">
+            <div class="image-drop">
+              <div>
+                <strong>Upload a matrix image</strong>
+                <p id="imageStatus">No upload selected.</p>
+              </div>
+              <input id="displayImage" type="file" accept="image/*">
+              <button type="button" id="uploadImageButton">Upload Image</button>
+            </div>
+          </section>
+
+          <section class="mode-panel" data-panel="calendar">
+            <div class="form-grid">
+              <label>
+                Calendar title
+                <input id="calendarTitle" autocomplete="off" placeholder="Today">
+              </label>
+            </div>
+          </section>
+
+          <section class="mode-panel" data-panel="weather">
+            <div class="form-grid">
+              <label>
+                Location
+                <input id="weatherLocation" autocomplete="off" placeholder="Dallas">
+              </label>
+              <label>
+                Temperature
+                <input id="weatherTemperature" autocomplete="off" placeholder="72F">
+              </label>
+              <label class="wide">
+                Condition
+                <input id="weatherCondition" autocomplete="off" placeholder="Clear">
+              </label>
+            </div>
+          </section>
+
+          <section class="mode-panel" data-panel="test_pattern">
+            <div class="test-card">
+              <strong>Panel test mode</strong>
+              <p>Shows moving color bars using the current matrix settings.</p>
+            </div>
+          </section>
+
+          <section class="preview-panel">
+            <div class="matrix-preview" id="matrixPreview">
+              <div class="preview-record"></div>
+              <div class="preview-text">
+                <strong id="previewTitle">Spotify</strong>
+                <span id="previewDetail">Waiting for playback</span>
+              </div>
+            </div>
+            <div class="runtime-actions">
+              <button type="button" id="saveButton">Save Mode</button>
+              <button type="button" id="saveStartButton">Save & Start</button>
+              <button type="button" id="stopButton" class="secondary">Stop</button>
+            </div>
+          </section>
+
+          <details class="advanced">
+            <summary>Matrix hardware</summary>
+            <div class="form-grid compact">
+              <label>Rows <input id="rows" type="number" min="1"></label>
+              <label>Cols <input id="cols" type="number" min="1"></label>
+              <label>Chain <input id="chainLength" type="number" min="1"></label>
+              <label>Parallel <input id="parallel" type="number" min="1"></label>
+              <label>Brightness <input id="brightness" type="number" min="1" max="100"></label>
+              <label>GPIO slowdown <input id="gpioSlowdown" type="number" min="0" max="10"></label>
+              <label>Hardware mapping <input id="hardwareMapping" autocomplete="off"></label>
+              <label>PWM bits <input id="pwmBits" type="number" min="1" max="11"></label>
+              <label>Refresh cap <input id="limitRefreshRateHz" type="number" min="1"></label>
+              <label>Poll seconds <input id="pollSeconds" type="number" min="0.1" step="0.1"></label>
+              <label>FPS <input id="fps" type="number" min="1" step="0.1"></label>
+              <label>RPM <input id="rpm" type="number" min="1" step="0.1"></label>
+              <label class="wide">Mock output <input id="mockOutput" placeholder="Optional PNG path"></label>
+              <label class="check wide">
+                <input id="noHardwarePulse" type="checkbox">
+                Disable hardware pulsing
+              </label>
+            </div>
+          </details>
+
+          <section class="runtime-details">
+            <dl>
+              <div><dt>Token</dt><dd id="tokenState">Unknown</dd></div>
+              <div><dt>Data</dt><dd id="dataDir">Unknown</dd></div>
+              <div><dt>Process</dt><dd id="processState">Unknown</dd></div>
+            </dl>
+            <pre class="command" id="pairCommand">Ready.</pre>
+          </section>
         </section>
       </section>
     </main>
