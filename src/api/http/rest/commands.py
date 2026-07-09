@@ -16,8 +16,8 @@ async def run_command(body: CommandRequest) -> CommandResponse:
     config = config_service.get_config()
 
     if body.command == "set_mode":
-        if body.value not in {"spotify", "clock", "agent", "testPattern"}:
-            raise ValueError("Mode must be spotify, clock, agent, or testPattern.")
+        if body.value not in {"spotify", "clock", "agent", "weather", "testPattern"}:
+            raise ValueError("Mode must be spotify, clock, agent, weather, or testPattern.")
         config.display.mode = str(body.value)
         config.runtime.testPattern = body.value == "testPattern"
         config_service.save_config(config)

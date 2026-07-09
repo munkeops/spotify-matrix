@@ -7,6 +7,7 @@ const spotifyPanel = document.querySelector("#spotifyPanel");
 const matrixPanel = document.querySelector("#matrixPanel");
 const clockPanel = document.querySelector("#clockPanel");
 const agentPanel = document.querySelector("#agentPanel");
+const weatherPanel = document.querySelector("#weatherPanel");
 const advancedPanel = document.querySelector("#advancedPanel");
 const pluginDialog = document.querySelector("#pluginDialog");
 const closeDialogButton = document.querySelector("#closeDialogButton");
@@ -179,6 +180,7 @@ const pluginLabels = {
   spotify: "Spotify",
   clock: "Clock",
   agent: "Agent Face",
+  weather: "Weather",
   testPattern: "Test Pattern"
 };
 
@@ -322,6 +324,14 @@ function fillForms(config) {
     agentFaceStyle: config.agent?.faceStyle || "classic",
     agentAnimationSpeed: config.agent?.animationSpeed || "normal"
   });
+  fillPanel(weatherPanel, {
+    weatherLabel: config.weather?.label || "Local weather",
+    weatherLatitude: config.weather?.latitude ?? "",
+    weatherLongitude: config.weather?.longitude ?? "",
+    weatherTemperatureUnit: config.weather?.temperatureUnit || "fahrenheit",
+    weatherFaceAccessory: config.weather?.faceAccessory || "auto",
+    weatherRefreshMinutes: config.weather?.refreshMinutes || 15
+  });
   fillPanel(advancedPanel, {
     mockOutput: config.runtime?.mockOutput || "",
     testPattern: Boolean(config.runtime?.testPattern)
@@ -368,6 +378,14 @@ function collectConfig(modeOverride = null) {
     agent: {
       faceStyle: fieldValue(agentPanel, "agentFaceStyle", "classic"),
       animationSpeed: fieldValue(agentPanel, "agentAnimationSpeed", "normal")
+    },
+    weather: {
+      label: fieldValue(weatherPanel, "weatherLabel", "Local weather") || "Local weather",
+      latitude: fieldValue(weatherPanel, "weatherLatitude") === "" ? null : Number(fieldValue(weatherPanel, "weatherLatitude")),
+      longitude: fieldValue(weatherPanel, "weatherLongitude") === "" ? null : Number(fieldValue(weatherPanel, "weatherLongitude")),
+      temperatureUnit: fieldValue(weatherPanel, "weatherTemperatureUnit", "fahrenheit"),
+      faceAccessory: fieldValue(weatherPanel, "weatherFaceAccessory", "auto"),
+      refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15)
     }
   };
 }

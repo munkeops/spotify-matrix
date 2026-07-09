@@ -56,6 +56,21 @@ class SharedPlaybackState:
 
 
 @dataclass
+class WeatherState:
+    temperature: float | None = None
+    apparent_temperature: float | None = None
+    weather_code: int | None = None
+    is_day: bool = True
+    precipitation: float = 0.0
+    rain: float = 0.0
+    snowfall: float = 0.0
+    cloud_cover: float = 0.0
+    wind_speed: float = 0.0
+    label: str = "Local weather"
+    summary: str = "Loading"
+
+
+@dataclass
 class HttpResponse:
     status: int
     headers: Message
@@ -202,6 +217,29 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         if any(flag in sys.argv[1:] for flag in agent_flags[config_name]):
             continue
         value = get_nested(config, "agent", config_name)
+        if value is not None:
+            setattr(args, attr_name, caster(value))
+
+    weather_fields = {
+        "label": ("weather_label", str),
+        "latitude": ("weather_latitude", float),
+        "longitude": ("weather_longitude", float),
+        "temperatureUnit": ("weather_temperature_unit", str),
+        "faceAccessory": ("weather_face_accessory", str),
+        "refreshMinutes": ("weather_refresh_minutes", int),
+    }
+    weather_flags = {
+        "label": ("--weather-label",),
+        "latitude": ("--weather-latitude",),
+        "longitude": ("--weather-longitude",),
+        "temperatureUnit": ("--weather-temperature-unit",),
+        "faceAccessory": ("--weather-face-accessory",),
+        "refreshMinutes": ("--weather-refresh-minutes",),
+    }
+    for config_name, (attr_name, caster) in weather_fields.items():
+        if any(flag in sys.argv[1:] for flag in weather_flags[config_name]):
+            continue
+        value = get_nested(config, "weather", config_name)
         if value is not None:
             setattr(args, attr_name, caster(value))
 
@@ -753,14 +791,17 @@ def render_agent_face(size: int, frame_index: int, style: str, speed: str) -> Im
     for eye_center_x in (size // 2 - eye_gap, size // 2 + eye_gap):
         x = eye_center_x - eye_size // 2 + eye_offset
         y = eye_y - eye_size // 2
-        if blink or style == "sleepy" and int(phase) % 48 < 10:
+        if style == "cool":
+            draw.rectangle((x - 1, eye_y - eye_size // 3, x + eye_size + 2, eye_y + eye_size // 2), fill=(245, 245, 245))
+            draw.rectangle((x + 1, eye_y - eye_size // 4, x + eye_size, eye_y + eye_size // 3), fill=(0, 0, 0))
+        elif blink or style == "sleepy" and int(phase) % 48 < 10:
             draw.rectangle((x, eye_y, x + eye_size, eye_y + max(1, eye_size // 4)), fill=eye_color)
         else:
             draw.rectangle((x, y, x + eye_size, y + eye_size), fill=eye_color)
 
     smile_y = size // 2 + size // 7
-    smile_w = size // 3
-    smile_h = size // 7
+    smile_w = size // (2 if style == "happy" else 3)
+    smile_h = size // (5 if style == "happy" else 7)
     mouth_shift = int(math.sin(phase / 12.0) * max(1, size // 40))
     for step in range(smile_w):
         progress = step / max(1, smile_w - 1)
@@ -769,6 +810,142 @@ def render_agent_face(size: int, frame_index: int, style: str, speed: str) -> Im
         draw.rectangle((x, y, x + 1, y + 1), fill=smile_color)
 
     return frame
+
+
+def weather_summary(code: int | None, precipitation: float, snowfall: float) -> str:
+    if snowfall > 0:
+        return "snow"
+    if precipitation > 0:
+        return "rain"
+    if code is None:
+        return "weather"
+    if code in {0, 1}:
+        return "sunny"
+    if code in {2, 3, 45, 48}:
+        return "cloudy"
+    if code in {51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99}:
+        return "rain"
+    if code in {71, 73, 75, 77, 85, 86}:
+        return "snow"
+    return "weather"
+
+
+def fetch_weather(args: argparse.Namespace) -> WeatherState:
+    if args.weather_latitude is None or args.weather_longitude is None:
+        raise RuntimeError("Weather mode needs latitude and longitude.")
+
+    response = http_request(
+        "GET",
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": str(args.weather_latitude),
+            "longitude": str(args.weather_longitude),
+            "current": "temperature_2m,apparent_temperature,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,wind_speed_10m",
+            "temperature_unit": args.weather_temperature_unit,
+            "wind_speed_unit": "mph",
+            "precipitation_unit": "inch",
+            "timezone": "auto",
+            "forecast_days": "1",
+        },
+        timeout=15,
+    )
+    if response.status != 200:
+        raise_http_error(response, "Open-Meteo weather request")
+    payload = response.json()
+    current = payload.get("current") or {}
+    state = WeatherState(
+        temperature=current.get("temperature_2m"),
+        apparent_temperature=current.get("apparent_temperature"),
+        weather_code=current.get("weather_code"),
+        is_day=bool(current.get("is_day", 1)),
+        precipitation=float(current.get("precipitation") or 0),
+        rain=float(current.get("rain") or 0),
+        snowfall=float(current.get("snowfall") or 0),
+        cloud_cover=float(current.get("cloud_cover") or 0),
+        wind_speed=float(current.get("wind_speed_10m") or 0),
+        label=args.weather_label,
+    )
+    state.summary = weather_summary(state.weather_code, state.precipitation + state.rain, state.snowfall)
+    return state
+
+
+def render_weather_face(draw: ImageDraw.ImageDraw, size: int, accessory: str, summary: str) -> None:
+    eye_y = int(size * 0.48)
+    left_x = int(size * 0.34)
+    right_x = int(size * 0.60)
+    eye = max(4, size // 10)
+    face_color = (255, 255, 255)
+    if accessory == "auto":
+        accessory = "umbrella" if summary in {"rain", "snow"} else "sunglasses" if summary == "sunny" else "none"
+
+    if accessory == "sunglasses":
+        lens_h = max(5, size // 9)
+        draw.rectangle((left_x - 1, eye_y - 2, left_x + eye + 3, eye_y + lens_h), fill=(10, 10, 10), outline=face_color)
+        draw.rectangle((right_x - 1, eye_y - 2, right_x + eye + 3, eye_y + lens_h), fill=(10, 10, 10), outline=face_color)
+        draw.line((left_x + eye + 3, eye_y + 2, right_x - 1, eye_y + 2), fill=face_color)
+    else:
+        draw.rectangle((left_x, eye_y, left_x + eye, eye_y + eye), fill=face_color)
+        draw.rectangle((right_x, eye_y, right_x + eye, eye_y + eye), fill=face_color)
+
+    smile_y = int(size * 0.72)
+    draw.arc((int(size * 0.35), int(size * 0.58), int(size * 0.67), int(size * 0.83)), start=20, end=160, fill=face_color, width=max(1, size // 22))
+
+    if accessory == "umbrella":
+        canopy_y = int(size * 0.18)
+        draw.pieslice((int(size * 0.18), canopy_y, int(size * 0.82), int(size * 0.62)), 180, 360, fill=(120, 200, 245), outline=face_color)
+        draw.line((size // 2, int(size * 0.4), size // 2, int(size * 0.68)), fill=face_color, width=max(1, size // 24))
+        draw.arc((size // 2, int(size * 0.62), int(size * 0.62), int(size * 0.76)), start=0, end=180, fill=face_color, width=max(1, size // 24))
+
+
+def render_weather(state: WeatherState, frame_index: int, size: int, accessory: str, temperature_unit: str) -> Image.Image:
+    summary = state.summary
+    if summary == "sunny":
+        bg_top, bg_bottom = (35, 80, 130), (245, 160, 55)
+    elif summary == "rain":
+        bg_top, bg_bottom = (16, 32, 48), (45, 83, 112)
+    elif summary == "snow":
+        bg_top, bg_bottom = (30, 44, 64), (140, 175, 200)
+    elif summary == "cloudy":
+        bg_top, bg_bottom = (45, 55, 66), (92, 104, 112)
+    else:
+        bg_top, bg_bottom = (20, 28, 38), (65, 85, 105)
+
+    image = Image.new("RGB", (size, size), bg_top)
+    draw = ImageDraw.Draw(image)
+    for y in range(size):
+        ratio = y / max(1, size - 1)
+        color = tuple(int(bg_top[index] * (1 - ratio) + bg_bottom[index] * ratio) for index in range(3))
+        draw.line((0, y, size, y), fill=color)
+
+    if summary == "sunny":
+        cx, cy, radius = int(size * 0.76), int(size * 0.18), max(7, size // 8)
+        for ray in range(10):
+            angle = ray * math.tau / 10 + frame_index * 0.03
+            draw.line((cx, cy, cx + int(math.cos(angle) * radius * 1.7), cy + int(math.sin(angle) * radius * 1.7)), fill=(255, 220, 90), width=1)
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(255, 220, 75))
+    elif summary == "cloudy":
+        draw.ellipse((int(size * 0.12), int(size * 0.12), int(size * 0.48), int(size * 0.34)), fill=(190, 200, 205))
+        draw.ellipse((int(size * 0.32), int(size * 0.08), int(size * 0.75), int(size * 0.35)), fill=(215, 220, 222))
+        draw.rectangle((int(size * 0.16), int(size * 0.23), int(size * 0.78), int(size * 0.37)), fill=(205, 212, 216))
+    elif summary in {"rain", "snow"}:
+        for drop in range(10):
+            x = (drop * 11 + frame_index * 2) % size
+            y = (drop * 17 + frame_index * 5) % size
+            if summary == "snow":
+                draw.rectangle((x, y, x + 1, y + 1), fill=(245, 245, 255))
+            else:
+                draw.line((x, y, x - 2, y + 5), fill=(120, 200, 245), width=1)
+
+    render_weather_face(draw, size, accessory, summary)
+
+    if state.temperature is not None:
+        temp = f"{round(state.temperature):.0f}"
+        suffix = "F" if temperature_unit == "fahrenheit" else "C"
+        label = f"{temp}{suffix}"
+        bbox = draw.textbbox((0, 0), label)
+        draw.rectangle((2, 2, 4 + bbox[2] - bbox[0], 13), fill=(0, 0, 0))
+        draw.text((3, 3), label, fill=(255, 255, 255))
+    return image
 
 
 def poll_spotify(
@@ -859,6 +1036,32 @@ def run_agent(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, si
         frame_index = 0
         while True:
             display.show(render_agent_face(size, frame_index, args.agent_face_style, args.agent_animation_speed))
+            frame_index += 1
+            if args.once:
+                break
+            time.sleep(1.0 / args.fps)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
+def run_weather(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    state = WeatherState(label=args.weather_label)
+    next_fetch = 0.0
+    frame_index = 0
+    try:
+        while True:
+            now = time.monotonic()
+            if now >= next_fetch:
+                try:
+                    state = fetch_weather(args)
+                    print(f"Weather: {state.label} {state.temperature} {state.summary}", flush=True)
+                except Exception as exc:
+                    print(f"Weather fetch failed: {exc}", flush=True)
+                next_fetch = now + max(60, args.weather_refresh_minutes * 60)
+
+            display.show(render_weather(state, frame_index, size, args.weather_face_accessory, args.weather_temperature_unit))
             frame_index += 1
             if args.once:
                 break
@@ -977,6 +1180,8 @@ def run(args: argparse.Namespace) -> None:
         run_clock(args, display, size)
     elif mode == "agent":
         run_agent(args, display, size)
+    elif mode == "weather":
+        run_weather(args, display, size)
     else:
         run_spotify(args, config, display, size)
 
@@ -997,7 +1202,7 @@ def render_preview_frames(directory: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
-    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "testPattern"), default="spotify")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "testPattern"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)
@@ -1025,8 +1230,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--clock-24-hour", action="store_true", help="Use 24-hour time in clock mode.")
     parser.add_argument("--clock-show-seconds", action="store_true", help="Show second progress in clock mode.")
     parser.add_argument("--clock-timezone", default="", help="IANA timezone name for clock mode, such as America/Chicago.")
-    parser.add_argument("--agent-face-style", choices=("classic", "wide", "sleepy"), default="classic")
+    parser.add_argument("--agent-face-style", choices=("classic", "wide", "sleepy", "happy", "cool"), default="classic")
     parser.add_argument("--agent-animation-speed", choices=("slow", "normal", "fast"), default="normal")
+    parser.add_argument("--weather-label", default="Local weather")
+    parser.add_argument("--weather-latitude", type=float)
+    parser.add_argument("--weather-longitude", type=float)
+    parser.add_argument("--weather-temperature-unit", choices=("fahrenheit", "celsius"), default="fahrenheit")
+    parser.add_argument("--weather-face-accessory", choices=("auto", "none", "sunglasses", "umbrella"), default="auto")
+    parser.add_argument("--weather-refresh-minutes", type=int, default=15)
     parser.add_argument("--once", action="store_true", help="Render one frame and exit.")
     parser.add_argument("--no-browser", action="store_true", help="Print the Spotify auth URL without trying to open a browser.")
     return parser

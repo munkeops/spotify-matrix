@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260709c">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260709d">
   </head>
   <body>
     <main class="app-frame">
@@ -109,6 +109,18 @@
               <strong>Agent Face</strong>
               <small>Animated idle face for future voice-agent behavior.</small>
               <span class="plugin-preview preview-agent" aria-hidden="true"></span>
+            </button>
+            <button class="plugin-card" type="button" data-plugin="weather">
+              <span class="plugin-meta">Weather</span>
+              <strong>Weather</strong>
+              <small>Live conditions with playful assistant scenes.</small>
+              <span class="plugin-preview preview-weather" aria-hidden="true">
+                <span class="weather-sun"></span>
+                <span class="weather-face-mini">
+                  <span class="weather-glasses"></span>
+                  <span class="weather-smile-mini"></span>
+                </span>
+              </span>
             </button>
             <button class="plugin-card" type="button" data-plugin="testPattern">
               <span class="plugin-meta">Diagnostic</span>
@@ -279,9 +291,51 @@
               <span>Sleepy blink</span>
               <small>Relaxed face with slow blink.</small>
             </label>
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="happy">
+              <span class="agent-preview-small agent-happy-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Happy</span>
+              <small>Bigger smile and brighter idle expression.</small>
+            </label>
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="cool">
+              <span class="agent-preview-small agent-cool-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Cool</span>
+              <small>Sunglasses-style idle face.</small>
+            </label>
           </fieldset>
           <div class="form-grid agent-settings-grid">
             <label>Animation speed <select name="agentAnimationSpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
+          </div>
+        </section>
+
+        <section class="plugin-config" data-config-panel="weather" id="weatherPanel">
+          <div class="weather-config-layout">
+            <div class="form-grid weather-settings-grid">
+              <label>Location label <input name="weatherLabel" placeholder="Home"></label>
+              <label>Latitude <input name="weatherLatitude" type="number" step="0.0001" placeholder="41.8781"></label>
+              <label>Longitude <input name="weatherLongitude" type="number" step="0.0001" placeholder="-87.6298"></label>
+              <label>Temperature unit <select name="weatherTemperatureUnit"><option value="fahrenheit">Fahrenheit</option><option value="celsius">Celsius</option></select></label>
+              <label>Face accessory <select name="weatherFaceAccessory"><option value="auto">Auto</option><option value="none">None</option><option value="sunglasses">Sunglasses</option><option value="umbrella">Umbrella</option></select></label>
+              <label>Refresh minutes <input name="weatherRefreshMinutes" type="number" min="5" max="120" step="1"></label>
+            </div>
+            <div class="weather-preview-large" aria-hidden="true">
+              <span class="weather-sun"></span>
+              <span class="weather-rain one"></span>
+              <span class="weather-rain two"></span>
+              <span class="weather-face-mini">
+                <span class="weather-glasses"></span>
+                <span class="weather-smile-mini"></span>
+              </span>
+            </div>
           </div>
         </section>
 
@@ -297,6 +351,6 @@
       </form>
     </dialog>
 
-    <script src="/app.js?v=assistant-20260709c"></script>
+    <script src="/app.js?v=assistant-20260709d"></script>
   </body>
 </html>

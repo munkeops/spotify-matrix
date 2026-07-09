@@ -35,7 +35,7 @@ class RuntimeConfig(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    mode: Literal["spotify", "clock", "agent", "testPattern"] = "spotify"
+    mode: Literal["spotify", "clock", "agent", "weather", "testPattern"] = "spotify"
 
 
 class ClockConfig(BaseModel):
@@ -46,8 +46,17 @@ class ClockConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
-    faceStyle: Literal["classic", "wide", "sleepy"] = "classic"
+    faceStyle: Literal["classic", "wide", "sleepy", "happy", "cool"] = "classic"
     animationSpeed: Literal["slow", "normal", "fast"] = "normal"
+
+
+class WeatherConfig(BaseModel):
+    label: str = "Local weather"
+    latitude: float | None = None
+    longitude: float | None = None
+    temperatureUnit: Literal["fahrenheit", "celsius"] = "fahrenheit"
+    faceAccessory: Literal["auto", "none", "sunglasses", "umbrella"] = "auto"
+    refreshMinutes: int = 15
 
 
 class AppConfig(BaseModel):
@@ -57,6 +66,7 @@ class AppConfig(BaseModel):
     display: DisplayConfig = Field(default_factory=DisplayConfig)
     clock: ClockConfig = Field(default_factory=ClockConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
+    weather: WeatherConfig = Field(default_factory=WeatherConfig)
 
 
 class TokenStatus(BaseModel):

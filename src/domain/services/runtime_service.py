@@ -84,6 +84,14 @@ class RuntimeService:
             config.agent.faceStyle,
             "--agent-animation-speed",
             config.agent.animationSpeed,
+            "--weather-label",
+            config.weather.label,
+            "--weather-temperature-unit",
+            config.weather.temperatureUnit,
+            "--weather-face-accessory",
+            config.weather.faceAccessory,
+            "--weather-refresh-minutes",
+            str(config.weather.refreshMinutes),
             "--config-path",
             str(config_service.config_path),
             "--token-cache",
@@ -124,6 +132,10 @@ class RuntimeService:
             args.append("--clock-show-seconds")
         if config.clock.timezone:
             args.extend(["--clock-timezone", config.clock.timezone])
+        if config.weather.latitude is not None:
+            args.extend(["--weather-latitude", str(config.weather.latitude)])
+        if config.weather.longitude is not None:
+            args.extend(["--weather-longitude", str(config.weather.longitude)])
         if config.runtime.testPattern:
             args.append("--test-pattern")
         return args
