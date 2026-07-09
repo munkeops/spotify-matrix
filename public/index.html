@@ -248,8 +248,39 @@
         </section>
 
         <section class="plugin-config" data-config-panel="agent" id="agentPanel">
-          <div class="form-grid">
-            <label>Face style <select name="agentFaceStyle"><option value="classic">Classic</option><option value="wide">Wide eyes</option><option value="sleepy">Sleepy blink</option></select></label>
+          <fieldset class="choice-grid agent-choice-grid">
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="classic">
+              <span class="agent-preview-small agent-classic-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Classic</span>
+              <small>Square eyes and a simple smile.</small>
+            </label>
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="wide">
+              <span class="agent-preview-small agent-wide-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Wide eyes</span>
+              <small>More alert idle face.</small>
+            </label>
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="sleepy">
+              <span class="agent-preview-small agent-sleepy-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Sleepy blink</span>
+              <small>Relaxed face with slow blink.</small>
+            </label>
+          </fieldset>
+          <div class="form-grid agent-settings-grid">
             <label>Animation speed <select name="agentAnimationSpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
           </div>
         </section>

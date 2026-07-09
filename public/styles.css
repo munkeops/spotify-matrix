@@ -814,6 +814,87 @@ label {
   margin-bottom: 0;
 }
 
+.agent-choice {
+  min-height: 210px;
+}
+
+.agent-preview-small {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 190px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  margin: 6px auto 12px;
+  background:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
+    #050607;
+  background-size: calc(100% / 16) calc(100% / 16);
+}
+
+.agent-eye {
+  position: absolute;
+  top: 30%;
+  width: 18%;
+  aspect-ratio: 1;
+  background: #f3f0e8;
+  animation: blink 4s infinite;
+}
+
+.agent-eye.left {
+  left: 25%;
+}
+
+.agent-eye.right {
+  right: 25%;
+}
+
+.agent-wide-preview .agent-eye {
+  width: 22%;
+}
+
+.agent-wide-preview .agent-eye.left {
+  left: 18%;
+}
+
+.agent-wide-preview .agent-eye.right {
+  right: 18%;
+}
+
+.agent-sleepy-preview .agent-eye {
+  height: 6%;
+  aspect-ratio: auto;
+  top: 37%;
+  animation: sleepy-blink 3s infinite;
+}
+
+.agent-smile {
+  position: absolute;
+  left: 34%;
+  right: 34%;
+  bottom: 28%;
+  height: 18%;
+  border-bottom: 5px solid #f3f0e8;
+  border-radius: 0 0 999px 999px;
+}
+
+.agent-wide-preview .agent-smile {
+  left: 30%;
+  right: 30%;
+}
+
+.agent-sleepy-preview .agent-smile {
+  left: 38%;
+  right: 38%;
+  opacity: 0.8;
+}
+
+.agent-settings-grid {
+  grid-template-columns: minmax(0, 280px);
+}
+
 .wide {
   grid-column: 1 / -1;
 }
@@ -1133,6 +1214,18 @@ label {
   8%,
   96% {
     transform: scaleY(1);
+  }
+}
+
+@keyframes sleepy-blink {
+  0%,
+  40%,
+  100% {
+    transform: scaleY(0.55);
+  }
+  45%,
+  52% {
+    transform: scaleY(0.1);
   }
 }
 

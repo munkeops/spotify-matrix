@@ -185,15 +185,18 @@ const pluginLabels = {
 let currentConfig = null;
 let selectedPlugin = "spotify";
 let runtimeRunning = false;
+let browserAmericaTimezone = "";
 
 function populateTimezones() {
   if (!clockTimezoneSelect) {
     return;
   }
+  const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
   const browserZones = typeof Intl.supportedValuesOf === "function"
     ? Intl.supportedValuesOf("timeZone").filter((zone) => zone.startsWith("America/"))
     : [];
   const zones = [...new Set(browserZones.length ? browserZones : fallbackAmericaTimezones)].sort();
+  browserAmericaTimezone = localTimezone.startsWith("America/") ? localTimezone : "America/Chicago";
   for (const zone of zones) {
     const option = document.createElement("option");
     option.value = zone;
@@ -230,8 +233,7 @@ function setMessage(message) {
   if (pairCommand) {
     pairCommand.textContent = message;
   }
-  if (statusTitle && statusText) {
-    statusTitle.textContent = "Preview mode";
+  if (statusText) {
     statusText.textContent = message;
   }
 }
@@ -284,7 +286,7 @@ function fillForms(config) {
   fillPanel(matrixPanel, config.matrix);
   fillPanel(clockPanel, {
     clockFace: config.clock?.face || "analog",
-    clockTimezone: config.clock?.timezone || "",
+    clockTimezone: config.clock?.timezone || browserAmericaTimezone,
     clock24Hour: Boolean(config.clock?.use24Hour),
     clockShowSeconds: Boolean(config.clock?.showSeconds)
   });
@@ -334,7 +336,7 @@ function collectConfig(modeOverride = null) {
       face: fieldValue(clockPanel, "clockFace", "analog") || "analog",
       use24Hour: fieldChecked(clockPanel, "clock24Hour"),
       showSeconds: fieldChecked(clockPanel, "clockShowSeconds"),
-      timezone: fieldValue(clockPanel, "clockTimezone")
+      timezone: fieldValue(clockPanel, "clockTimezone") || browserAmericaTimezone
     },
     agent: {
       faceStyle: fieldValue(agentPanel, "agentFaceStyle", "classic"),
@@ -368,7 +370,7 @@ async function applyPlugin(plugin = selectedPlugin) {
   } finally {
     applyButton.disabled = false;
     applyPluginButton.disabled = false;
-    applyButton.textContent = "Apply Current Plugin";
+    applyButton.textContent = "Apply";
   }
 }
 
