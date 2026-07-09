@@ -963,12 +963,16 @@ def draw_aqi_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int) -> None:
         draw.rectangle((cx - 10 + index * 5, cy + 6 - index * 3, cx - 7 + index * 5, cy + 9), fill=color)
 
 
-def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int]) -> None:
-    draw.text((x + 3, y + 3), title, fill=(205, 215, 225))
+def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int], unit: str = "") -> None:
+    draw.text((x + 3, y + 3), title, fill=(225, 232, 238))
     bbox = draw.textbbox((0, 0), value)
     value_width = bbox[2] - bbox[0]
     value_x = x + max(2, (32 - value_width) // 2)
-    draw.text((value_x, y + 18), value, fill=color)
+    draw.text((value_x, y + 15), value, fill=color)
+    if unit:
+        unit_bbox = draw.textbbox((0, 0), unit)
+        unit_width = unit_bbox[2] - unit_bbox[0]
+        draw.text((x + max(2, (32 - unit_width) // 2), y + 24), unit, fill=(180, 190, 200))
 
 
 def render_weather_quad(state: WeatherState, frame_index: int, size: int, temperature_unit: str) -> Image.Image:
@@ -986,16 +990,11 @@ def render_weather_quad(state: WeatherState, frame_index: int, size: int, temper
     draw.line((mid, 0, mid, size), fill=(8, 12, 20))
     draw.line((0, mid, size, mid), fill=(8, 12, 20))
 
-    temp_suffix = "F" if temperature_unit == "fahrenheit" else "C"
-    draw_sun_icon(draw, 25, 8, 3, frame_index * 0.05)
-    draw_uv_icon(draw, mid + 24, 8)
-    draw_aqi_icon(draw, 24, mid + 8)
-    draw_wind_icon(draw, mid + 5, mid + 5)
-
-    draw_weather_metric(draw, 0, 0, "TEMP", short_weather_value(state.temperature, temp_suffix), (255, 235, 130))
+    temp_unit = "F" if temperature_unit == "fahrenheit" else "C"
+    draw_weather_metric(draw, 0, 0, "TMP", short_weather_value(state.temperature), (255, 235, 130), temp_unit)
     draw_weather_metric(draw, mid, 0, "UV", short_weather_value(state.uv_index), (235, 205, 255))
     draw_weather_metric(draw, 0, mid, "AQI", short_weather_value(state.aqi), (175, 235, 125))
-    draw_weather_metric(draw, mid, mid, "WIND", short_weather_value(state.wind_speed, "MPH"), (145, 225, 255))
+    draw_weather_metric(draw, mid, mid, "WND", short_weather_value(state.wind_speed), (145, 225, 255), "MPH")
     return image
 
 
