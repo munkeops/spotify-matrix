@@ -59,6 +59,7 @@ class SharedPlaybackState:
 class WeatherState:
     temperature: float | None = None
     apparent_temperature: float | None = None
+    uv_index: float | None = None
     weather_code: int | None = None
     is_day: bool = True
     precipitation: float = 0.0
@@ -849,6 +850,7 @@ def fetch_weather(args: argparse.Namespace) -> WeatherState:
             "latitude": str(args.weather_latitude),
             "longitude": str(args.weather_longitude),
             "current": "temperature_2m,apparent_temperature,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,wind_speed_10m",
+            "daily": "uv_index_max",
             "temperature_unit": args.weather_temperature_unit,
             "wind_speed_unit": "mph",
             "precipitation_unit": "inch",
@@ -861,9 +863,12 @@ def fetch_weather(args: argparse.Namespace) -> WeatherState:
         raise_http_error(response, "Open-Meteo weather request")
     payload = response.json()
     current = payload.get("current") or {}
+    daily = payload.get("daily") or {}
+    uv_values = daily.get("uv_index_max") or []
     state = WeatherState(
         temperature=current.get("temperature_2m"),
         apparent_temperature=current.get("apparent_temperature"),
+        uv_index=uv_values[0] if uv_values else None,
         weather_code=current.get("weather_code"),
         is_day=bool(current.get("is_day", 1)),
         precipitation=float(current.get("precipitation") or 0),
@@ -875,6 +880,87 @@ def fetch_weather(args: argparse.Namespace) -> WeatherState:
     )
     state.summary = weather_summary(state.weather_code, state.precipitation + state.rain, state.snowfall)
     return state
+
+
+def short_weather_value(value: float | None, suffix: str = "") -> str:
+    if value is None:
+        return "--"
+    rounded = round(value)
+    if abs(value) < 1 and value > 0:
+        return f"{value:.1f}{suffix}"
+    return f"{rounded:.0f}{suffix}"
+
+
+def draw_sun_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int, radius: int, phase: float = 0.0) -> None:
+    for ray in range(8):
+        angle = ray * math.tau / 8 + phase
+        draw.line(
+            (
+                cx + int(math.cos(angle) * radius * 1.35),
+                cy + int(math.sin(angle) * radius * 1.35),
+                cx + int(math.cos(angle) * radius * 2.0),
+                cy + int(math.sin(angle) * radius * 2.0),
+            ),
+            fill=(255, 205, 45),
+        )
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(255, 210, 45), outline=(255, 245, 140))
+
+
+def draw_rain_icon(draw: ImageDraw.ImageDraw, x: int, y: int, frame_index: int = 0) -> None:
+    draw.ellipse((x, y, x + 20, y + 9), fill=(120, 150, 170))
+    draw.ellipse((x + 8, y - 4, x + 25, y + 10), fill=(165, 180, 190))
+    draw.rectangle((x + 2, y + 5, x + 25, y + 11), fill=(145, 165, 180))
+    for drop in range(4):
+        dx = x + 3 + drop * 6
+        dy = y + 15 + ((frame_index + drop * 2) % 4)
+        draw.line((dx, dy, dx - 2, dy + 6), fill=(70, 190, 255))
+
+
+def draw_moon_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int, radius: int) -> None:
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(230, 235, 190))
+    draw.ellipse((cx - radius // 3, cy - radius, cx + radius + 2, cy + radius), fill=(24, 30, 48))
+    draw.point((cx - 13, cy - 7), fill=(255, 255, 210))
+    draw.point((cx + 10, cy - 10), fill=(255, 255, 210))
+    draw.point((cx + 13, cy + 7), fill=(255, 255, 210))
+
+
+def draw_uv_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int) -> None:
+    draw.arc((cx - 12, cy - 11, cx + 12, cy + 13), 205, 335, fill=(190, 110, 255), width=2)
+    draw.rectangle((cx - 10, cy + 8, cx + 10, cy + 10), fill=(190, 110, 255))
+    draw.text((cx - 7, cy - 2), "UV", fill=(245, 235, 255))
+
+
+def render_weather_quad(state: WeatherState, frame_index: int, size: int, temperature_unit: str) -> Image.Image:
+    image = Image.new("RGB", (size, size), (8, 12, 20))
+    draw = ImageDraw.Draw(image)
+    mid = size // 2
+    draw.line((mid, 0, mid, size), fill=(45, 55, 70))
+    draw.line((0, mid, size, mid), fill=(45, 55, 70))
+
+    panels = [
+        ((0, 0, mid, mid), (20, 50, 95), "SUN", short_weather_value(state.temperature, "F" if temperature_unit == "fahrenheit" else "C")),
+        ((mid, 0, size, mid), (10, 35, 60), "RAIN", short_weather_value(state.precipitation + state.rain)),
+        ((0, mid, mid, size), (20, 24, 42), "MOON", "DAY" if state.is_day else "NITE"),
+        ((mid, mid, size, size), (45, 28, 70), "UV", short_weather_value(state.uv_index)),
+    ]
+    for box, fill, label, value in panels:
+        draw.rectangle(box, fill=fill)
+
+    draw_sun_icon(draw, 16, 12, 5, frame_index * 0.05)
+    draw_rain_icon(draw, mid + 4, 7, frame_index)
+    draw_moon_icon(draw, 16, mid + 13, 7)
+    draw_uv_icon(draw, mid + 16, mid + 12)
+
+    text_rows = [
+        (3, 22, "SUN", panels[0][3], (255, 238, 140)),
+        (mid + 3, 22, "RAIN", panels[1][3], (120, 220, 255)),
+        (3, mid + 22, "MOON", panels[2][3], (240, 240, 205)),
+        (mid + 4, mid + 22, "UV", panels[3][3], (230, 200, 255)),
+    ]
+    for x, y, label, value, color in text_rows:
+        draw.text((x, y), label, fill=(210, 220, 230))
+        draw.text((x, y + 8), value, fill=color)
+    return image
 
 
 def render_weather_face(draw: ImageDraw.ImageDraw, size: int, accessory: str, summary: str) -> None:
@@ -904,7 +990,7 @@ def render_weather_face(draw: ImageDraw.ImageDraw, size: int, accessory: str, su
         draw.arc((size // 2, int(size * 0.62), int(size * 0.62), int(size * 0.76)), start=0, end=180, fill=face_color, width=max(1, size // 24))
 
 
-def render_weather(state: WeatherState, frame_index: int, size: int, accessory: str, temperature_unit: str) -> Image.Image:
+def render_weather_scene(state: WeatherState, frame_index: int, size: int, accessory: str, temperature_unit: str) -> Image.Image:
     summary = state.summary
     if summary == "sunny":
         bg_top, bg_bottom = (20, 55, 115), (240, 135, 35)
@@ -926,21 +1012,7 @@ def render_weather(state: WeatherState, frame_index: int, size: int, accessory: 
 
     if summary == "sunny":
         cx, cy, radius = int(size * 0.72), int(size * 0.20), max(10, size // 6)
-        for ray in range(12):
-            angle = ray * math.tau / 12 + frame_index * 0.035
-            start = radius * 1.15
-            end = radius * 1.95
-            draw.line(
-                (
-                    cx + int(math.cos(angle) * start),
-                    cy + int(math.sin(angle) * start),
-                    cx + int(math.cos(angle) * end),
-                    cy + int(math.sin(angle) * end),
-                ),
-                fill=(255, 210, 50),
-                width=max(1, size // 32),
-            )
-        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(255, 205, 35), outline=(255, 245, 145))
+        draw_sun_icon(draw, cx, cy, radius, frame_index * 0.035)
     elif summary == "cloudy":
         draw.ellipse((int(size * 0.12), int(size * 0.12), int(size * 0.48), int(size * 0.34)), fill=(190, 200, 205))
         draw.ellipse((int(size * 0.32), int(size * 0.08), int(size * 0.75), int(size * 0.35)), fill=(215, 220, 222))
@@ -969,6 +1041,13 @@ def render_weather(state: WeatherState, frame_index: int, size: int, accessory: 
         draw.rectangle((2, 2, 4 + bbox[2] - bbox[0], 13), fill=(0, 0, 0))
         draw.text((3, 3), label, fill=(255, 255, 255))
     return image
+
+
+def render_weather(state: WeatherState, frame_index: int, size: int, accessory: str, temperature_unit: str, fps: float) -> Image.Image:
+    slide_frames = max(1, int(round(fps)))
+    if (frame_index // slide_frames) % 2 == 0:
+        return render_weather_quad(state, frame_index, size, temperature_unit)
+    return render_weather_scene(state, frame_index, size, accessory, temperature_unit)
 
 
 def poll_spotify(
@@ -1084,7 +1163,7 @@ def run_weather(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, 
                     print(f"Weather fetch failed: {exc}", flush=True)
                 next_fetch = now + max(60, args.weather_refresh_minutes * 60)
 
-            display.show(render_weather(state, frame_index, size, args.weather_face_accessory, args.weather_temperature_unit))
+            display.show(render_weather(state, frame_index, size, args.weather_face_accessory, args.weather_temperature_unit, args.fps))
             frame_index += 1
             if args.once:
                 break
