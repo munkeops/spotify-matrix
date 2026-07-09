@@ -28,7 +28,9 @@ async function api(path, options = {}) {
 }
 
 function setMessage(message) {
-  pairCommand.textContent = message;
+  if (pairCommand) {
+    pairCommand.textContent = message;
+  }
 }
 
 function fillForms(config) {
@@ -117,16 +119,16 @@ async function refreshStatus() {
       : "Stopped";
 }
 
-configForm.addEventListener("submit", saveConfig);
-matrixForm.addEventListener("submit", saveConfig);
+configForm?.addEventListener("submit", saveConfig);
+matrixForm?.addEventListener("submit", saveConfig);
 
-pairButton.addEventListener("click", async () => {
+pairButton?.addEventListener("click", async () => {
   const session = await api("/api/auth/session", { method: "POST", body: "{}" });
   const origin = window.location.origin;
   setMessage(session.command.replace(`http://<pi-host>:${window.location.port || 3000}`, origin));
 });
 
-directAuthButton.addEventListener("click", async () => {
+directAuthButton?.addEventListener("click", async () => {
   await api("/api/config", {
     method: "POST",
     body: JSON.stringify(collectConfig())
@@ -134,12 +136,12 @@ directAuthButton.addEventListener("click", async () => {
   window.location.href = "/api/auth/login";
 });
 
-startButton.addEventListener("click", async () => {
+startButton?.addEventListener("click", async () => {
   await api("/api/runtime/start", { method: "POST", body: "{}" });
   await refreshStatus();
 });
 
-stopButton.addEventListener("click", async () => {
+stopButton?.addEventListener("click", async () => {
   await api("/api/runtime/stop", { method: "POST", body: "{}" });
   await refreshStatus();
 });
