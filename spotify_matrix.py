@@ -61,6 +61,7 @@ class WeatherState:
     temperature: float | None = None
     apparent_temperature: float | None = None
     uv_index: float | None = None
+    aqi: float | None = None
     weather_code: int | None = None
     is_day: bool = True
     precipitation: float = 0.0
@@ -880,6 +881,25 @@ def fetch_weather(args: argparse.Namespace) -> WeatherState:
         label=args.weather_label,
     )
     state.summary = weather_summary(state.weather_code, state.precipitation + state.rain, state.snowfall)
+    try:
+        air_response = http_request(
+            "GET",
+            "https://air-quality-api.open-meteo.com/v1/air-quality",
+            params={
+                "latitude": str(args.weather_latitude),
+                "longitude": str(args.weather_longitude),
+                "current": "uv_index,us_aqi",
+                "timezone": "auto",
+                "forecast_days": "1",
+            },
+            timeout=10,
+        )
+        if air_response.status == 200:
+            air_current = (air_response.json().get("current") or {})
+            state.uv_index = air_current.get("uv_index", state.uv_index)
+            state.aqi = air_current.get("us_aqi")
+    except Exception:
+        pass
     return state
 
 
@@ -931,36 +951,51 @@ def draw_uv_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int) -> None:
     draw.text((cx - 7, cy - 2), "UV", fill=(245, 235, 255))
 
 
+def draw_wind_icon(draw: ImageDraw.ImageDraw, x: int, y: int) -> None:
+    draw.arc((x, y, x + 14, y + 8), 180, 20, fill=(170, 225, 255), width=1)
+    draw.line((x + 2, y + 8, x + 22, y + 8), fill=(170, 225, 255))
+    draw.arc((x + 6, y + 9, x + 24, y + 18), 190, 20, fill=(170, 225, 255), width=1)
+
+
+def draw_aqi_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int) -> None:
+    colors = [(90, 210, 110), (230, 210, 70), (235, 125, 55), (190, 75, 160)]
+    for index, color in enumerate(colors):
+        draw.rectangle((cx - 10 + index * 5, cy + 6 - index * 3, cx - 7 + index * 5, cy + 9), fill=color)
+
+
+def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int]) -> None:
+    draw.text((x + 3, y + 3), title, fill=(205, 215, 225))
+    bbox = draw.textbbox((0, 0), value)
+    value_width = bbox[2] - bbox[0]
+    value_x = x + max(2, (32 - value_width) // 2)
+    draw.text((value_x, y + 18), value, fill=color)
+
+
 def render_weather_quad(state: WeatherState, frame_index: int, size: int, temperature_unit: str) -> Image.Image:
     image = Image.new("RGB", (size, size), (8, 12, 20))
     draw = ImageDraw.Draw(image)
     mid = size // 2
-    draw.line((mid, 0, mid, size), fill=(45, 55, 70))
-    draw.line((0, mid, size, mid), fill=(45, 55, 70))
-
     panels = [
-        ((0, 0, mid, mid), (20, 50, 95), "SUN", short_weather_value(state.temperature, "F" if temperature_unit == "fahrenheit" else "C")),
-        ((mid, 0, size, mid), (10, 35, 60), "RAIN", short_weather_value(state.precipitation + state.rain)),
-        ((0, mid, mid, size), (20, 24, 42), "MOON", "DAY" if state.is_day else "NITE"),
-        ((mid, mid, size, size), (45, 28, 70), "UV", short_weather_value(state.uv_index)),
+        ((0, 0, mid, mid), (18, 48, 86)),
+        ((mid, 0, size, mid), (48, 30, 76)),
+        ((0, mid, mid, size), (40, 50, 30)),
+        ((mid, mid, size, size), (12, 42, 62)),
     ]
-    for box, fill, label, value in panels:
+    for box, fill in panels:
         draw.rectangle(box, fill=fill)
+    draw.line((mid, 0, mid, size), fill=(8, 12, 20))
+    draw.line((0, mid, size, mid), fill=(8, 12, 20))
 
-    draw_sun_icon(draw, 16, 12, 5, frame_index * 0.05)
-    draw_rain_icon(draw, mid + 4, 7, frame_index)
-    draw_moon_icon(draw, 16, mid + 13, 7)
-    draw_uv_icon(draw, mid + 16, mid + 12)
+    temp_suffix = "F" if temperature_unit == "fahrenheit" else "C"
+    draw_sun_icon(draw, 25, 8, 3, frame_index * 0.05)
+    draw_uv_icon(draw, mid + 24, 8)
+    draw_aqi_icon(draw, 24, mid + 8)
+    draw_wind_icon(draw, mid + 5, mid + 5)
 
-    text_rows = [
-        (3, 22, "SUN", panels[0][3], (255, 238, 140)),
-        (mid + 3, 22, "RAIN", panels[1][3], (120, 220, 255)),
-        (3, mid + 22, "MOON", panels[2][3], (240, 240, 205)),
-        (mid + 4, mid + 22, "UV", panels[3][3], (230, 200, 255)),
-    ]
-    for x, y, label, value, color in text_rows:
-        draw.text((x, y), label, fill=(210, 220, 230))
-        draw.text((x, y + 8), value, fill=color)
+    draw_weather_metric(draw, 0, 0, "TEMP", short_weather_value(state.temperature, temp_suffix), (255, 235, 130))
+    draw_weather_metric(draw, mid, 0, "UV", short_weather_value(state.uv_index), (235, 205, 255))
+    draw_weather_metric(draw, 0, mid, "AQI", short_weather_value(state.aqi), (175, 235, 125))
+    draw_weather_metric(draw, mid, mid, "WIND", short_weather_value(state.wind_speed, "MPH"), (145, 225, 255))
     return image
 
 
