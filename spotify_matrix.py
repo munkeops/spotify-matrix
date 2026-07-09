@@ -147,6 +147,7 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         "fps": float,
         "rpm": float,
         "noHardwarePulse": bool,
+        "rotation": int,
     }
     attr_names = {
         "chainLength": "chain_length",
@@ -171,6 +172,7 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         "fps": ("--fps",),
         "rpm": ("--rpm",),
         "noHardwarePulse": ("--no-hardware-pulse",),
+        "rotation": ("--rotation",),
     }
 
     for config_name, caster in matrix_fields.items():
@@ -497,8 +499,11 @@ class MatrixDisplay:
 
         self.matrix = RGBMatrix(options=options)
         self.canvas = self.matrix.CreateFrameCanvas()
+        self.rotation = args.rotation
 
     def show(self, image: Image.Image) -> None:
+        if self.rotation:
+            image = image.rotate(-self.rotation, expand=False)
         self.canvas.SetImage(image.convert("RGB"))
         self.canvas = self.matrix.SwapOnVSync(self.canvas)
 
@@ -507,11 +512,14 @@ class MatrixDisplay:
 
 
 class MockDisplay:
-    def __init__(self, output: Path) -> None:
+    def __init__(self, output: Path, rotation: int = 0) -> None:
         self.output = output
+        self.rotation = rotation
         self.output.parent.mkdir(parents=True, exist_ok=True)
 
     def show(self, image: Image.Image) -> None:
+        if self.rotation:
+            image = image.rotate(-self.rotation, expand=False)
         image.save(self.output)
 
     def clear(self) -> None:
@@ -996,7 +1004,7 @@ def poll_spotify(
 def create_display(args: argparse.Namespace) -> MatrixDisplay | MockDisplay:
     display: MatrixDisplay | MockDisplay
     if args.mock_output:
-        display = MockDisplay(args.mock_output)
+        display = MockDisplay(args.mock_output, args.rotation)
     else:
         display = MatrixDisplay(args)
     return display
@@ -1220,6 +1228,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--poll-seconds", type=positive_float, default=2.0)
     parser.add_argument("--fps", type=positive_float, default=20.0)
     parser.add_argument("--rpm", type=positive_float, default=20.0)
+    parser.add_argument("--rotation", type=int, choices=(0, 90, 180, 270), default=0, help="Rotate rendered frames before display.")
     parser.add_argument("--config-path", type=Path, default=DEFAULT_CONFIG_PATH)
     parser.add_argument("--token-cache", type=Path, default=DEFAULT_TOKEN_CACHE)
     parser.add_argument("--mock-output", type=Path, help="Write the current frame PNG instead of using RGB matrix hardware.")

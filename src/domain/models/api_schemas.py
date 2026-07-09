@@ -27,6 +27,7 @@ class MatrixConfig(BaseModel):
     pollSeconds: float = 2
     fps: float = 20
     rpm: float = 20
+    rotation: Literal[0, 90, 180, 270] = 0
 
 
 class RuntimeConfig(BaseModel):

@@ -363,7 +363,8 @@ function collectConfig(modeOverride = null) {
       noHardwarePulse: fieldChecked(matrixPanel, "noHardwarePulse"),
       pollSeconds: fieldValue(matrixPanel, "pollSeconds"),
       fps: fieldValue(matrixPanel, "fps"),
-      rpm: fieldValue(matrixPanel, "rpm")
+      rpm: fieldValue(matrixPanel, "rpm"),
+      rotation: Number(fieldValue(matrixPanel, "rotation", "0"))
     },
     runtime: {
       mockOutput: fieldValue(advancedPanel, "mockOutput"),

@@ -120,6 +120,8 @@ class RuntimeService:
             str(matrix.fps),
             "--rpm",
             str(matrix.rpm),
+            "--rotation",
+            str(matrix.rotation),
             "--no-browser",
         ]
         if matrix.noHardwarePulse:
