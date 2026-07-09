@@ -22,14 +22,10 @@ RUN pip install --no-cache-dir "poetry>=1.8,<2"
 
 COPY pyproject.toml ./
 COPY README.md ./
-COPY configs ./configs
-COPY public ./public
-COPY scripts ./scripts
-COPY src ./src
-COPY spotify_matrix.py requirements.txt ./
+COPY requirements.txt ./
 
 RUN poetry config virtualenvs.in-project true \
-    && poetry install --only main --no-ansi
+    && poetry install --only main --no-root --no-ansi
 
 RUN PILLOW_VERSION="$(poetry run python -c 'import PIL; print(PIL.__version__)')" \
     && mkdir -p /tmp/pillow-src \
@@ -41,6 +37,12 @@ RUN PILLOW_VERSION="$(poetry run python -c 'import PIL; print(PIL.__version__)')
     && echo "Using Pillow ${PILLOW_VERSION} header path: ${PILLOW_INCLUDE}" \
     && CFLAGS="-I${PILLOW_INCLUDE}" poetry run pip install --no-cache-dir git+https://github.com/hzeller/rpi-rgb-led-matrix \
     && rm -rf /tmp/pillow-src
+
+COPY configs ./configs
+COPY public ./public
+COPY scripts ./scripts
+COPY src ./src
+COPY spotify_matrix.py ./
 
 RUN mkdir -p /app/data
 

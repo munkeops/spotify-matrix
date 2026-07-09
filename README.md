@@ -36,6 +36,8 @@ Runtime secrets are stored under `data/`, which is ignored by Git:
 
 The Dockerfile keeps the base Python dependency install and the `rpi-rgb-led-matrix` native binding install in separate layers. If the matrix binding fails to compile, rebuilds can reuse the Poetry dependency layer while debugging the native build step.
 
+The slow dependency layers are intentionally built before app code is copied into the image. Normal changes under `src/`, `public/`, `scripts/`, or `spotify_matrix.py` should reuse the Poetry and matrix-binding cache. Those native layers rebuild only when dependency files such as `pyproject.toml`, `requirements.txt`, or the Dockerfile dependency steps change.
+
 ## Hardware feasibility
 
 Docker deployment is possible on Raspberry Pi, but HUB75 matrix output needs direct GPIO access. The Compose service uses `privileged: true` and host networking for that reason.
