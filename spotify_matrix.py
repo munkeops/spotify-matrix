@@ -878,11 +878,11 @@ def fetch_weather(args: argparse.Namespace) -> WeatherState:
 
 
 def render_weather_face(draw: ImageDraw.ImageDraw, size: int, accessory: str, summary: str) -> None:
-    eye_y = int(size * 0.48)
+    eye_y = int(size * 0.52)
     left_x = int(size * 0.34)
     right_x = int(size * 0.60)
-    eye = max(4, size // 10)
-    face_color = (255, 255, 255)
+    eye = max(3, size // 11)
+    face_color = (245, 248, 255)
     if accessory == "auto":
         accessory = "umbrella" if summary in {"rain", "snow"} else "sunglasses" if summary == "sunny" else "none"
 
@@ -895,8 +895,7 @@ def render_weather_face(draw: ImageDraw.ImageDraw, size: int, accessory: str, su
         draw.rectangle((left_x, eye_y, left_x + eye, eye_y + eye), fill=face_color)
         draw.rectangle((right_x, eye_y, right_x + eye, eye_y + eye), fill=face_color)
 
-    smile_y = int(size * 0.72)
-    draw.arc((int(size * 0.35), int(size * 0.58), int(size * 0.67), int(size * 0.83)), start=20, end=160, fill=face_color, width=max(1, size // 22))
+    draw.arc((int(size * 0.37), int(size * 0.62), int(size * 0.65), int(size * 0.82)), start=20, end=160, fill=face_color, width=max(1, size // 28))
 
     if accessory == "umbrella":
         canopy_y = int(size * 0.18)
@@ -908,15 +907,15 @@ def render_weather_face(draw: ImageDraw.ImageDraw, size: int, accessory: str, su
 def render_weather(state: WeatherState, frame_index: int, size: int, accessory: str, temperature_unit: str) -> Image.Image:
     summary = state.summary
     if summary == "sunny":
-        bg_top, bg_bottom = (35, 80, 130), (245, 160, 55)
+        bg_top, bg_bottom = (20, 55, 115), (240, 135, 35)
     elif summary == "rain":
-        bg_top, bg_bottom = (16, 32, 48), (45, 83, 112)
+        bg_top, bg_bottom = (5, 20, 42), (20, 70, 120)
     elif summary == "snow":
-        bg_top, bg_bottom = (30, 44, 64), (140, 175, 200)
+        bg_top, bg_bottom = (18, 35, 70), (115, 165, 210)
     elif summary == "cloudy":
-        bg_top, bg_bottom = (45, 55, 66), (92, 104, 112)
+        bg_top, bg_bottom = (25, 35, 55), (85, 100, 115)
     else:
-        bg_top, bg_bottom = (20, 28, 38), (65, 85, 105)
+        bg_top, bg_bottom = (16, 20, 30), (42, 50, 64)
 
     image = Image.new("RGB", (size, size), bg_top)
     draw = ImageDraw.Draw(image)
@@ -926,23 +925,39 @@ def render_weather(state: WeatherState, frame_index: int, size: int, accessory: 
         draw.line((0, y, size, y), fill=color)
 
     if summary == "sunny":
-        cx, cy, radius = int(size * 0.76), int(size * 0.18), max(7, size // 8)
-        for ray in range(10):
-            angle = ray * math.tau / 10 + frame_index * 0.03
-            draw.line((cx, cy, cx + int(math.cos(angle) * radius * 1.7), cy + int(math.sin(angle) * radius * 1.7)), fill=(255, 220, 90), width=1)
-        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(255, 220, 75))
+        cx, cy, radius = int(size * 0.72), int(size * 0.20), max(10, size // 6)
+        for ray in range(12):
+            angle = ray * math.tau / 12 + frame_index * 0.035
+            start = radius * 1.15
+            end = radius * 1.95
+            draw.line(
+                (
+                    cx + int(math.cos(angle) * start),
+                    cy + int(math.sin(angle) * start),
+                    cx + int(math.cos(angle) * end),
+                    cy + int(math.sin(angle) * end),
+                ),
+                fill=(255, 210, 50),
+                width=max(1, size // 32),
+            )
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=(255, 205, 35), outline=(255, 245, 145))
     elif summary == "cloudy":
         draw.ellipse((int(size * 0.12), int(size * 0.12), int(size * 0.48), int(size * 0.34)), fill=(190, 200, 205))
         draw.ellipse((int(size * 0.32), int(size * 0.08), int(size * 0.75), int(size * 0.35)), fill=(215, 220, 222))
         draw.rectangle((int(size * 0.16), int(size * 0.23), int(size * 0.78), int(size * 0.37)), fill=(205, 212, 216))
     elif summary in {"rain", "snow"}:
-        for drop in range(10):
-            x = (drop * 11 + frame_index * 2) % size
-            y = (drop * 17 + frame_index * 5) % size
+        for drop in range(16):
+            x = (drop * 9 + frame_index * 2) % size
+            y = (drop * 13 + frame_index * 5) % size
             if summary == "snow":
-                draw.rectangle((x, y, x + 1, y + 1), fill=(245, 245, 255))
+                draw.rectangle((x, y, x + 2, y + 2), fill=(245, 250, 255))
             else:
-                draw.line((x, y, x - 2, y + 5), fill=(120, 200, 245), width=1)
+                draw.line((x, y, x - 3, y + 7), fill=(70, 190, 255), width=max(1, size // 32))
+
+    if summary == "weather":
+        draw.rectangle((8, int(size * 0.20), size - 8, int(size * 0.36)), fill=(210, 180, 70))
+        draw.text((11, int(size * 0.22)), "SET", fill=(10, 10, 10))
+        draw.text((30, int(size * 0.22)), "LOC", fill=(10, 10, 10))
 
     render_weather_face(draw, size, accessory, summary)
 
