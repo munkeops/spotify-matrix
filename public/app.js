@@ -219,7 +219,9 @@ saveButton.addEventListener("click", async () => {
 
 saveStartButton.addEventListener("click", async () => {
   await saveConfig(activeMode);
+  await api("/api/runtime/stop", { method: "POST", body: "{}" });
   await api("/api/runtime/start", { method: "POST", body: "{}" });
+  setMessage(`${modeMeta[activeMode][0]} mode saved and restarted.`);
   await refreshStatus();
 });
 
