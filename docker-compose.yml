@@ -1,0 +1,42 @@
+services:
+  spotify-matrix:
+    build: .
+    container_name: spotify-matrix
+    privileged: true
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      SPOTIFY_MATRIX_DATA_DIR: /app/data
+      SPOTIFY_MATRIX_CONFIG: /app/data/config.json
+      SPOTIFY_TOKEN_CACHE: /app/data/spotify_token.json
+    volumes:
+      - ./data:/app/data
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: spotify-matrix-cloudflared
+    network_mode: host
+    restart: unless-stopped
+    profiles:
+      - tunnel
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN:?Set CLOUDFLARED_TOKEN in .env}
+    depends_on:
+      - spotify-matrix
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: spotify-matrix-portainer
+    restart: unless-stopped
+    profiles:
+      - admin
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+volumes:
+  portainer_data:
