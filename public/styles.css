@@ -1446,6 +1446,7 @@ label {
 
   body.sidebar-collapsed .sidebar {
     align-items: stretch;
+    padding: 16px;
   }
 
   .nav-list {
@@ -1455,11 +1456,21 @@ label {
   body.sidebar-collapsed .sidebar-head {
     display: flex;
     justify-content: space-between;
+    width: 100%;
   }
 
   body.sidebar-collapsed .brand-mark {
     justify-content: flex-start;
     width: auto;
+  }
+
+  body.sidebar-collapsed .brand-copy {
+    display: block;
+  }
+
+  body.sidebar-collapsed .nav-list,
+  body.sidebar-collapsed .sidebar-status {
+    display: none;
   }
 
   body.sidebar-collapsed .nav-item {
