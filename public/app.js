@@ -217,16 +217,35 @@ async function api(path, options = {}) {
   return payload;
 }
 
-function field(form, name) {
-  return form?.elements?.[name];
+function fields(container, name) {
+  if (!container) {
+    return [];
+  }
+  const element = container.elements?.[name];
+  if (element) {
+    if (element instanceof RadioNodeList) {
+      return [...element];
+    }
+    return [element];
+  }
+  return [...container.querySelectorAll(`[name="${name}"]`)];
 }
 
-function fieldValue(form, name, fallback = "") {
-  return field(form, name)?.value ?? fallback;
+function field(container, name) {
+  return fields(container, name)[0];
 }
 
-function fieldChecked(form, name) {
-  return Boolean(field(form, name)?.checked);
+function fieldValue(container, name, fallback = "") {
+  const controls = fields(container, name);
+  if (!controls.length) {
+    return fallback;
+  }
+  const checked = controls.find((control) => control.type === "radio" && control.checked);
+  return (checked || controls[0]).value ?? fallback;
+}
+
+function fieldChecked(container, name) {
+  return Boolean(field(container, name)?.checked);
 }
 
 function setMessage(message) {
@@ -263,8 +282,11 @@ function fillPanel(form, values) {
     if (!control) {
       continue;
     }
-    if (control instanceof RadioNodeList) {
-      control.value = value;
+    const controls = fields(form, key);
+    if (controls.length > 1 && controls.every((candidate) => candidate.type === "radio")) {
+      controls.forEach((candidate) => {
+        candidate.checked = candidate.value === value;
+      });
     } else if (control.type === "checkbox") {
       control.checked = Boolean(value);
     } else {
