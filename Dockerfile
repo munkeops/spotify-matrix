@@ -16,6 +16,7 @@ RUN apt-get update \
         cython3 \
         git \
         python3-dev \
+        tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir "poetry>=1.8,<2"

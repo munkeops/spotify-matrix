@@ -276,6 +276,12 @@ function setSelectedPlugin(plugin) {
   dialogTitle.textContent = pluginLabels[plugin] || "Plugin";
 }
 
+function syncActiveMode(mode) {
+  activeMode.textContent = pluginLabels[mode] || "Spotify";
+  matrixPreview.dataset.mode = mode;
+  pluginCards.forEach((card) => card.classList.toggle("active", card.dataset.plugin === mode));
+}
+
 function fillPanel(form, values) {
   for (const [key, value] of Object.entries(values || {})) {
     const control = field(form, key);
@@ -321,8 +327,7 @@ function fillForms(config) {
     testPattern: Boolean(config.runtime?.testPattern)
   });
 
-  activeMode.textContent = pluginLabels[mode] || "Spotify";
-  matrixPreview.dataset.mode = mode;
+  syncActiveMode(mode);
   setSelectedPlugin(mode);
 }
 
@@ -383,6 +388,7 @@ async function applyPlugin(plugin = selectedPlugin) {
   try {
     await saveConfig(plugin);
     await api("/api/runtime/apply", { method: "POST", body: "{}" });
+    syncActiveMode(plugin);
     if (pluginDialog.open) {
       pluginDialog.close();
     }
@@ -480,9 +486,25 @@ directAuthButton?.addEventListener("click", async () => {
 });
 
 displayPowerButton?.addEventListener("click", async () => {
-  const path = runtimeRunning ? "/api/runtime/stop" : "/api/runtime/start";
-  await api(path, { method: "POST", body: "{}" });
-  await refreshStatus();
+  displayPowerButton.disabled = true;
+  try {
+    const path = runtimeRunning ? "/api/runtime/stop" : "/api/runtime/apply";
+    await api(path, { method: "POST", body: "{}" });
+    await refreshStatus();
+  } catch (error) {
+    setMessage(error.message);
+    await refreshStatus().catch(() => undefined);
+  } finally {
+    displayPowerButton.disabled = false;
+  }
+});
+
+fields(clockPanel, "clockFace").forEach((control) => {
+  control.addEventListener("change", () => {
+    if (control.checked) {
+      selectedPlugin = "clock";
+    }
+  });
 });
 
 populateTimezones();
