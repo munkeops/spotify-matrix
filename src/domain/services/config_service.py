@@ -56,6 +56,8 @@ class ConfigService:
 
     def missing_values(self, config: AppConfig) -> list[str]:
         missing = []
+        if config.display.mode != "spotify":
+            return missing
         if not config.spotify.clientId:
             missing.append("Spotify Client ID")
         if not config.spotify.clientSecret:

@@ -18,3 +18,8 @@ async def start_runtime() -> RuntimeActionResponse:
 @router.post("/api/runtime/stop", response_model=RuntimeActionResponse)
 async def stop_runtime() -> RuntimeActionResponse:
     return RuntimeActionResponse(runtime=runtime_service.stop())
+
+
+@router.post("/api/runtime/apply", response_model=RuntimeActionResponse)
+async def apply_runtime() -> RuntimeActionResponse:
+    return RuntimeActionResponse(runtime=runtime_service.apply())

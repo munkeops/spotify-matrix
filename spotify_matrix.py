@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import argparse
 import base64
+from datetime import datetime
 from io import BytesIO
 import json
+import math
 import os
 import secrets
 import sys
@@ -19,6 +21,7 @@ from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from PIL import Image, ImageDraw, ImageOps
 
@@ -163,6 +166,44 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
             continue
         attr_name = attr_names.get(config_name, config_name)
         setattr(args, attr_name, caster(value))
+
+    display_mode = get_nested(config, "display", "mode")
+    if display_mode and "--display-mode" not in sys.argv[1:]:
+        args.display_mode = str(display_mode)
+
+    clock_fields = {
+        "face": ("clock_face", str),
+        "use24Hour": ("clock_24_hour", bool),
+        "showSeconds": ("clock_show_seconds", bool),
+        "timezone": ("clock_timezone", str),
+    }
+    clock_flags = {
+        "face": ("--clock-face",),
+        "use24Hour": ("--clock-24-hour",),
+        "showSeconds": ("--clock-show-seconds",),
+        "timezone": ("--clock-timezone",),
+    }
+    for config_name, (attr_name, caster) in clock_fields.items():
+        if any(flag in sys.argv[1:] for flag in clock_flags[config_name]):
+            continue
+        value = get_nested(config, "clock", config_name)
+        if value is not None:
+            setattr(args, attr_name, caster(value))
+
+    agent_fields = {
+        "faceStyle": ("agent_face_style", str),
+        "animationSpeed": ("agent_animation_speed", str),
+    }
+    agent_flags = {
+        "faceStyle": ("--agent-face-style",),
+        "animationSpeed": ("--agent-animation-speed",),
+    }
+    for config_name, (attr_name, caster) in agent_fields.items():
+        if any(flag in sys.argv[1:] for flag in agent_flags[config_name]):
+            continue
+        value = get_nested(config, "agent", config_name)
+        if value is not None:
+            setattr(args, attr_name, caster(value))
 
 
 def spotify_credentials(config: dict[str, Any]) -> tuple[str | None, str | None, str]:
@@ -564,6 +605,172 @@ def render_test_pattern(size: int, offset: int) -> Image.Image:
     return frame
 
 
+DIGIT_SEGMENTS = {
+    "0": ("a", "b", "c", "d", "e", "f"),
+    "1": ("b", "c"),
+    "2": ("a", "b", "g", "e", "d"),
+    "3": ("a", "b", "c", "d", "g"),
+    "4": ("f", "g", "b", "c"),
+    "5": ("a", "f", "g", "c", "d"),
+    "6": ("a", "f", "e", "d", "c", "g"),
+    "7": ("a", "b", "c"),
+    "8": ("a", "b", "c", "d", "e", "f", "g"),
+    "9": ("a", "b", "c", "d", "f", "g"),
+}
+
+
+def now_for_clock(timezone_name: str) -> datetime:
+    if timezone_name:
+        try:
+            return datetime.now(ZoneInfo(timezone_name))
+        except ZoneInfoNotFoundError:
+            print(f"Clock timezone not found: {timezone_name}; using system timezone.", flush=True)
+    return datetime.now().astimezone()
+
+
+def draw_segment_digit(draw: ImageDraw.ImageDraw, origin: tuple[int, int], digit: str, scale: int, color: tuple[int, int, int]) -> None:
+    x, y = origin
+    thickness = max(1, scale)
+    width = scale * 4
+    height = scale * 7
+    segments = DIGIT_SEGMENTS.get(digit, ())
+    boxes = {
+        "a": (x + thickness, y, x + width - thickness, y + thickness),
+        "b": (x + width - thickness, y + thickness, x + width, y + height // 2 - thickness // 2),
+        "c": (x + width - thickness, y + height // 2 + thickness // 2, x + width, y + height - thickness),
+        "d": (x + thickness, y + height - thickness, x + width - thickness, y + height),
+        "e": (x, y + height // 2 + thickness // 2, x + thickness, y + height - thickness),
+        "f": (x, y + thickness, x + thickness, y + height // 2 - thickness // 2),
+        "g": (x + thickness, y + height // 2 - thickness // 2, x + width - thickness, y + height // 2 + thickness // 2),
+    }
+    for segment in segments:
+        draw.rounded_rectangle(boxes[segment], radius=max(1, thickness // 2), fill=color)
+
+
+def render_digital_clock(size: int, now: datetime, use_24_hour: bool, show_seconds: bool) -> Image.Image:
+    frame = Image.new("RGB", (size, size), (0, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    hour = now.hour if use_24_hour else ((now.hour - 1) % 12) + 1
+    text = f"{hour:02d}{now.minute:02d}"
+    scale = max(1, size // 26)
+    digit_width = scale * 4
+    gap = max(1, scale)
+    colon_width = scale
+    total_width = digit_width * 4 + gap * 4 + colon_width
+    start_x = max(0, (size - total_width) // 2)
+    start_y = max(2, (size - scale * 7) // 2 - (scale if show_seconds else 0))
+    color = (245, 245, 245)
+    x = start_x
+    for index, digit in enumerate(text):
+        if index == 2:
+            cx = x + gap
+            cy = start_y + scale * 2
+            dot = max(1, scale)
+            draw.rectangle((cx, cy, cx + dot, cy + dot), fill=(150, 255, 190))
+            draw.rectangle((cx, cy + scale * 3, cx + dot, cy + scale * 3 + dot), fill=(150, 255, 190))
+            x += colon_width + gap * 2
+        draw_segment_digit(draw, (x, start_y), digit, scale, color)
+        x += digit_width + gap
+    if show_seconds:
+        seconds_width = max(1, size // 2)
+        filled = int(seconds_width * (now.second / 59))
+        x0 = (size - seconds_width) // 2
+        y0 = min(size - 5, start_y + scale * 8 + 3)
+        draw.rectangle((x0, y0, x0 + seconds_width, y0 + 1), fill=(32, 32, 32))
+        draw.rectangle((x0, y0, x0 + filled, y0 + 1), fill=(150, 255, 190))
+    return frame
+
+
+def render_analog_clock(size: int, now: datetime) -> Image.Image:
+    frame = Image.new("RGB", (size, size), (0, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    center = size // 2
+    radius = max(8, size // 2 - 4)
+    draw.ellipse((center - radius, center - radius, center + radius, center + radius), outline=(240, 240, 240), width=max(1, size // 32))
+    for tick in range(12):
+        angle = (tick / 12.0) * math.tau - math.pi / 2
+        inner = radius - (5 if tick % 3 == 0 else 3)
+        x1 = center + int(math.cos(angle) * inner)
+        y1 = center + int(math.sin(angle) * inner)
+        x2 = center + int(math.cos(angle) * radius)
+        y2 = center + int(math.sin(angle) * radius)
+        draw.line((x1, y1, x2, y2), fill=(140, 255, 185) if tick % 3 == 0 else (95, 95, 95), width=1)
+
+    minute_angle = ((now.minute + now.second / 60.0) / 60.0) * math.tau - math.pi / 2
+    hour_angle = (((now.hour % 12) + now.minute / 60.0) / 12.0) * math.tau - math.pi / 2
+    hour_len = radius * 0.46
+    minute_len = radius * 0.72
+    draw.line((center, center, center + int(math.cos(hour_angle) * hour_len), center + int(math.sin(hour_angle) * hour_len)), fill=(255, 255, 255), width=max(2, size // 22))
+    draw.line((center, center, center + int(math.cos(minute_angle) * minute_len), center + int(math.sin(minute_angle) * minute_len)), fill=(130, 255, 180), width=max(1, size // 32))
+    draw.ellipse((center - 2, center - 2, center + 2, center + 2), fill=(255, 255, 255))
+    return frame
+
+
+def render_minimal_clock(size: int, now: datetime, use_24_hour: bool) -> Image.Image:
+    frame = Image.new("RGB", (size, size), (0, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    center = size // 2
+    radius = max(8, size // 2 - 5)
+    progress = (now.minute * 60 + now.second) / 3600.0
+    steps = max(12, size * 2)
+    previous: tuple[int, int] | None = None
+    for step in range(int(steps * progress) + 1):
+        angle = (step / steps) * math.tau - math.pi / 2
+        point = (center + int(math.cos(angle) * radius), center + int(math.sin(angle) * radius))
+        if previous:
+            draw.line((previous[0], previous[1], point[0], point[1]), fill=(140, 255, 190), width=2)
+        previous = point
+    draw.ellipse((center - radius, center - radius, center + radius, center + radius), outline=(38, 38, 38), width=1)
+    hour = now.hour if use_24_hour else ((now.hour - 1) % 12) + 1
+    label = f"{hour:02d}:{now.minute:02d}"
+    bbox = draw.textbbox((0, 0), label)
+    draw.text(((size - (bbox[2] - bbox[0])) // 2, center - 4), label, fill=(245, 245, 245))
+    return frame
+
+
+def render_clock(size: int, now: datetime, face: str, use_24_hour: bool, show_seconds: bool) -> Image.Image:
+    if face == "digital":
+        return render_digital_clock(size, now, use_24_hour, show_seconds)
+    if face == "minimal":
+        return render_minimal_clock(size, now, use_24_hour)
+    return render_analog_clock(size, now)
+
+
+def render_agent_face(size: int, frame_index: int, style: str, speed: str) -> Image.Image:
+    frame = Image.new("RGB", (size, size), (0, 0, 0))
+    draw = ImageDraw.Draw(frame)
+    speed_factor = {"slow": 0.65, "normal": 1.0, "fast": 1.45}.get(speed, 1.0)
+    phase = frame_index * speed_factor
+    blink = int(phase) % 72 in {0, 1, 2}
+    glance = int(phase // 36) % 3 - 1
+    eye_size = max(5, size // (7 if style == "wide" else 8))
+    eye_y = size // 3
+    eye_gap = size // (4 if style == "wide" else 5)
+    eye_offset = int(glance * max(1, size // 18))
+    eye_color = (245, 245, 245)
+    smile_color = (245, 245, 245)
+
+    for eye_center_x in (size // 2 - eye_gap, size // 2 + eye_gap):
+        x = eye_center_x - eye_size // 2 + eye_offset
+        y = eye_y - eye_size // 2
+        if blink or style == "sleepy" and int(phase) % 48 < 10:
+            draw.rectangle((x, eye_y, x + eye_size, eye_y + max(1, eye_size // 4)), fill=eye_color)
+        else:
+            draw.rectangle((x, y, x + eye_size, y + eye_size), fill=eye_color)
+
+    smile_y = size // 2 + size // 7
+    smile_w = size // 3
+    smile_h = size // 7
+    mouth_shift = int(math.sin(phase / 12.0) * max(1, size // 40))
+    for step in range(smile_w):
+        progress = step / max(1, smile_w - 1)
+        x = size // 2 - smile_w // 2 + step
+        y = smile_y + int(math.sin(progress * math.pi) * smile_h) + mouth_shift
+        draw.rectangle((x, y, x + 1, y + 1), fill=smile_color)
+
+    return frame
+
+
 def poll_spotify(
     spotify: SpotifyClient,
     state: SharedPlaybackState,
@@ -609,15 +816,65 @@ def poll_spotify(
         stop_event.wait(poll_seconds)
 
 
-def run(args: argparse.Namespace) -> None:
-    if args.preview_frames:
-        render_preview_frames(args.preview_frames)
-        return
+def create_display(args: argparse.Namespace) -> MatrixDisplay | MockDisplay:
+    display: MatrixDisplay | MockDisplay
+    if args.mock_output:
+        display = MockDisplay(args.mock_output)
+    else:
+        display = MatrixDisplay(args)
+    return display
 
-    load_dotenv()
-    config = load_json_config(args.config_path)
-    apply_config_defaults(args, config)
 
+def run_test_pattern(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    try:
+        offset = 0
+        while True:
+            display.show(render_test_pattern(size, offset))
+            offset = (offset + 1) % size
+            if args.once:
+                break
+            time.sleep(1.0 / args.fps)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
+def run_clock(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    try:
+        while True:
+            now = now_for_clock(args.clock_timezone)
+            display.show(render_clock(size, now, args.clock_face, args.clock_24_hour, args.clock_show_seconds))
+            if args.once:
+                break
+            time.sleep(1.0 if not args.clock_show_seconds else min(1.0, 1.0 / args.fps))
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
+def run_agent(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    try:
+        frame_index = 0
+        while True:
+            display.show(render_agent_face(size, frame_index, args.agent_face_style, args.agent_animation_speed))
+            frame_index += 1
+            if args.once:
+                break
+            time.sleep(1.0 / args.fps)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
+def run_spotify(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+    display: MatrixDisplay | MockDisplay | None = None,
+    size: int | None = None,
+) -> None:
     client_id, client_secret, redirect_uri = spotify_credentials(config)
 
     missing = [
@@ -648,27 +905,10 @@ def run(args: argparse.Namespace) -> None:
         print(f"Spotify token cached at {args.token_cache}")
         return
 
-    display: MatrixDisplay | MockDisplay
-    if args.mock_output:
-        display = MockDisplay(args.mock_output)
-    else:
-        display = MatrixDisplay(args)
-
-    size = min(args.rows, args.cols)
-
-    if args.test_pattern:
-        try:
-            offset = 0
-            while True:
-                display.show(render_test_pattern(size, offset))
-                offset = (offset + 1) % size
-                time.sleep(1.0 / args.fps)
-        except KeyboardInterrupt:
-            pass
-        finally:
-            display.clear()
-        return
-
+    if display is None:
+        display = create_display(args)
+    if size is None:
+        size = min(args.rows, args.cols)
     idle = render_idle(size)
     playback_state = SharedPlaybackState()
     playback_lock = threading.Lock()
@@ -713,6 +953,34 @@ def run(args: argparse.Namespace) -> None:
         display.clear()
 
 
+def run(args: argparse.Namespace) -> None:
+    if args.preview_frames:
+        render_preview_frames(args.preview_frames)
+        return
+
+    load_dotenv()
+    config = load_json_config(args.config_path)
+    apply_config_defaults(args, config)
+
+    mode = "testPattern" if args.test_pattern else args.display_mode
+
+    if mode == "spotify":
+        run_spotify(args, config)
+        return
+
+    display = create_display(args)
+    size = min(args.rows, args.cols)
+
+    if mode == "testPattern":
+        run_test_pattern(args, display, size)
+    elif mode == "clock":
+        run_clock(args, display, size)
+    elif mode == "agent":
+        run_agent(args, display, size)
+    else:
+        run_spotify(args, config, display, size)
+
+
 def positive_float(value: str) -> float:
     parsed = float(value)
     if parsed <= 0:
@@ -728,7 +996,8 @@ def render_preview_frames(directory: Path) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Spin Spotify album art on a 64x64 RGB matrix.")
+    parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "testPattern"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)
@@ -752,6 +1021,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--preview-frames", type=Path, help="Render sample spinning-album-art disk frames and exit.")
     parser.add_argument("--auth-only", action="store_true", help="Authorize Spotify, cache the token, and exit without using the matrix.")
     parser.add_argument("--test-pattern", action="store_true", help="Show a bright moving color test pattern without using Spotify.")
+    parser.add_argument("--clock-face", choices=("analog", "digital", "minimal"), default="analog")
+    parser.add_argument("--clock-24-hour", action="store_true", help="Use 24-hour time in clock mode.")
+    parser.add_argument("--clock-show-seconds", action="store_true", help="Show second progress in clock mode.")
+    parser.add_argument("--clock-timezone", default="", help="IANA timezone name for clock mode, such as America/Chicago.")
+    parser.add_argument("--agent-face-style", choices=("classic", "wide", "sleepy"), default="classic")
+    parser.add_argument("--agent-animation-speed", choices=("slow", "normal", "fast"), default="normal")
     parser.add_argument("--once", action="store_true", help="Render one frame and exit.")
     parser.add_argument("--no-browser", action="store_true", help="Print the Spotify auth URL without trying to open a browser.")
     return parser

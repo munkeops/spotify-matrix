@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from configs import base_config
-from src.api.http.rest import auth, config, runtime, status
+from src.api.http.rest import auth, commands, config, runtime, status
 from src.domain.models.response import ErrorResponse, SuccessResponse
 from src.utils.logging_setup import initialize_logging
 
@@ -20,7 +20,7 @@ def create_app() -> FastAPI:
     initialize_logging()
 
     app = FastAPI(
-        title="Spotify Matrix Service",
+        title="Assistant Matrix Service",
         version="0.2.0",
         docs_url="/api/v1/spotify-matrix/docs",
         redoc_url="/api/v1/spotify-matrix/redoc",
@@ -65,6 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(config.router)
     app.include_router(status.router)
     app.include_router(auth.router)
+    app.include_router(commands.router)
     app.include_router(runtime.router)
 
     public_dir = str(base_config["paths"]["public_dir"])

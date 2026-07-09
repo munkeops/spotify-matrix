@@ -65,11 +65,25 @@ class RuntimeService:
             self.last_exit = RuntimeExit(code=self.process.returncode, signal=None, at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
         return self.state()
 
+    def apply(self) -> RuntimeState:
+        was_running = self.process is not None and self.process.poll() is None
+        if was_running:
+            self.stop()
+        return self.start()
+
     def _args(self) -> list[str]:
         config = config_service.get_config()
         matrix = config.matrix
         args = [
             str(self.runtime_script),
+            "--display-mode",
+            "testPattern" if config.runtime.testPattern else config.display.mode,
+            "--clock-face",
+            config.clock.face,
+            "--agent-face-style",
+            config.agent.faceStyle,
+            "--agent-animation-speed",
+            config.agent.animationSpeed,
             "--config-path",
             str(config_service.config_path),
             "--token-cache",
@@ -104,6 +118,12 @@ class RuntimeService:
             args.append("--no-hardware-pulse")
         if config.runtime.mockOutput:
             args.extend(["--mock-output", config.runtime.mockOutput])
+        if config.clock.use24Hour:
+            args.append("--clock-24-hour")
+        if config.clock.showSeconds:
+            args.append("--clock-show-seconds")
+        if config.clock.timezone:
+            args.extend(["--clock-timezone", config.clock.timezone])
         if config.runtime.testPattern:
             args.append("--test-pattern")
         return args

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -34,10 +34,29 @@ class RuntimeConfig(BaseModel):
     testPattern: bool = False
 
 
+class DisplayConfig(BaseModel):
+    mode: Literal["spotify", "clock", "agent", "testPattern"] = "spotify"
+
+
+class ClockConfig(BaseModel):
+    face: Literal["analog", "digital", "minimal"] = "analog"
+    use24Hour: bool = False
+    showSeconds: bool = False
+    timezone: str = ""
+
+
+class AgentConfig(BaseModel):
+    faceStyle: Literal["classic", "wide", "sleepy"] = "classic"
+    animationSpeed: Literal["slow", "normal", "fast"] = "normal"
+
+
 class AppConfig(BaseModel):
     spotify: SpotifyConfig = Field(default_factory=SpotifyConfig)
     matrix: MatrixConfig = Field(default_factory=MatrixConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)
+    display: DisplayConfig = Field(default_factory=DisplayConfig)
+    clock: ClockConfig = Field(default_factory=ClockConfig)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
 
 
 class TokenStatus(BaseModel):
@@ -101,4 +120,15 @@ class TokenSaveResponse(BaseModel):
 
 
 class RuntimeActionResponse(BaseModel):
+    runtime: RuntimeState
+
+
+class CommandRequest(BaseModel):
+    command: Literal["set_mode", "set_clock_face", "set_brightness", "start_runtime", "stop_runtime"]
+    value: str | int | None = None
+
+
+class CommandResponse(BaseModel):
+    ok: bool
+    config: AppConfig
     runtime: RuntimeState
