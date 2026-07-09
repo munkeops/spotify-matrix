@@ -38,6 +38,7 @@ CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 SCOPE = "user-read-currently-playing"
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SPOTIFY_MATRIX_CONFIG", "data/config.json"))
 DEFAULT_TOKEN_CACHE = Path(os.environ.get("SPOTIFY_TOKEN_CACHE", "data/spotify_token.json"))
+WEATHER_SLIDE_SECONDS = 4
 
 
 @dataclass
@@ -1044,7 +1045,7 @@ def render_weather_scene(state: WeatherState, frame_index: int, size: int, acces
 
 
 def render_weather(state: WeatherState, frame_index: int, size: int, accessory: str, temperature_unit: str, fps: float) -> Image.Image:
-    slide_frames = max(1, int(round(fps)))
+    slide_frames = max(1, int(round(fps * WEATHER_SLIDE_SECONDS)))
     if (frame_index // slide_frames) % 2 == 0:
         return render_weather_quad(state, frame_index, size, temperature_unit)
     return render_weather_scene(state, frame_index, size, accessory, temperature_unit)
