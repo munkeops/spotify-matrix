@@ -570,6 +570,7 @@ dd {
   padding: 16px;
   color: #f3f0e8;
   text-align: left;
+  cursor: pointer;
 }
 
 .plugin-card:hover {
@@ -578,6 +579,16 @@ dd {
 
 .plugin-card.active {
   border-color: #9bd0d9;
+}
+
+.plugin-card:focus-visible {
+  outline: 3px solid rgba(155, 208, 217, 0.38);
+  outline-offset: 2px;
+}
+
+.plugin-card.planned {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .plugin-card strong {
@@ -610,6 +621,19 @@ dd {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background-color: #050607;
   overflow: hidden;
+}
+
+.plugin-settings-button {
+  align-self: end;
+  justify-self: start;
+  padding: 8px 11px;
+  background: #272b2f;
+  color: #f3f0e8;
+  font-size: 12px;
+}
+
+.plugin-settings-button:hover {
+  background: #343b42;
 }
 
 .preview-spotify {

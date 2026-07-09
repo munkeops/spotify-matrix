@@ -2,6 +2,7 @@ const navItems = [...document.querySelectorAll(".nav-item")];
 const sidebarToggle = document.querySelector("#sidebarToggle");
 const pages = [...document.querySelectorAll("[data-page-panel]")];
 const pluginCards = [...document.querySelectorAll(".plugin-card[data-plugin]")];
+const pluginSettingsButtons = [...document.querySelectorAll("[data-plugin-settings]")];
 const configPanels = [...document.querySelectorAll("[data-config-panel]")];
 const spotifyPanel = document.querySelector("#spotifyPanel");
 const matrixPanel = document.querySelector("#matrixPanel");
@@ -459,6 +460,20 @@ sidebarToggle?.addEventListener("click", () => {
 pluginCards.forEach((card) => {
   card.addEventListener("click", () => {
     const plugin = card.dataset.plugin;
+    applyPlugin(plugin);
+  });
+  card.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      applyPlugin(card.dataset.plugin);
+    }
+  });
+});
+
+pluginSettingsButtons.forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const plugin = button.dataset.pluginSettings;
     setSelectedPlugin(plugin);
     pluginDialog.showModal();
   });

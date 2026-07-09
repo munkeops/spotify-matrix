@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260709d">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260709e">
   </head>
   <body>
     <main class="app-frame">
@@ -82,13 +82,14 @@
           </header>
 
           <section class="plugin-grid" aria-label="Display plugins">
-            <button class="plugin-card active" type="button" data-plugin="spotify">
+            <article class="plugin-card active" data-plugin="spotify" role="button" tabindex="0">
               <span class="plugin-meta">Music</span>
               <strong>Spotify</strong>
               <small>Spin the current album art while music is playing.</small>
               <span class="plugin-preview preview-spotify" aria-hidden="true"></span>
-            </button>
-            <button class="plugin-card" type="button" data-plugin="clock">
+              <button class="plugin-settings-button" type="button" data-plugin-settings="spotify">Settings</button>
+            </article>
+            <article class="plugin-card" data-plugin="clock" role="button" tabindex="0">
               <span class="plugin-meta">Ambient</span>
               <strong>Clock</strong>
               <small>Show time with swappable matrix clock faces.</small>
@@ -103,14 +104,16 @@
                   <span class="plugin-clock-pin"></span>
                 </span>
               </span>
-            </button>
-            <button class="plugin-card" type="button" data-plugin="agent">
+              <button class="plugin-settings-button" type="button" data-plugin-settings="clock">Settings</button>
+            </article>
+            <article class="plugin-card" data-plugin="agent" role="button" tabindex="0">
               <span class="plugin-meta">Assistant</span>
               <strong>Agent Face</strong>
               <small>Animated idle face for future voice-agent behavior.</small>
               <span class="plugin-preview preview-agent" aria-hidden="true"></span>
-            </button>
-            <button class="plugin-card" type="button" data-plugin="weather">
+              <button class="plugin-settings-button" type="button" data-plugin-settings="agent">Settings</button>
+            </article>
+            <article class="plugin-card" data-plugin="weather" role="button" tabindex="0">
               <span class="plugin-meta">Weather</span>
               <strong>Weather</strong>
               <small>Live conditions with playful assistant scenes.</small>
@@ -121,25 +124,27 @@
                   <span class="weather-smile-mini"></span>
                 </span>
               </span>
-            </button>
-            <button class="plugin-card" type="button" data-plugin="testPattern">
+              <button class="plugin-settings-button" type="button" data-plugin-settings="weather">Settings</button>
+            </article>
+            <article class="plugin-card" data-plugin="testPattern" role="button" tabindex="0">
               <span class="plugin-meta">Diagnostic</span>
               <strong>Test Pattern</strong>
               <small>Moving color bars for panel tuning.</small>
               <span class="plugin-preview preview-test" aria-hidden="true"></span>
-            </button>
-            <button class="plugin-card planned" type="button" disabled>
+              <button class="plugin-settings-button" type="button" data-plugin-settings="testPattern">Settings</button>
+            </article>
+            <article class="plugin-card planned" aria-disabled="true">
               <span class="plugin-meta">Planned</span>
               <strong>Widget Board</strong>
               <small>Compose multiple small widgets into one live screen.</small>
               <span class="plugin-preview preview-board" aria-hidden="true"></span>
-            </button>
-            <button class="plugin-card planned" type="button" disabled>
+            </article>
+            <article class="plugin-card planned" aria-disabled="true">
               <span class="plugin-meta">Planned</span>
               <strong>Calendar</strong>
               <small>Rotating pages for agenda and schedule views.</small>
               <span class="plugin-preview preview-calendar" aria-hidden="true"></span>
-            </button>
+            </article>
           </section>
         </section>
 
@@ -351,6 +356,6 @@
       </form>
     </dialog>
 
-    <script src="/app.js?v=assistant-20260709d"></script>
+    <script src="/app.js?v=assistant-20260709e"></script>
   </body>
 </html>
