@@ -605,7 +605,8 @@ Trigger rules need priorities so urgent display events can temporarily override 
 - Status: partially implemented.
 - Added priority-based trigger handling.
 - Added event submission API and command API.
-- Event producers and event history UI remain future work.
+- Spotify playback event emission is implemented for the Spotify runtime.
+- Additional event producers and event history UI remain future work.
 
 ### Phase 7: Hosted Store
 
@@ -621,7 +622,7 @@ The local widget registry, static store, SDK, install lifecycle, config APIs, po
 The next useful branches should focus on:
 
 - UI polish for the Store and Display Policy pages.
-- Event producers, such as emitting `spotify.playback_started` automatically from the Spotify runtime.
+- Additional event producers beyond Spotify, such as weather alerts, calendar reminders, sensors, and future voice-agent state.
 - Event history in the UI.
 - Dependency isolation for third-party Python widgets.
 - A hosted store service if static object-store publishing becomes limiting.

@@ -309,6 +309,14 @@ Response:
 
 Events temporarily override the current display based on saved trigger rules.
 
+Built-in Spotify runtime events:
+
+- `spotify.playback_started`
+- `spotify.playback_paused`
+- `spotify.playback_stopped`
+
+When the FastAPI supervisor starts `spotify_matrix.py`, it passes the local event endpoint through `--event-api-url`. Standalone CLI runs can omit that flag to disable event posting.
+
 ### Submit Display Event
 
 ```text

@@ -120,6 +120,21 @@ def raise_http_error(response: HttpResponse, context: str) -> None:
     raise RuntimeError(f"{context} failed with HTTP {response.status}: {body}")
 
 
+def post_json(url: str, payload: dict[str, Any], *, timeout: float = 2.0) -> HttpResponse:
+    encoded = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=encoded,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return HttpResponse(response.status, response.headers, response.read())
+    except HTTPError as exc:
+        return HttpResponse(exc.code, exc.headers, exc.read())
+
+
 def load_json_config(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -1138,14 +1153,28 @@ def render_weather(
     return render_weather_scene(state, frame_index, size, accessory, temperature_unit)
 
 
+def emit_display_event(event_api_url: str, event: str, payload: dict[str, Any]) -> None:
+    if not event_api_url:
+        return
+    try:
+        response = post_json(event_api_url, {"event": event, "payload": payload}, timeout=2)
+        if response.status >= 400:
+            print(f"Display event {event} failed with HTTP {response.status}", flush=True)
+    except Exception as exc:
+        print(f"Display event {event} failed: {exc}", flush=True)
+
+
 def poll_spotify(
     spotify: SpotifyClient,
     state: SharedPlaybackState,
     state_lock: threading.Lock,
     stop_event: threading.Event,
     poll_seconds: float,
+    event_api_url: str = "",
 ) -> None:
     last_status: str | None = None
+    last_is_playing: bool | None = None
+    last_art_key: str | None = None
 
     while not stop_event.is_set():
         try:
@@ -1166,6 +1195,20 @@ def poll_spotify(
                         state.image = image
 
                 status = f"art found, is_playing={art.is_playing}"
+                if art.is_playing and (last_is_playing is not True or art.key != last_art_key):
+                    emit_display_event(
+                        event_api_url,
+                        "spotify.playback_started",
+                        {"source": "spotify", "artKey": art.key, "imageUrl": art.image_url, "isPlaying": True},
+                    )
+                elif not art.is_playing and last_is_playing is True:
+                    emit_display_event(
+                        event_api_url,
+                        "spotify.playback_paused",
+                        {"source": "spotify", "artKey": art.key, "imageUrl": art.image_url, "isPlaying": False},
+                    )
+                last_is_playing = art.is_playing
+                last_art_key = art.key
             else:
                 with state_lock:
                     state.art_key = None
@@ -1173,6 +1216,14 @@ def poll_spotify(
                     state.image = None
                     state.is_playing = False
                 status = "no currently playing item"
+                if last_art_key is not None:
+                    emit_display_event(
+                        event_api_url,
+                        "spotify.playback_stopped",
+                        {"source": "spotify", "artKey": last_art_key, "isPlaying": False},
+                    )
+                last_is_playing = False
+                last_art_key = None
 
             if status != last_status:
                 print(f"Spotify: {status}", flush=True)
@@ -1391,7 +1442,7 @@ def run_spotify(
     stop_event = threading.Event()
     poll_thread = threading.Thread(
         target=poll_spotify,
-        args=(spotify, playback_state, playback_lock, stop_event, args.poll_seconds),
+        args=(spotify, playback_state, playback_lock, stop_event, args.poll_seconds, args.event_api_url),
         daemon=True,
     )
     poll_thread.start()
@@ -1521,6 +1572,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")
+    parser.add_argument("--event-api-url", default="", help="Optional Assistant Matrix display event endpoint URL.")
     parser.add_argument("--once", action="store_true", help="Render one frame and exit.")
     parser.add_argument("--no-browser", action="store_true", help="Print the Spotify auth URL without trying to open a browser.")
     return parser

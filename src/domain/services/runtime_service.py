@@ -74,6 +74,8 @@ class RuntimeService:
     def _args(self) -> list[str]:
         config = config_service.get_config()
         matrix = config.matrix
+        http_config = base_config["http"]
+        event_api_url = os.environ.get("ASSISTANT_MATRIX_EVENT_API_URL", f"http://127.0.0.1:{http_config['port']}/api/display/events")
         args = [
             str(self.runtime_script),
             "--display-mode",
@@ -128,6 +130,8 @@ class RuntimeService:
             str(matrix.fps),
             "--rpm",
             str(matrix.rpm),
+            "--event-api-url",
+            event_api_url,
             "--rotation",
             str(matrix.rotation),
             "--no-browser",
