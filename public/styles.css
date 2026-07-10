@@ -591,6 +591,14 @@ dd {
   opacity: 0.58;
 }
 
+.plugin-card.store-card {
+  cursor: default;
+}
+
+.plugin-card.store-card.installed {
+  border-color: rgba(155, 208, 217, 0.7);
+}
+
 .plugin-card strong {
   font-size: 20px;
 }
@@ -634,6 +642,27 @@ dd {
 
 .plugin-settings-button:hover {
   background: #343b42;
+}
+
+.plugin-settings-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.store-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: #171b1f;
+  color: #c9c3ba;
+}
+
+.store-note strong {
+  color: #f3f0e8;
 }
 
 .preview-spotify {

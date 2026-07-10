@@ -2,6 +2,7 @@ const navItems = [...document.querySelectorAll(".nav-item")];
 const sidebarToggle = document.querySelector("#sidebarToggle");
 const pages = [...document.querySelectorAll("[data-page-panel]")];
 const pluginGrid = document.querySelector("#pluginGrid");
+const storeGrid = document.querySelector("#storeGrid");
 const configPanels = [...document.querySelectorAll("[data-config-panel]")];
 const spotifyPanel = document.querySelector("#spotifyPanel");
 const matrixPanel = document.querySelector("#matrixPanel");
@@ -186,6 +187,7 @@ const pluginLabels = {
 
 let currentConfig = null;
 let localWidgets = [];
+let storeWidgets = [];
 let selectedPlugin = "spotify";
 let runtimeRunning = false;
 let browserAmericaTimezone = "";
@@ -248,6 +250,19 @@ function previewMarkup(mode) {
       </span>`;
   }
   return `<span class="plugin-preview preview-${mode === "testPattern" ? "test" : mode}" aria-hidden="true"></span>`;
+}
+
+function storePreviewClass(widgetId) {
+  if (widgetId?.includes("calendar")) {
+    return "preview-calendar";
+  }
+  if (widgetId?.includes("board")) {
+    return "preview-board";
+  }
+  if (widgetId?.includes("music")) {
+    return "preview-spotify";
+  }
+  return "preview-agent";
 }
 
 function populateTimezones() {
@@ -350,7 +365,6 @@ function renderLocalWidgets(widgets) {
     return;
   }
   localWidgets = widgets;
-  const plannedCards = [...pluginGrid.querySelectorAll(".plugin-card.planned")].map((card) => card.outerHTML).join("");
   const cards = widgets.map((widget) => {
     const manifest = widget.manifest || {};
     const mode = modeFromWidgetId(manifest.id);
@@ -369,7 +383,7 @@ function renderLocalWidgets(widgets) {
         <button class="plugin-settings-button" type="button" data-plugin-settings="${escapedMode}">Settings</button>
       </article>`;
   }).join("");
-  pluginGrid.innerHTML = cards + plannedCards;
+  pluginGrid.innerHTML = cards;
   syncActiveMode(normalizeMode(currentConfig));
 }
 
@@ -379,6 +393,52 @@ async function refreshLocalWidgets() {
     renderLocalWidgets(response.widgets || []);
   } catch (error) {
     console.warn("Unable to load local widget registry", error);
+  }
+}
+
+function renderStoreWidgets(widgets) {
+  if (!storeGrid) {
+    return;
+  }
+  storeWidgets = widgets;
+  if (!widgets.length) {
+    storeGrid.innerHTML = `
+      <article class="plugin-card planned" aria-disabled="true">
+        <span class="plugin-meta">Empty</span>
+        <strong>No widgets found</strong>
+        <small>The configured widget store did not return any catalog entries.</small>
+        <span class="plugin-preview preview-board" aria-hidden="true"></span>
+      </article>`;
+    return;
+  }
+  storeGrid.innerHTML = widgets.map((widget) => {
+    const id = escapeHtml(widget.id || "");
+    const name = escapeHtml(widget.name || widget.id || "Widget");
+    const summary = escapeHtml(widget.summary || "Assistant Matrix store widget.");
+    const meta = escapeHtml(widgetCategoryLabel(widget.category));
+    const version = escapeHtml(widget.version || "");
+    const author = escapeHtml(widget.author || "Assistant Matrix");
+    const previewClass = escapeHtml(storePreviewClass(widget.id));
+    const installed = Boolean(widget.installed);
+    return `
+      <article class="plugin-card store-card${installed ? " installed" : ""}" data-store-widget-id="${id}">
+        <span class="plugin-meta">${installed ? "Installed" : meta}</span>
+        <strong>${name}</strong>
+        <small>${summary}</small>
+        <span class="plugin-preview ${previewClass}" aria-hidden="true"></span>
+        <small>v${version} · ${author}</small>
+        <button class="plugin-settings-button" type="button" disabled>${installed ? "Installed" : "Install soon"}</button>
+      </article>`;
+  }).join("");
+}
+
+async function refreshStoreWidgets() {
+  try {
+    const response = await api("/api/widgets/store");
+    renderStoreWidgets(response.widgets || []);
+  } catch (error) {
+    console.warn("Unable to load widget store", error);
+    renderStoreWidgets([]);
   }
 }
 
@@ -709,6 +769,7 @@ populateTimezones();
 
 refreshConfig()
   .then(refreshLocalWidgets)
+  .then(refreshStoreWidgets)
   .then(refreshStatus)
   .catch((error) => setMessage(error.message));
 
