@@ -483,4 +483,14 @@ previews/
 assets/
 ```
 
+Before packaging or publishing, the widget folder must contain:
+
+- `widget.toml` with valid id, name, semantic version, summary, runtime, entrypoint, category, and matrix size metadata.
+- The declared Python entrypoint file, for example `renderer/widget.py`.
+- The required matrix preview declared by `preview.matrix_png`, usually `previews/matrix-64.png`.
+- Optional `preview.card_gif`; when present it becomes the animated store-card preview, and when absent the store index leaves `previewGifUrl` empty.
+- Config fields with stable `key`, `label`, and supported `type`; select fields need `{label, value}` options.
+- Permissions with both `name` and `reason`.
+- Trigger hints with an `event` name.
+
 That folder is the unit that gets packaged, published to the store, installed on the Pi, configured, and run.

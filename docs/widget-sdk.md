@@ -74,7 +74,7 @@ The generated `widget.toml` is the store contract. It contains:
 - config fields the Assistant Matrix UI can render
 - trigger hints for rotation or event-based display rules
 
-The Store and Plugins pages use `preview.card_gif` / `previewGifUrl` first and fall back to `preview.matrix_png` / `matrixPreviewUrl`. If neither is present, the UI shows a generated placeholder based on the widget category/id.
+The Store and Plugins pages use `preview.card_gif` / `previewGifUrl` first and fall back to `preview.matrix_png` / `matrixPreviewUrl`. `preview.matrix_png` is the required baseline preview for packaging and publishing. `preview.card_gif` is optional; if the file is not present, the published store index leaves `previewGifUrl` empty and the UI uses the matrix PNG. If neither preview URL is available, the UI shows a generated placeholder based on the widget category/id.
 
 Trigger events are delivered through the display API:
 
@@ -86,7 +86,7 @@ curl -X POST http://<pi-host>:3000/api/display/events \
 
 The app evaluates saved display policy trigger rules and temporarily runs the matching widget.
 
-Packaging writes `dist/<widget-id>-<version>.tar.gz` and prints a SHA256 that can be copied into the store index.
+Packaging validates the manifest, Python entrypoint file, and required `preview.matrix_png`, then writes `dist/<widget-id>-<version>.tar.gz` and prints a SHA256 that can be copied into the store index.
 
 Publishing writes an object-store-ready layout:
 

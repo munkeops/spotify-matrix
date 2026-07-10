@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-pytest.importorskip("PIL")
+try:
+    import PIL  # noqa: F401
+except ImportError:
+    pytest.skip("Pillow is required for widget CLI tests.", allow_module_level=True)
 
 from assistant_matrix_sdk import cli
 
@@ -128,3 +131,97 @@ def test_init_refuses_non_empty_directory_without_force(tmp_path):
         assert "not empty" in str(exc)
     else:
         raise AssertionError("Expected FileExistsError")
+
+
+def test_validate_rejects_bad_manifest_metadata(tmp_path):
+    manifest_path = tmp_path / "widget.toml"
+    cli.write_manifest(
+        manifest_path,
+        {
+            "widget": {
+                "id": "bad widget",
+                "name": "Bad",
+                "version": "first",
+                "summary": "Invalid widget.",
+                "runtime": "python",
+                "entrypoint": "renderer.widget:WidgetRenderer",
+                "category": "unknown",
+                "matrix_size": "big",
+            },
+            "config": [
+                {
+                    "key": "mode",
+                    "label": "Mode",
+                    "type": "select",
+                    "options": ["one", "two"],
+                }
+            ],
+            "permissions": [{"name": "network"}],
+            "triggers": [{"priority": 1}],
+        },
+    )
+
+    errors = cli.validate_manifest_data(cli.read_manifest(manifest_path))
+
+    assert any("widget.id" in error for error in errors)
+    assert any("widget.version" in error for error in errors)
+    assert any("widget.category" in error for error in errors)
+    assert any("widget.matrix_size" in error for error in errors)
+    assert any("options[0]" in error for error in errors)
+    assert any("missing reason" in error for error in errors)
+    assert any("missing event" in error for error in errors)
+
+
+def test_package_requires_declared_entrypoint_and_previews(tmp_path):
+    widget_dir = tmp_path / "user.missing"
+    cli.command_init(
+        argparse.Namespace(
+            widget_id="user.missing",
+            directory=str(widget_dir),
+            name="Missing Preview",
+            summary="Missing preview test widget.",
+            author="Tester",
+            category="custom",
+            version="0.1.0",
+            license="MIT",
+            force=False,
+        )
+    )
+
+    errors = cli.validate_widget_package_files(cli.read_manifest(widget_dir / "widget.toml"), widget_dir)
+
+    assert "Missing preview.matrix_png file previews/matrix-64.png." in errors
+    assert cli.command_package(argparse.Namespace(widget_dir=str(widget_dir), output_dir=str(tmp_path / "dist"))) == 1
+
+
+def test_publish_allows_missing_optional_card_gif(tmp_path):
+    widget_dir = tmp_path / "user.static"
+    cli.command_init(
+        argparse.Namespace(
+            widget_id="user.static",
+            directory=str(widget_dir),
+            name="Static Preview",
+            summary="Static preview test widget.",
+            author="Tester",
+            category="custom",
+            version="0.1.0",
+            license="MIT",
+            force=False,
+        )
+    )
+    (widget_dir / "previews" / "matrix-64.png").write_bytes(b"png")
+
+    store_dir = tmp_path / "store-dist"
+    assert cli.command_publish(
+        argparse.Namespace(
+            widget_dir=str(widget_dir),
+            store_dir=str(store_dir),
+            base_url="https://store.example.com",
+            index="store-index.json",
+        )
+    ) == 0
+
+    index = json.loads((store_dir / "store-index.json").read_text(encoding="utf-8"))
+    entry = index["widgets"][0]
+    assert entry["previewGifUrl"] == ""
+    assert entry["matrixPreviewUrl"] == "https://store.example.com/widgets/user.static/0.1.0/previews/matrix-64.png"

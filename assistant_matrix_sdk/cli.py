@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import re
 import shutil
 import sys
 import tarfile
@@ -15,6 +16,13 @@ from typing import Any
 
 from assistant_matrix_sdk.context import WidgetContext
 from assistant_matrix_sdk.widget import Widget
+
+ALLOWED_CATEGORIES = {"media", "time", "assistant", "information", "diagnostics", "custom"}
+ALLOWED_FIELD_TYPES = {"string", "number", "boolean", "select", "secret", "location", "color"}
+ALLOWED_RUNTIMES = {"python", "builtin"}
+WIDGET_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+SEMVERISH_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?$")
+MATRIX_SIZE_PATTERN = re.compile(r"^[1-9][0-9]*x[1-9][0-9]*$")
 
 
 def class_name_from_widget_id(widget_id: str) -> str:
@@ -43,17 +51,103 @@ def validate_manifest_data(data: dict[str, Any]) -> list[str]:
     widget = data.get("widget")
     if not isinstance(widget, dict):
         return ["Missing [widget] section."]
+
     for key in ("id", "name", "version", "summary", "runtime", "entrypoint"):
         if not str(widget.get(key, "")).strip():
             errors.append(f"Missing widget.{key}.")
-    if widget.get("runtime") not in {"python", "builtin"}:
+
+    widget_id = str(widget.get("id", ""))
+    version = str(widget.get("version", ""))
+    category = str(widget.get("category", "custom"))
+    matrix_size = str(widget.get("matrix_size", widget.get("matrixSize", "64x64")))
+
+    if widget_id and not WIDGET_ID_PATTERN.match(widget_id):
+        errors.append("widget.id may only contain letters, numbers, dots, underscores, and hyphens, and must start with a letter or number.")
+    if version and not SEMVERISH_PATTERN.match(version):
+        errors.append("widget.version should use semantic version format, for example 0.1.0.")
+    if widget.get("runtime") not in ALLOWED_RUNTIMES:
         errors.append("widget.runtime must be python or builtin.")
+    if category not in ALLOWED_CATEGORIES:
+        errors.append(f"widget.category must be one of: {', '.join(sorted(ALLOWED_CATEGORIES))}.")
+    if matrix_size and not MATRIX_SIZE_PATTERN.match(matrix_size):
+        errors.append("widget.matrix_size must look like 64x64.")
+
+    preview = data.get("preview")
+    if preview is not None and not isinstance(preview, dict):
+        errors.append("[preview] must be a table.")
     if data.get("config") is not None and not isinstance(data["config"], list):
         errors.append("[[config]] entries must be a list.")
     if data.get("permissions") is not None and not isinstance(data["permissions"], list):
         errors.append("[[permissions]] entries must be a list.")
     if data.get("triggers") is not None and not isinstance(data["triggers"], list):
         errors.append("[[triggers]] entries must be a list.")
+
+    for index, field in enumerate(data.get("config") or []):
+        if not isinstance(field, dict):
+            errors.append(f"config[{index}] must be a table.")
+            continue
+        for key in ("key", "label", "type"):
+            if not str(field.get(key, "")).strip():
+                errors.append(f"config[{index}] missing {key}.")
+        field_type = field.get("type")
+        if field_type and field_type not in ALLOWED_FIELD_TYPES:
+            errors.append(f"config[{index}].type must be one of: {', '.join(sorted(ALLOWED_FIELD_TYPES))}.")
+        options = field.get("options", [])
+        if field_type == "select" and not options:
+            errors.append(f"config[{index}] select fields need options.")
+        if options and not isinstance(options, list):
+            errors.append(f"config[{index}].options must be a list.")
+        for option_index, option in enumerate(options if isinstance(options, list) else []):
+            if not isinstance(option, dict) or "label" not in option or "value" not in option:
+                errors.append(f"config[{index}].options[{option_index}] must be an inline table with label and value.")
+
+    for index, permission in enumerate(data.get("permissions") or []):
+        if not isinstance(permission, dict):
+            errors.append(f"permissions[{index}] must be a table.")
+            continue
+        if not str(permission.get("name", "")).strip():
+            errors.append(f"permissions[{index}] missing name.")
+        if not str(permission.get("reason", "")).strip():
+            errors.append(f"permissions[{index}] missing reason.")
+
+    for index, trigger in enumerate(data.get("triggers") or []):
+        if not isinstance(trigger, dict):
+            errors.append(f"triggers[{index}] must be a table.")
+            continue
+        if not str(trigger.get("event", "")).strip():
+            errors.append(f"triggers[{index}] missing event.")
+    return errors
+
+
+def validate_widget_package_files(manifest: dict[str, Any], widget_dir: Path) -> list[str]:
+    errors: list[str] = []
+    widget = manifest.get("widget", {})
+    if not isinstance(widget, dict):
+        return errors
+    if widget.get("runtime") == "python":
+        entrypoint = str(widget.get("entrypoint", ""))
+        module_name = entrypoint.split(":", 1)[0]
+        if not module_name:
+            return errors
+        module_path = widget_dir / Path(*module_name.split(".")).with_suffix(".py")
+        if not module_path.exists():
+            errors.append(f"Missing Python entrypoint file {module_path.relative_to(widget_dir)}.")
+
+    preview = manifest.get("preview", {})
+    if not isinstance(preview, dict):
+        return errors
+    for key in ("matrix_png",):
+        relative = str(preview.get(key, "")).strip()
+        if not relative:
+            continue
+        preview_path = widget_dir / relative
+        try:
+            preview_path.resolve().relative_to(widget_dir.resolve())
+        except ValueError:
+            errors.append(f"preview.{key} must stay inside the widget package.")
+            continue
+        if not preview_path.exists():
+            errors.append(f"Missing preview.{key} file {relative}.")
     return errors
 
 
@@ -244,14 +338,16 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def widget_store_entry(manifest: dict[str, Any], *, base_url: str, archive_path: Path) -> dict[str, Any]:
+def widget_store_entry(manifest: dict[str, Any], *, base_url: str, archive_path: Path, widget_dir: Path | None = None) -> dict[str, Any]:
     widget = manifest["widget"]
     preview = manifest.get("preview", {})
     widget_id = widget["id"]
     version = widget["version"]
     base = base_url.rstrip("/")
     widget_base = f"{base}/widgets/{widget_id}/{version}"
-    return {
+    card_gif = preview.get("card_gif", "previews/card.gif")
+    matrix_png = preview.get("matrix_png", "previews/matrix-64.png")
+    entry = {
         "id": widget_id,
         "name": widget["name"],
         "version": version,
@@ -260,10 +356,13 @@ def widget_store_entry(manifest: dict[str, Any], *, base_url: str, archive_path:
         "author": widget.get("author", "Assistant Matrix"),
         "manifestUrl": f"{widget_base}/widget.toml",
         "archiveUrl": f"{widget_base}/{archive_path.name}",
-        "previewGifUrl": f"{widget_base}/{preview.get('card_gif', 'previews/card.gif')}",
-        "matrixPreviewUrl": f"{widget_base}/{preview.get('matrix_png', 'previews/matrix-64.png')}",
+        "previewGifUrl": "",
+        "matrixPreviewUrl": f"{widget_base}/{matrix_png}",
         "sha256": sha256_file(archive_path),
     }
+    if card_gif and (widget_dir is None or (widget_dir / card_gif).exists()):
+        entry["previewGifUrl"] = f"{widget_base}/{card_gif}"
+    return entry
 
 
 def command_package(args: argparse.Namespace) -> int:
@@ -273,6 +372,7 @@ def command_package(args: argparse.Namespace) -> int:
         raise FileNotFoundError(f"Expected {manifest_path}")
     manifest = read_manifest(manifest_path)
     errors = validate_manifest_data(manifest)
+    errors.extend(validate_widget_package_files(manifest, widget_dir))
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
@@ -310,6 +410,7 @@ def write_store_index(path: Path, payload: dict[str, Any]) -> None:
 def package_widget(widget_dir: Path, output_dir: Path) -> Path:
     manifest = read_manifest(widget_dir / "widget.toml")
     errors = validate_manifest_data(manifest)
+    errors.extend(validate_widget_package_files(manifest, widget_dir))
     if errors:
         raise ValueError("; ".join(errors))
     widget = manifest["widget"]
@@ -329,6 +430,7 @@ def command_publish(args: argparse.Namespace) -> int:
         raise FileNotFoundError(f"Expected {manifest_path}")
     manifest = read_manifest(manifest_path)
     errors = validate_manifest_data(manifest)
+    errors.extend(validate_widget_package_files(manifest, widget_dir))
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
@@ -357,7 +459,7 @@ def command_publish(args: argparse.Namespace) -> int:
     if not index_path.is_absolute():
         index_path = publish_root / index_path
     index = read_store_index(index_path)
-    entry = widget_store_entry(manifest, base_url=args.base_url, archive_path=archive_path)
+    entry = widget_store_entry(manifest, base_url=args.base_url, archive_path=archive_path, widget_dir=widget_dir)
     widgets = [item for item in index.get("widgets", []) if item.get("id") != entry["id"]]
     widgets.append(entry)
     widgets.sort(key=lambda item: item.get("name", item.get("id", "")))
