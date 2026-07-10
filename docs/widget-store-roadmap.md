@@ -28,7 +28,31 @@ The repo already has useful foundations:
 - `src/api/http/rest/commands.py` gives future agents a command-oriented API.
 - `spotify_matrix.py` contains current renderers for Spotify, Clock, Agent, Weather, and Test Pattern.
 
-The next platform step is to stop treating modes as hardcoded enum values and introduce a widget registry.
+The current branch has introduced that widget registry and the supporting store, SDK, install, policy, and command APIs. The remaining work is mostly product hardening, richer UI polish, dependency isolation for third-party widgets, and an optional hosted database-backed store.
+
+## Implementation Status
+
+Implemented in this branch:
+
+- Local widget registry with built-in `core.*` widgets and installed store widgets.
+- Static widget store index loading from HTTP(S) or a local file path.
+- Store browse/install/update behavior in the UI and backend.
+- Local widget config persistence and apply APIs.
+- External Python widget package execution through `spotify_matrix.py --display-mode widget`.
+- Display policy for single-widget mode and scheduled rotation.
+- Event triggers with priority and minimum display duration.
+- Command API support for applying widgets and submitting events.
+- Python SDK primitives for canvas rendering, context, config fields, permissions, previews, and triggers.
+- Author CLI for scaffold, manifest generation, preview rendering, validation, packaging, and static-store publishing.
+- Package publishing validation and device-side install validation.
+
+Still intentionally future work:
+
+- Third-party dependency isolation beyond the app environment.
+- A database-backed hosted store with accounts, approvals, ratings, and private widgets.
+- Event history in the UI.
+- True in-process hot swapping; V1 still restarts the display runtime on apply.
+- A richer widget-builder/visualizer UI for non-code authors.
 
 ## Core Concepts
 
@@ -235,6 +259,33 @@ store-dist/widgets/<widget-id>/<version>/previews/...
 
 The Pi only needs the public index URL. It can browse the index, install an archive, persist widget config, and run the package locally.
 
+## End-To-End Workflow
+
+```mermaid
+flowchart LR
+  author["Widget author"] --> sdk["assistant-matrix-widget CLI"]
+  sdk --> package["widget.toml + previews + archive"]
+  package --> store["Static object store or future hosted DB"]
+  store --> index["store-index.json"]
+  index --> piui["Assistant Matrix Store UI"]
+  piui --> install["Install/update widget"]
+  install --> local["data/widgets/packages/<widget-id>"]
+  piui --> config["Configure widget"]
+  config --> saved["data/widgets/config/<widget-id>.json"]
+  piui --> apply["Apply widget or display policy"]
+  apply --> runtime["spotify_matrix.py widget runner"]
+  runtime --> matrix["64x64 LED matrix"]
+  event["Event or future voice agent"] --> commands["Command/event APIs"]
+  commands --> apply
+```
+
+The same installed widget can be:
+
+- applied directly with `POST /api/widgets/local/{widget_id}/apply`
+- selected by `POST /api/commands` using `set_widget`
+- placed into rotation through `POST /api/display/policy`
+- triggered temporarily through `POST /api/display/events` or the `trigger_event` command
+
 On the device, configure the store source in Assistant Matrix settings:
 
 ```json
@@ -318,14 +369,17 @@ spotify_matrix.py --display-mode widget --widget-dir data/widgets/packages/<widg
 
 Store entries without a reachable archive can still be shown as catalog metadata, but they are not runnable until the package is available locally.
 
-### Runtime
+### Display Policy and Events
+
+The current runtime control surface is policy-based:
 
 ```text
-GET  /api/display/state
-POST /api/display/run
-POST /api/display/stop
-POST /api/display/playlist
-POST /api/display/trigger
+GET  /api/display/policy
+POST /api/display/policy
+POST /api/display/policy/apply
+POST /api/display/policy/stop
+GET  /api/display/policy/state
+POST /api/display/events
 ```
 
 Current event trigger API:
@@ -349,15 +403,24 @@ The runner compares the event with saved `policy.triggers`, chooses the enabled 
 
 ### Commands
 
-The existing `/api/commands` should evolve from fixed commands into a generic command bus:
+The `/api/commands` endpoint is the stable command surface for future voice agents and automations.
 
 ```json
 {
-  "command": "display.run_widget",
-  "widgetId": "core.weather",
-  "configOverride": {}
+  "command": "set_widget",
+  "value": "core.weather"
 }
 ```
+
+Current widget-relevant commands:
+
+- `set_widget`
+- `trigger_event`
+- `set_mode`
+- `set_clock_face`
+- `set_brightness`
+- `start_runtime`
+- `stop_runtime`
 
 ## SDK Shape
 
@@ -408,11 +471,11 @@ Canvas helpers:
 Developer flow:
 
 ```bash
-assistant-matrix widget init weather
-assistant-matrix widget preview
-assistant-matrix widget validate
-assistant-matrix widget package
-assistant-matrix widget publish
+assistant-matrix-widget init user.weather
+assistant-matrix-widget preview renderer.widget:UserWeatherWidget --output previews/matrix-64.png
+assistant-matrix-widget validate widget.toml
+assistant-matrix-widget package . --output-dir dist
+assistant-matrix-widget publish . --store-dir store-dist --base-url https://store.example.com
 ```
 
 Validation should check:
@@ -495,45 +558,52 @@ Trigger rules need priorities so urgent display events can temporarily override 
 
 ### Phase 1: Local Widget Registry
 
-- Create a local registry model.
-- Convert built-in modes into registry entries.
-- Keep renderers inside `spotify_matrix.py` initially.
-- Add `/api/widgets/local`.
-- UI reads plugin cards from registry instead of hardcoded HTML.
+- Status: implemented.
+- Created a local registry model.
+- Converted built-in modes into registry entries.
+- Kept renderers inside `spotify_matrix.py` initially.
+- Added `/api/widgets/local`.
+- UI reads local plugin cards from the registry.
 
 ### Phase 2: Widget Config Schema
 
-- Replace per-widget hardcoded form sections with manifest-driven forms.
-- Define config field types: string, number, boolean, select, secret, location, color.
-- Persist config per widget under `data/widgets/configs/`.
+- Status: partially implemented.
+- Defined config field types: string, number, boolean, select, secret, location, color.
+- External widgets use manifest-driven forms.
+- Built-in widgets still keep some custom panels where they need bespoke UX.
+- External widget config persists under `data/widgets/config/`.
 
 ### Phase 3: Store Index
 
-- Add `GET /api/widgets/store`.
-- Load a static remote store index.
-- Show store cards with preview GIFs.
-- Add install/uninstall local lifecycle.
+- Status: implemented for static stores.
+- Added `GET /api/widgets/store`.
+- Loads a static local or HTTP(S) store index.
+- Shows store cards with preview GIFs or matrix PNG fallback.
+- Added install/update/uninstall local lifecycle.
 
 ### Phase 4: SDK and Packaging
 
-- Add `assistant_matrix_sdk`.
-- Add widget manifest validation.
-- Add local preview command.
-- Add package command.
-- Start with Python widgets only.
+- Status: implemented for Python widgets.
+- Added `assistant_matrix_sdk`.
+- Added widget manifest and package validation.
+- Added local preview command.
+- Added package and publish commands.
+- Python widgets are supported first.
 
 ### Phase 5: Runner and Scheduling
 
-- Move display switching from fixed modes to widget runner.
-- Add rotation playlist.
-- Add manual run, stop, apply.
-- Add trigger policy.
+- Status: implemented with restart-on-apply.
+- Added widget runner mode for installed Python widgets.
+- Added display policy rotation.
+- Added manual apply through widget APIs and command APIs.
+- Added trigger policy.
 
 ### Phase 6: Event System
 
-- Emit events from Spotify, clock/time, weather alerts, future sensors, and future voice agent.
-- Add priority-based trigger handling.
-- Add event history in the UI.
+- Status: partially implemented.
+- Added priority-based trigger handling.
+- Added event submission API and command API.
+- Event producers and event history UI remain future work.
 
 ### Phase 7: Hosted Store
 
