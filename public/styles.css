@@ -604,7 +604,7 @@ dd {
 }
 
 .trigger-row {
-  grid-template-columns: 110px minmax(190px, 1.4fr) minmax(170px, 1fr) 110px 130px;
+  grid-template-columns: 110px minmax(190px, 1.4fr) minmax(170px, 1fr) 110px 130px 92px;
 }
 
 .trigger-list,
@@ -615,6 +615,13 @@ dd {
 .trigger-list {
   display: grid;
   gap: 8px;
+}
+
+.trigger-list-heading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  justify-content: space-between;
 }
 
 .trigger-list-heading h3 {
@@ -636,6 +643,14 @@ dd {
 .rotation-row .check-row,
 .trigger-row .check-row {
   min-height: auto;
+}
+
+.icon-danger {
+  min-height: 38px;
+  padding: 0 10px;
+  border-color: rgba(255, 118, 118, 0.35);
+  background: rgba(255, 118, 118, 0.08);
+  color: #ffb6b6;
 }
 
 .plugin-card {

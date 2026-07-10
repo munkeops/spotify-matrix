@@ -23,6 +23,7 @@ const rotationList = document.querySelector("#rotationList");
 const triggerList = document.querySelector("#triggerList");
 const savePolicyButton = document.querySelector("#savePolicyButton");
 const applyPolicyButton = document.querySelector("#applyPolicyButton");
+const addTriggerButton = document.querySelector("#addTriggerButton");
 const pairButton = document.querySelector("#pairButton");
 const directAuthButton = document.querySelector("#directAuthButton");
 const pairCommand = document.querySelector("#pairCommand");
@@ -548,33 +549,58 @@ function renderDisplayPolicy(policy) {
     const name = escapeHtml(widget.manifest.name);
     return { id, name };
   });
-  triggerList.innerHTML = (policy.triggers || []).map((rule, index) => {
-    const selectedWidget = rule.widgetId || "core.spotify";
-    const options = widgetOptions.map((option) => `<option value="${option.id}" ${option.id === selectedWidget ? "selected" : ""}>${option.name}</option>`).join("");
-    return `
-      <div class="trigger-row" data-trigger-index="${index}">
-        <label class="check-row">
-          <input type="checkbox" name="triggerEnabled" ${rule.enabled ? "checked" : ""}>
-          <span>Enabled</span>
-        </label>
-        <label>
-          Event
-          <input name="triggerEvent" value="${escapeHtml(rule.event || "")}" placeholder="spotify.playback_started">
-        </label>
-        <label>
-          Widget
-          <select name="triggerWidgetId">${options}</select>
-        </label>
-        <label>
-          Priority
-          <input name="triggerPriority" type="number" step="1" value="${escapeHtml(rule.priority ?? 0)}">
-        </label>
-        <label>
-          Hold seconds
-          <input name="triggerMinDuration" type="number" min="0" max="86400" step="5" value="${escapeHtml(rule.minDurationSeconds ?? 15)}">
-        </label>
-      </div>`;
-  }).join("") || `<p class="muted">No trigger rules configured.</p>`;
+  triggerList.innerHTML = (policy.triggers || []).map((rule, index) => triggerRowMarkup(rule, index, widgetOptions)).join("") || `<p class="muted">No trigger rules configured.</p>`;
+}
+
+function triggerRowMarkup(rule, index, widgetOptions = null) {
+  const optionsSource = widgetOptions || localWidgets.map((widget) => ({
+    id: escapeHtml(widget.manifest.id),
+    name: escapeHtml(widget.manifest.name)
+  }));
+  const selectedWidget = rule.widgetId || "core.spotify";
+  const options = optionsSource.map((option) => `<option value="${option.id}" ${option.id === selectedWidget ? "selected" : ""}>${option.name}</option>`).join("");
+  return `
+    <div class="trigger-row" data-trigger-index="${index}">
+      <label class="check-row">
+        <input type="checkbox" name="triggerEnabled" ${rule.enabled ? "checked" : ""}>
+        <span>Enabled</span>
+      </label>
+      <label>
+        Event
+        <input name="triggerEvent" value="${escapeHtml(rule.event || "")}" placeholder="spotify.playback_started">
+      </label>
+      <label>
+        Widget
+        <select name="triggerWidgetId">${options}</select>
+      </label>
+      <label>
+        Priority
+        <input name="triggerPriority" type="number" step="1" value="${escapeHtml(rule.priority ?? 0)}">
+      </label>
+      <label>
+        Hold seconds
+        <input name="triggerMinDuration" type="number" min="0" max="86400" step="5" value="${escapeHtml(rule.minDurationSeconds ?? 15)}">
+      </label>
+      <button type="button" class="icon-danger" data-remove-trigger aria-label="Remove trigger">Remove</button>
+    </div>`;
+}
+
+function addTriggerRule() {
+  if (!triggerList) {
+    return;
+  }
+  const existingRows = [...triggerList.querySelectorAll(".trigger-row")];
+  if (!existingRows.length) {
+    triggerList.innerHTML = "";
+  }
+  const index = existingRows.length;
+  triggerList.insertAdjacentHTML("beforeend", triggerRowMarkup({
+    event: "spotify.playback_started",
+    widgetId: "core.spotify",
+    enabled: true,
+    priority: 50,
+    minDurationSeconds: 15
+  }, index));
 }
 
 function collectDisplayPolicy() {
@@ -997,6 +1023,19 @@ applyPolicyButton?.addEventListener("click", async () => {
     setMessage(error.message);
   } finally {
     applyPolicyButton.disabled = false;
+  }
+});
+
+addTriggerButton?.addEventListener("click", () => addTriggerRule());
+
+triggerList?.addEventListener("click", (event) => {
+  const removeButton = event.target.closest("[data-remove-trigger]");
+  if (!removeButton) {
+    return;
+  }
+  removeButton.closest(".trigger-row")?.remove();
+  if (!triggerList.querySelector(".trigger-row")) {
+    triggerList.innerHTML = `<p class="muted">No trigger rules configured.</p>`;
   }
 });
 

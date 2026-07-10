@@ -108,8 +108,11 @@
             </div>
             <div class="rotation-list" id="rotationList" aria-label="Rotation widgets"></div>
             <div class="trigger-list-heading">
-              <h3>Event Triggers</h3>
-              <p>Temporarily show a widget when an event is submitted to the display API.</p>
+              <div>
+                <h3>Event Triggers</h3>
+                <p>Temporarily show a widget when an event is submitted to the display API.</p>
+              </div>
+              <button type="button" id="addTriggerButton" class="secondary">Add Trigger</button>
             </div>
             <div class="trigger-list" id="triggerList" aria-label="Event trigger rules"></div>
           </section>
@@ -178,7 +181,7 @@
 
           <section class="store-note">
             <strong>Catalog preview</strong>
-            <span>Install/download support is the next backend slice. These cards are loaded from the store API contract.</span>
+            <span>Install, update, and uninstall widgets from the configured store index.</span>
           </section>
 
           <section class="plugin-grid" id="storeGrid" aria-label="Widget store">
