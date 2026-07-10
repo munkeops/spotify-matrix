@@ -4,10 +4,25 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest
+from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, StoreWidget, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest, WidgetStoreListResponse
 from src.domain.services.widget_registry_service import widget_registry_service
+from src.domain.services.widget_store_service import widget_store_service
 
 router = APIRouter(tags=["assistant-matrix-widgets"])
+
+
+@router.get("/api/widgets/store", response_model=WidgetStoreListResponse)
+async def list_store_widgets() -> WidgetStoreListResponse:
+    index = widget_store_service.list_widgets()
+    return WidgetStoreListResponse(schemaVersion=index.schemaVersion, widgets=index.widgets)
+
+
+@router.get("/api/widgets/store/{widget_id}", response_model=StoreWidget)
+async def get_store_widget(widget_id: str) -> StoreWidget:
+    widget = widget_store_service.get_widget(widget_id)
+    if widget is None:
+        raise ValueError(f"Unknown store widget {widget_id}.")
+    return widget
 
 
 @router.get("/api/widgets/local", response_model=LocalWidgetListResponse)

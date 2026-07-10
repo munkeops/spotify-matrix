@@ -96,3 +96,28 @@ class WidgetApplyResponse(BaseModel):
     ok: bool
     widget: LocalWidget
     runtime: Any
+
+
+class StoreWidget(BaseModel):
+    id: str
+    name: str
+    version: str
+    summary: str
+    category: WidgetCategory = "custom"
+    author: str = "Assistant Matrix"
+    manifestUrl: str = ""
+    archiveUrl: str = ""
+    previewGifUrl: str = ""
+    matrixPreviewUrl: str = ""
+    sha256: str = ""
+    installed: bool = False
+
+
+class WidgetStoreIndex(BaseModel):
+    schemaVersion: int = 1
+    widgets: list[StoreWidget] = Field(default_factory=list)
+
+
+class WidgetStoreListResponse(BaseModel):
+    schemaVersion: int = 1
+    widgets: list[StoreWidget] = Field(default_factory=list)
