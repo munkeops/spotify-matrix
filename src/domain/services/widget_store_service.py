@@ -7,6 +7,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import urllib.error
 import urllib.parse
 import urllib.request
 import hashlib
@@ -20,7 +21,6 @@ from src.domain.services.widget_registry_service import widget_registry_service
 
 class WidgetStoreService:
     def __init__(self) -> None:
-        self.index_path = Path(os.environ.get("ASSISTANT_MATRIX_WIDGET_STORE_INDEX", "configs/widget_store_index.json")).resolve()
         self.installed_path = config_service.data_dir / "widgets" / "installed.json"
 
     def list_widgets(self) -> WidgetStoreIndex:
@@ -76,11 +76,24 @@ class WidgetStoreService:
         return [StoreWidget.model_validate(widget) for widget in widgets]
 
     def _read_index(self) -> WidgetStoreIndex:
+        source = self._index_source()
         try:
-            with self.index_path.open("r", encoding="utf-8") as file:
+            if source.startswith(("http://", "https://")):
+                with urllib.request.urlopen(source, timeout=10) as response:
+                    return WidgetStoreIndex.model_validate(json.loads(response.read().decode("utf-8")))
+            path = Path(source)
+            if not path.is_absolute():
+                path = Path.cwd() / path
+            with path.open("r", encoding="utf-8") as file:
                 return WidgetStoreIndex.model_validate(json.load(file))
-        except FileNotFoundError:
+        except (FileNotFoundError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
             return WidgetStoreIndex()
+
+    def _index_source(self) -> str:
+        env_source = os.environ.get("ASSISTANT_MATRIX_WIDGET_STORE_INDEX")
+        if env_source:
+            return env_source
+        return config_service.get_config().store.indexUrl or "configs/widget_store_index.json"
 
     def _write_installed_widgets(self, widgets: list[StoreWidget]) -> None:
         self.installed_path.parent.mkdir(parents=True, exist_ok=True)

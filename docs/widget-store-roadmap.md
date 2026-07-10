@@ -235,6 +235,18 @@ store-dist/widgets/<widget-id>/<version>/previews/...
 
 The Pi only needs the public index URL. It can browse the index, install an archive, persist widget config, and run the package locally.
 
+On the device, configure the store source in Assistant Matrix settings:
+
+```json
+{
+  "store": {
+    "indexUrl": "https://store.example.com/store-index.json"
+  }
+}
+```
+
+`store.indexUrl` can be an HTTP(S) URL or a local file path. The `ASSISTANT_MATRIX_WIDGET_STORE_INDEX` environment variable still overrides this value for deployments that prefer immutable container config.
+
 ## Local Storage
 
 Recommended Pi local layout:

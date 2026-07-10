@@ -63,6 +63,10 @@ class WeatherConfig(BaseModel):
     refreshMinutes: int = 15
 
 
+class StoreConfig(BaseModel):
+    indexUrl: str = "configs/widget_store_index.json"
+
+
 class AppConfig(BaseModel):
     spotify: SpotifyConfig = Field(default_factory=SpotifyConfig)
     matrix: MatrixConfig = Field(default_factory=MatrixConfig)
@@ -71,6 +75,7 @@ class AppConfig(BaseModel):
     clock: ClockConfig = Field(default_factory=ClockConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     weather: WeatherConfig = Field(default_factory=WeatherConfig)
+    store: StoreConfig = Field(default_factory=StoreConfig)
 
 
 class TokenStatus(BaseModel):

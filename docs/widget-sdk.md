@@ -89,6 +89,14 @@ store-dist/
 
 The `--base-url` is used to generate public `manifestUrl`, `archiveUrl`, and preview URLs in the index. The resulting folder can be uploaded to GitHub Pages, S3, Cloudflare R2, or any static file host.
 
+Point the Pi at the published index from Assistant Matrix settings:
+
+```text
+Widget Store -> Store index URL -> https://store.example.com/store-index.json
+```
+
+The same value is persisted as `store.indexUrl` in `data/config.json`.
+
 On the Pi, the lifecycle APIs are:
 
 ```text

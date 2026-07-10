@@ -6,6 +6,7 @@ const storeGrid = document.querySelector("#storeGrid");
 const configPanels = [...document.querySelectorAll("[data-config-panel]")];
 const spotifyPanel = document.querySelector("#spotifyPanel");
 const matrixPanel = document.querySelector("#matrixPanel");
+const storeSettingsPanel = document.querySelector("#storeSettingsPanel");
 const clockPanel = document.querySelector("#clockPanel");
 const agentPanel = document.querySelector("#agentPanel");
 const weatherPanel = document.querySelector("#weatherPanel");
@@ -606,6 +607,9 @@ function fillForms(config) {
     redirectUri: config.spotify.redirectUri || "http://127.0.0.1:8888/callback"
   });
   fillPanel(matrixPanel, config.matrix);
+  fillPanel(storeSettingsPanel, {
+    storeIndexUrl: config.store?.indexUrl || "configs/widget_store_index.json"
+  });
   fillPanel(clockPanel, {
     clockFace: config.clock?.face || "analog",
     clockTimezone: config.clock?.timezone || browserAmericaTimezone,
@@ -664,6 +668,9 @@ function collectConfig(modeOverride = null) {
       testPattern: mode === "testPattern"
     },
     display: { mode },
+    store: {
+      indexUrl: fieldValue(storeSettingsPanel, "storeIndexUrl", "configs/widget_store_index.json") || "configs/widget_store_index.json"
+    },
     clock: {
       face: fieldValue(clockPanel, "clockFace", "analog") || "analog",
       use24Hour: fieldChecked(clockPanel, "clock24Hour"),
@@ -959,6 +966,13 @@ matrixPanel?.addEventListener("submit", async (event) => {
   await saveConfig();
   setMessage("Matrix settings saved.");
   await refreshStatus();
+});
+
+storeSettingsPanel?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await saveConfig();
+  await refreshStoreWidgets();
+  setMessage("Widget store settings saved.");
 });
 
 pairButton?.addEventListener("click", async () => {
