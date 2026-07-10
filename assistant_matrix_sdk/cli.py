@@ -11,11 +11,9 @@ import shutil
 import sys
 import tarfile
 import tomllib
+import urllib.parse
 from pathlib import Path
 from typing import Any
-
-from assistant_matrix_sdk.context import WidgetContext
-from assistant_matrix_sdk.widget import Widget
 
 ALLOWED_CATEGORIES = {"media", "time", "assistant", "information", "diagnostics", "custom"}
 ALLOWED_FIELD_TYPES = {"string", "number", "boolean", "select", "secret", "location", "color"}
@@ -35,7 +33,9 @@ def display_name_from_widget_id(widget_id: str) -> str:
     return tail.replace("-", " ").replace("_", " ").title() or widget_id
 
 
-def load_widget(target: str) -> type[Widget]:
+def load_widget(target: str):
+    from assistant_matrix_sdk.widget import Widget
+
     if ":" not in target:
         raise ValueError("Widget target must use module.path:ClassName.")
     module_name, class_name = target.split(":", 1)
@@ -149,6 +149,56 @@ def validate_widget_package_files(manifest: dict[str, Any], widget_dir: Path) ->
         if not preview_path.exists():
             errors.append(f"Missing preview.{key} file {relative}.")
     return errors
+
+
+def validate_store_index_data(data: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    if data.get("schemaVersion") != 1:
+        errors.append("schemaVersion must be 1.")
+    widgets = data.get("widgets")
+    if not isinstance(widgets, list):
+        return errors + ["widgets must be a list."]
+
+    seen_ids: set[str] = set()
+    for index, widget in enumerate(widgets):
+        if not isinstance(widget, dict):
+            errors.append(f"widgets[{index}] must be an object.")
+            continue
+        prefix = f"widgets[{index}]"
+        for key in ("id", "name", "version", "summary"):
+            if not str(widget.get(key, "")).strip():
+                errors.append(f"{prefix} missing {key}.")
+        widget_id = str(widget.get("id", ""))
+        version = str(widget.get("version", ""))
+        category = str(widget.get("category", "custom"))
+        sha256 = str(widget.get("sha256", ""))
+        archive_url = str(widget.get("archiveUrl", ""))
+        matrix_preview_url = str(widget.get("matrixPreviewUrl", ""))
+
+        if widget_id:
+            if widget_id in seen_ids:
+                errors.append(f"{prefix}.id duplicates {widget_id}.")
+            seen_ids.add(widget_id)
+            if not WIDGET_ID_PATTERN.match(widget_id):
+                errors.append(f"{prefix}.id may only contain letters, numbers, dots, underscores, and hyphens, and must start with a letter or number.")
+        if version and not SEMVERISH_PATTERN.match(version):
+            errors.append(f"{prefix}.version should use semantic version format, for example 0.1.0.")
+        if category not in ALLOWED_CATEGORIES:
+            errors.append(f"{prefix}.category must be one of: {', '.join(sorted(ALLOWED_CATEGORIES))}.")
+        if sha256 and not re.fullmatch(r"[A-Fa-f0-9]{64}", sha256):
+            errors.append(f"{prefix}.sha256 must be empty or a 64-character hex digest.")
+        if archive_url and not _valid_store_url(archive_url):
+            errors.append(f"{prefix}.archiveUrl must be http(s), file, absolute, or relative path.")
+        if matrix_preview_url and not _valid_store_url(matrix_preview_url):
+            errors.append(f"{prefix}.matrixPreviewUrl must be http(s), file, absolute, or relative path.")
+    return errors
+
+
+def _valid_store_url(value: str) -> bool:
+    if not value:
+        return True
+    parsed = urllib.parse.urlparse(value)
+    return parsed.scheme in {"", "http", "https", "file"}
 
 
 def read_manifest(path: Path) -> dict[str, Any]:
@@ -307,6 +357,8 @@ assistant-matrix-widget publish . --store-dir store-dist --base-url https://stor
 
 
 def command_preview(args: argparse.Namespace) -> int:
+    from assistant_matrix_sdk.context import WidgetContext
+
     widget_class = load_widget(args.widget)
     if args.config.startswith("@"):
         config = json.loads(Path(args.config[1:]).read_text(encoding="utf-8"))
@@ -327,6 +379,17 @@ def command_validate(args: argparse.Namespace) -> int:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
     print(f"Valid manifest: {args.manifest}")
+    return 0
+
+
+def command_validate_store(args: argparse.Namespace) -> int:
+    index = read_store_index(Path(args.index))
+    errors = validate_store_index_data(index)
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+    print(f"Valid store index: {args.index}")
     return 0
 
 
@@ -464,6 +527,11 @@ def command_publish(args: argparse.Namespace) -> int:
     widgets.append(entry)
     widgets.sort(key=lambda item: item.get("name", item.get("id", "")))
     index["widgets"] = widgets
+    errors = validate_store_index_data(index)
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
     write_store_index(index_path, index)
 
     print(f"Published {entry['id']} {entry['version']}")
@@ -505,6 +573,10 @@ def build_parser() -> argparse.ArgumentParser:
     validate = subparsers.add_parser("validate", help="Validate widget.toml or widget.json.")
     validate.add_argument("manifest")
     validate.set_defaults(func=command_validate)
+
+    validate_store = subparsers.add_parser("validate-store", help="Validate a static widget store index JSON.")
+    validate_store.add_argument("index")
+    validate_store.set_defaults(func=command_validate_store)
 
     package = subparsers.add_parser("package", help="Package a widget folder into a store archive.")
     package.add_argument("widget_dir")

@@ -157,6 +157,12 @@ Publish to a local object-store-shaped folder:
 poetry run assistant-matrix-widget publish . --store-dir ../store-dist --base-url https://store.example.com
 ```
 
+Validate the generated store index before upload:
+
+```bash
+poetry run assistant-matrix-widget validate-store ../store-dist/store-index.json
+```
+
 Output:
 
 ```text

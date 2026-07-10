@@ -50,6 +50,7 @@ poetry run assistant-matrix-widget preview docs.examples.weather_badge_widget:We
 poetry run assistant-matrix-widget validate widget.toml
 poetry run assistant-matrix-widget package . --output-dir dist
 poetry run assistant-matrix-widget publish . --store-dir store-dist --base-url https://store.example.com --index store-index.json
+poetry run assistant-matrix-widget validate-store store-dist/store-index.json
 ```
 
 For shells that make inline JSON awkward, `preview --config @config.json` reads the preview config from a file.
@@ -137,6 +138,7 @@ The SDK currently provides:
 - `Widget` base class with `setup`, `render`, `teardown`, and `preview`.
 - `WidgetPreview`, `WidgetPermission`, and `WidgetTrigger` helpers for publishing metadata.
 - `assistant-matrix-widget` CLI for scaffolding, manifest, preview, validation, packaging, and static-store publishing.
+- `validate-store` for checking a static `store-index.json` before upload.
 - Local package execution for installed Python widgets that provide `widget.toml` and a Python entrypoint.
 
 Still future work:

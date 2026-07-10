@@ -470,6 +470,7 @@ assistant-matrix-widget validate widget.toml
 assistant-matrix-widget preview renderer.widget:UserHelloWidget --output previews/matrix-64.png
 assistant-matrix-widget package . --output-dir dist
 assistant-matrix-widget publish . --store-dir store-dist --base-url https://store.example.com
+assistant-matrix-widget validate-store store-dist/store-index.json
 ```
 
 `init` creates:
