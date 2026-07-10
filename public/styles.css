@@ -678,6 +678,19 @@ dd {
   overflow: hidden;
 }
 
+.media-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
 .plugin-settings-button {
   align-self: end;
   justify-self: start;

@@ -60,6 +60,8 @@ The generated `widget.toml` is the store contract. It contains:
 - config fields the Assistant Matrix UI can render
 - trigger hints for rotation or event-based display rules
 
+The Store and Plugins pages use `preview.card_gif` / `previewGifUrl` first and fall back to `preview.matrix_png` / `matrixPreviewUrl`. If neither is present, the UI shows a generated placeholder based on the widget category/id.
+
 Trigger events are delivered through the display API:
 
 ```bash

@@ -273,6 +273,16 @@ function storePreviewClass(widgetId) {
   return "preview-agent";
 }
 
+function previewMediaMarkup({ url = "", fallbackClass = "preview-agent", alt = "Widget preview" } = {}) {
+  if (url) {
+    return `
+      <span class="plugin-preview media-preview">
+        <img src="${escapeHtml(url)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async">
+      </span>`;
+  }
+  return `<span class="plugin-preview ${escapeHtml(fallbackClass)}" aria-hidden="true"></span>`;
+}
+
 function populateTimezones() {
   if (!clockTimezoneSelect) {
     return;
@@ -426,7 +436,8 @@ function renderLocalWidgets(widgets) {
     const meta = escapeHtml(widgetCategoryLabel(manifest.category));
     const widgetId = escapeHtml(manifest.id || "");
     const escapedMode = escapeHtml(mode);
-    const preview = manifest.id?.startsWith("core.") ? previewMarkup(mode) : `<span class="plugin-preview ${escapeHtml(storePreviewClass(manifest.id))}" aria-hidden="true"></span>`;
+    const previewUrl = manifest.preview?.cardGif || manifest.preview?.matrixPreview || "";
+    const preview = manifest.id?.startsWith("core.") ? previewMarkup(mode) : previewMediaMarkup({ url: previewUrl, fallbackClass: storePreviewClass(manifest.id), alt: `${manifest.name || "Widget"} preview` });
     return `
       <article class="plugin-card${widget.active ? " active" : ""}" data-plugin="${escapedMode}" data-widget-id="${widgetId}" role="button" tabindex="0">
         <span class="plugin-meta">${meta}</span>
@@ -475,14 +486,14 @@ function renderStoreWidgets(widgets) {
     const meta = escapeHtml(widgetCategoryLabel(widget.category));
     const version = escapeHtml(widget.version || "");
     const author = escapeHtml(widget.author || "Assistant Matrix");
-    const previewClass = escapeHtml(storePreviewClass(widget.id));
+    const previewUrl = widget.previewGifUrl || widget.matrixPreviewUrl || "";
     const installed = Boolean(widget.installed);
     return `
       <article class="plugin-card store-card${installed ? " installed" : ""}" data-store-widget-id="${id}">
         <span class="plugin-meta">${installed ? "Installed" : meta}</span>
         <strong>${name}</strong>
         <small>${summary}</small>
-        <span class="plugin-preview ${previewClass}" aria-hidden="true"></span>
+        ${previewMediaMarkup({ url: previewUrl, fallbackClass: storePreviewClass(widget.id), alt: `${widget.name || "Widget"} preview` })}
         <small>v${version} - ${author}</small>
         <button class="plugin-settings-button" type="button" data-store-install="${id}">${installed ? "Update" : "Install"}</button>
       </article>`;
