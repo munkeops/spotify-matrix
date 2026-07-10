@@ -10,6 +10,8 @@ const clockPanel = document.querySelector("#clockPanel");
 const agentPanel = document.querySelector("#agentPanel");
 const weatherPanel = document.querySelector("#weatherPanel");
 const advancedPanel = document.querySelector("#advancedPanel");
+const externalWidgetPanel = document.querySelector("#externalWidgetPanel");
+const externalWidgetFields = document.querySelector("#externalWidgetFields");
 const pluginDialog = document.querySelector("#pluginDialog");
 const closeDialogButton = document.querySelector("#closeDialogButton");
 const savePluginButton = document.querySelector("#savePluginButton");
@@ -207,7 +209,7 @@ function modeFromWidgetId(widgetId) {
 }
 
 function widgetIdForMode(mode) {
-  return mode?.startsWith("core.") ? mode : `core.${mode}`;
+  return mode?.startsWith("core.") || mode?.includes(".") ? mode : `core.${mode}`;
 }
 
 function widgetCategoryLabel(category) {
@@ -344,7 +346,47 @@ function normalizeMode(config) {
   if (config?.runtime?.testPattern) {
     return "testPattern";
   }
+  if (config?.display?.mode === "widget") {
+    return config?.display?.widgetId || "widget";
+  }
   return config?.display?.mode || "spotify";
+}
+
+function selectedLocalWidget(plugin = selectedPlugin) {
+  const widgetId = widgetIdForMode(plugin);
+  return localWidgets.find((widget) => widget.manifest?.id === widgetId) || null;
+}
+
+function renderExternalWidgetConfig(plugin = selectedPlugin, savedConfig = {}) {
+  if (!externalWidgetFields) {
+    return;
+  }
+  const widget = selectedLocalWidget(plugin);
+  const fields = widget?.manifest?.config || [];
+  if (!fields.length) {
+    externalWidgetFields.innerHTML = `<p class="muted">This widget does not expose configurable fields.</p>`;
+    return;
+  }
+  externalWidgetFields.innerHTML = fields.map((field) => {
+    const key = escapeHtml(field.key);
+    const label = escapeHtml(field.label || field.key);
+    const value = savedConfig[field.key] ?? field.default ?? "";
+    const help = field.helpText ? `<small>${escapeHtml(field.helpText)}</small>` : "";
+    if (field.type === "boolean") {
+      return `<label class="check-row"><input name="${key}" type="checkbox" ${value ? "checked" : ""}><span>${label}</span></label>${help}`;
+    }
+    if (field.type === "select") {
+      const options = (field.options || []).map((option) => {
+        const optionValue = option.value ?? option;
+        const optionLabel = option.label ?? optionValue;
+        return `<option value="${escapeHtml(optionValue)}" ${String(optionValue) === String(value) ? "selected" : ""}>${escapeHtml(optionLabel)}</option>`;
+      }).join("");
+      return `<label>${label}<select name="${key}">${options}</select></label>${help}`;
+    }
+    const inputType = field.type === "number" ? "number" : field.type === "secret" ? "password" : "text";
+    const placeholder = field.placeholder ? ` placeholder="${escapeHtml(field.placeholder)}"` : "";
+    return `<label>${label}<input name="${key}" type="${inputType}" value="${escapeHtml(value)}"${placeholder}></label>${help}`;
+  }).join("");
 }
 
 function setPage(pageName) {
@@ -355,8 +397,12 @@ function setPage(pageName) {
 function setSelectedPlugin(plugin) {
   selectedPlugin = plugin;
   pluginCards().forEach((card) => card.classList.toggle("active", card.dataset.plugin === plugin));
-  configPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.configPanel === plugin));
+  const panelName = plugin?.includes(".") && !plugin?.startsWith("core.") ? "external" : plugin;
+  configPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.configPanel === panelName));
   dialogTitle.textContent = pluginLabels[plugin] || "Plugin";
+  if (panelName === "external") {
+    renderExternalWidgetConfig(plugin);
+  }
 }
 
 function syncActiveMode(mode) {
@@ -379,12 +425,13 @@ function renderLocalWidgets(widgets) {
     const meta = escapeHtml(widgetCategoryLabel(manifest.category));
     const widgetId = escapeHtml(manifest.id || "");
     const escapedMode = escapeHtml(mode);
+    const preview = manifest.id?.startsWith("core.") ? previewMarkup(mode) : `<span class="plugin-preview ${escapeHtml(storePreviewClass(manifest.id))}" aria-hidden="true"></span>`;
     return `
       <article class="plugin-card${widget.active ? " active" : ""}" data-plugin="${escapedMode}" data-widget-id="${widgetId}" role="button" tabindex="0">
         <span class="plugin-meta">${meta}</span>
         <strong>${name}</strong>
         <small>${summary}</small>
-        ${previewMarkup(mode)}
+        ${preview}
         <button class="plugin-settings-button" type="button" data-plugin-settings="${escapedMode}">Settings</button>
       </article>`;
   }).join("");
@@ -678,6 +725,24 @@ function collectWidgetConfig(plugin = selectedPlugin) {
       testPattern: true
     };
   }
+  if (plugin?.includes(".") && !plugin?.startsWith("core.")) {
+    const widget = selectedLocalWidget(plugin);
+    const values = {};
+    for (const fieldDef of widget?.manifest?.config || []) {
+      const control = field(externalWidgetPanel, fieldDef.key);
+      if (!control) {
+        continue;
+      }
+      if (control.type === "checkbox") {
+        values[fieldDef.key] = control.checked;
+      } else if (control.type === "number") {
+        values[fieldDef.key] = control.value === "" ? null : Number(control.value);
+      } else {
+        values[fieldDef.key] = control.value;
+      }
+    }
+    return values;
+  }
   return {};
 }
 
@@ -731,6 +796,20 @@ async function refreshConfig() {
   fillForms(await api("/api/config"));
 }
 
+async function openPluginSettings(plugin) {
+  setSelectedPlugin(plugin);
+  if (plugin?.includes(".") && !plugin?.startsWith("core.")) {
+    try {
+      const response = await api(`/api/widgets/local/${encodeURIComponent(widgetIdForMode(plugin))}/config`);
+      renderExternalWidgetConfig(plugin, response.config || {});
+    } catch (error) {
+      renderExternalWidgetConfig(plugin);
+      setMessage(error.message);
+    }
+  }
+  pluginDialog.showModal();
+}
+
 async function refreshStatus() {
   const status = await api("/api/status");
   const mode = normalizeMode(currentConfig);
@@ -768,8 +847,7 @@ pluginGrid?.addEventListener("click", (event) => {
   if (settingsButton) {
     event.stopPropagation();
     const plugin = settingsButton.dataset.pluginSettings;
-    setSelectedPlugin(plugin);
-    pluginDialog.showModal();
+    openPluginSettings(plugin);
     return;
   }
   const card = event.target.closest(".plugin-card[data-plugin]");
@@ -843,8 +921,7 @@ savePluginButton?.addEventListener("click", async () => {
 applyPluginButton?.addEventListener("click", () => applyPlugin(selectedPlugin));
 applyButton?.addEventListener("click", () => applyPlugin(normalizeMode(currentConfig)));
 editActivePluginButton?.addEventListener("click", () => {
-  setSelectedPlugin(normalizeMode(currentConfig));
-  pluginDialog.showModal();
+  openPluginSettings(normalizeMode(currentConfig));
 });
 
 spotifyPanel?.addEventListener("submit", async (event) => {

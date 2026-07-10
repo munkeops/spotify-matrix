@@ -12,6 +12,7 @@ import secrets
 import sys
 import threading
 import time
+import tomllib
 import urllib.parse
 import urllib.request
 from email.message import Message
@@ -24,6 +25,8 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from PIL import Image, ImageDraw, ImageOps
+
+from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
 
 try:
     from dotenv import load_dotenv
@@ -1249,6 +1252,78 @@ def run_weather(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, 
         display.clear()
 
 
+def load_external_widget(widget_dir: Path, entrypoint: str) -> Any:
+    if str(widget_dir) not in sys.path:
+        sys.path.insert(0, str(widget_dir))
+    if ":" not in entrypoint:
+        raise RuntimeError("Widget entrypoint must use module.path:object.")
+    module_name, object_name = entrypoint.split(":", 1)
+    module = __import__(module_name, fromlist=[object_name])
+    target = getattr(module, object_name)
+    if isinstance(target, type) and issubclass(target, Widget):
+        return target()
+    return target
+
+
+def read_external_widget_manifest(widget_dir: Path) -> dict[str, Any]:
+    manifest_path = widget_dir / "widget.toml"
+    if not manifest_path.exists():
+        raise RuntimeError(f"Missing widget manifest at {manifest_path}.")
+    return tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+
+
+def read_external_widget_config(path: Path | None) -> dict[str, Any]:
+    if path is None or not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as file:
+        payload = json.load(file)
+    return payload if isinstance(payload, dict) else {}
+
+
+def run_external_widget(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    if not args.widget_dir:
+        raise RuntimeError("Widget mode requires --widget-dir.")
+
+    widget_dir = args.widget_dir.resolve()
+    manifest = read_external_widget_manifest(widget_dir)
+    widget_info = manifest.get("widget", {})
+    entrypoint = str(widget_info.get("entrypoint", ""))
+    if not entrypoint:
+        raise RuntimeError("Widget manifest is missing widget.entrypoint.")
+
+    renderer = load_external_widget(widget_dir, entrypoint)
+    state: dict[str, Any] = {}
+    context = WidgetContext(config=read_external_widget_config(args.widget_config), state=state, assets_dir=widget_dir / "assets")
+
+    if isinstance(renderer, Widget):
+        renderer.setup(context)
+    elif hasattr(renderer, "setup"):
+        renderer.setup(context)
+
+    frame_index = 0
+    try:
+        while True:
+            context.frame_index = frame_index
+            canvas = MatrixCanvas(size, size)
+            if isinstance(renderer, Widget):
+                renderer.render(canvas, context)
+            else:
+                renderer(canvas, context)
+            display.show(canvas.frame())
+            frame_index += 1
+            if args.once:
+                break
+            time.sleep(1.0 / args.fps)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if isinstance(renderer, Widget):
+            renderer.teardown(context)
+        elif hasattr(renderer, "teardown"):
+            renderer.teardown(context)
+        display.clear()
+
+
 def run_spotify(
     args: argparse.Namespace,
     config: dict[str, Any],
@@ -1359,6 +1434,8 @@ def run(args: argparse.Namespace) -> None:
         run_agent(args, display, size)
     elif mode == "weather":
         run_weather(args, display, size)
+    elif mode == "widget":
+        run_external_widget(args, display, size)
     else:
         run_spotify(args, config, display, size)
 
@@ -1379,7 +1456,7 @@ def render_preview_frames(directory: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
-    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "testPattern"), default="spotify")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "testPattern", "widget"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)
@@ -1418,6 +1495,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--weather-temperature-unit", choices=("fahrenheit", "celsius"), default="fahrenheit")
     parser.add_argument("--weather-face-accessory", choices=("auto", "none", "sunglasses", "umbrella"), default="auto")
     parser.add_argument("--weather-refresh-minutes", type=int, default=15)
+    parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
+    parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
+    parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")
     parser.add_argument("--once", action="store_true", help="Render one frame and exit.")
     parser.add_argument("--no-browser", action="store_true", help="Print the Spotify auth URL without trying to open a browser.")
     return parser

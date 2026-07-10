@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from typing import Any
 
 from pydantic import BaseModel
@@ -24,6 +25,58 @@ WIDGET_MODE_MAP = {
     "core.weather": "weather",
     "core.testPattern": "testPattern",
 }
+
+
+def _safe_widget_id(widget_id: str) -> str:
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+    if not widget_id or any(character not in allowed for character in widget_id):
+        raise ValueError(f"Invalid widget id {widget_id}.")
+    return widget_id
+
+
+def _manifest_from_toml(payload: dict[str, Any]) -> WidgetManifest:
+    widget = payload.get("widget", {})
+    preview = payload.get("preview", {})
+    config_fields = []
+    for field in payload.get("config", []):
+        config_fields.append(
+            {
+                **field,
+                "helpText": field.get("helpText", field.get("help_text", "")),
+            }
+        )
+    triggers = []
+    for trigger in payload.get("triggers", []):
+        triggers.append(
+            {
+                "event": trigger.get("event", ""),
+                "defaultEnabled": trigger.get("defaultEnabled", trigger.get("default_enabled", False)),
+                "priority": trigger.get("priority", 0),
+                "minDurationSeconds": trigger.get("minDurationSeconds", trigger.get("min_duration_seconds", 0)),
+            }
+        )
+    return WidgetManifest.model_validate(
+        {
+            "id": widget.get("id", ""),
+            "name": widget.get("name", ""),
+            "version": widget.get("version", ""),
+            "summary": widget.get("summary", ""),
+            "author": widget.get("author", "Assistant Matrix"),
+            "category": widget.get("category", "custom"),
+            "runtime": widget.get("runtime", "python"),
+            "entrypoint": widget.get("entrypoint", ""),
+            "matrixSize": widget.get("matrixSize", widget.get("matrix_size", "64x64")),
+            "license": widget.get("license", "MIT"),
+            "preview": {
+                "cardGif": preview.get("cardGif", preview.get("card_gif", "")),
+                "matrixPreview": preview.get("matrixPreview", preview.get("matrix_png", "")),
+                "description": preview.get("description", ""),
+            },
+            "permissions": payload.get("permissions", []),
+            "config": config_fields,
+            "triggers": triggers,
+        }
+    )
 
 
 class WidgetRegistryService:
@@ -53,7 +106,7 @@ class WidgetRegistryService:
             return config.weather.model_dump()
         if widget_id == "core.testPattern":
             return {"testPattern": config.runtime.testPattern}
-        raise ValueError(f"Widget {widget_id} is not configurable.")
+        return self._read_installed_widget_config(widget_id)
 
     def update_widget_config(self, widget_id: str, values: dict[str, Any]) -> dict[str, Any]:
         self._require_widget(widget_id)
@@ -71,20 +124,26 @@ class WidgetRegistryService:
         elif widget_id == "core.testPattern":
             config.runtime.testPattern = bool(values.get("testPattern", config.runtime.testPattern))
         else:
-            raise ValueError(f"Widget {widget_id} is not configurable.")
+            self._write_installed_widget_config(widget_id, values)
+            return self.get_widget_config(widget_id)
         config_service.save_config(config)
         return self.get_widget_config(widget_id)
 
     def apply_widget(self, widget_id: str, values: dict[str, Any] | None = None):
         widget = self._require_widget(widget_id)
-        if widget_id not in WIDGET_MODE_MAP:
-            raise ValueError(f"Widget {widget_id} is installed but does not have a runnable package yet.")
         if values:
             self.update_widget_config(widget_id, values)
         config = config_service.get_config()
-        mode = WIDGET_MODE_MAP[widget_id]
-        config.display.mode = mode
-        config.runtime.testPattern = mode == "testPattern"
+        if widget_id in WIDGET_MODE_MAP:
+            mode = WIDGET_MODE_MAP[widget_id]
+            config.display.mode = mode
+            config.display.widgetId = ""
+            config.runtime.testPattern = mode == "testPattern"
+        else:
+            self._require_installed_package(widget_id)
+            config.display.mode = "widget"
+            config.display.widgetId = widget_id
+            config.runtime.testPattern = False
         config_service.save_config(config)
         runtime = runtime_service.apply()
         return self.get_local_widget(widget.manifest.id), runtime
@@ -235,6 +294,50 @@ class WidgetRegistryService:
             ),
         ]
 
+    def _widget_package_dir(self, widget_id: str):
+        return config_service.data_dir / "widgets" / "packages" / _safe_widget_id(widget_id)
+
+    def _widget_config_path(self, widget_id: str):
+        return config_service.data_dir / "widgets" / "config" / f"{_safe_widget_id(widget_id)}.json"
+
+    def _read_installed_manifest(self, widget_id: str) -> WidgetManifest | None:
+        manifest_path = self._widget_package_dir(widget_id) / "widget.toml"
+        if not manifest_path.exists():
+            return None
+        return _manifest_from_toml(tomllib.loads(manifest_path.read_text(encoding="utf-8")))
+
+    def _require_installed_package(self, widget_id: str) -> None:
+        manifest = self._read_installed_manifest(widget_id)
+        if manifest is None:
+            raise ValueError(f"Widget {widget_id} is installed as catalog metadata but no runnable package is present.")
+        if manifest.runtime != "python" or not manifest.entrypoint:
+            raise ValueError(f"Widget {widget_id} does not declare a runnable Python entrypoint.")
+
+    def _read_installed_widget_config(self, widget_id: str) -> dict[str, Any]:
+        self._require_installed_package(widget_id)
+        path = self._widget_config_path(widget_id)
+        if path.exists():
+            with path.open("r", encoding="utf-8") as file:
+                payload = json.load(file)
+            return payload if isinstance(payload, dict) else {}
+        manifest = self._read_installed_manifest(widget_id)
+        defaults: dict[str, Any] = {}
+        if manifest:
+            for field in manifest.config:
+                if field.default is not None:
+                    defaults[field.key] = field.default
+        return defaults
+
+    def _write_installed_widget_config(self, widget_id: str, values: dict[str, Any]) -> None:
+        self._require_installed_package(widget_id)
+        current = self._read_installed_widget_config(widget_id)
+        current.update(values)
+        path = self._widget_config_path(widget_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as file:
+            json.dump(current, file, indent=2)
+            file.write("\n")
+
     def _installed_store_widgets(self) -> list[LocalWidget]:
         installed_path = config_service.data_dir / "widgets" / "installed.json"
         try:
@@ -246,24 +349,27 @@ class WidgetRegistryService:
         widgets: list[LocalWidget] = []
         for raw_widget in raw_widgets:
             store_widget = StoreWidget.model_validate(raw_widget)
+            package_manifest = self._read_installed_manifest(store_widget.id)
+            manifest = package_manifest or WidgetManifest(
+                id=store_widget.id,
+                name=store_widget.name,
+                version=store_widget.version,
+                summary=store_widget.summary,
+                author=store_widget.author,
+                category=store_widget.category,
+                runtime="python",
+                matrixSize="64x64",
+                preview=WidgetPreview(cardGif=store_widget.previewGifUrl, matrixPreview=store_widget.matrixPreviewUrl),
+            )
+            config = config_service.get_config()
             widgets.append(
                 LocalWidget(
-                    manifest=WidgetManifest(
-                        id=store_widget.id,
-                        name=store_widget.name,
-                        version=store_widget.version,
-                        summary=store_widget.summary,
-                        author=store_widget.author,
-                        category=store_widget.category,
-                        runtime="python",
-                        matrixSize="64x64",
-                        preview=WidgetPreview(cardGif=store_widget.previewGifUrl, matrixPreview=store_widget.matrixPreviewUrl),
-                    ),
+                    manifest=manifest,
                     installed=True,
                     builtIn=False,
                     enabled=True,
-                    configurable=False,
-                    active=False,
+                    configurable=bool(manifest.config),
+                    active=config.display.mode == "widget" and config.display.widgetId == store_widget.id,
                 )
             )
         return widgets

@@ -144,6 +144,18 @@ class RuntimeService:
             args.extend(["--weather-longitude", str(config.weather.longitude)])
         if config.runtime.testPattern:
             args.append("--test-pattern")
+        if config.display.mode == "widget" and config.display.widgetId:
+            widget_id = config.display.widgetId
+            args.extend(
+                [
+                    "--widget-id",
+                    widget_id,
+                    "--widget-dir",
+                    str(config_service.data_dir / "widgets" / "packages" / widget_id),
+                    "--widget-config",
+                    str(config_service.data_dir / "widgets" / "config" / f"{widget_id}.json"),
+                ]
+            )
         return args
 
 

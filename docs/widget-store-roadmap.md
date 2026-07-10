@@ -261,6 +261,26 @@ POST   /api/widgets/local/{widget_id}/config
 POST   /api/widgets/local/{widget_id}/apply
 ```
 
+Installed Python widgets become runnable when the store entry points to a reachable `.tar.gz` archive. The archive is unpacked under:
+
+```text
+data/widgets/packages/<widget-id>/
+```
+
+The app reads `widget.toml`, renders config fields from the manifest, stores user config under:
+
+```text
+data/widgets/config/<widget-id>.json
+```
+
+and launches the runtime with:
+
+```text
+spotify_matrix.py --display-mode widget --widget-dir data/widgets/packages/<widget-id> --widget-config data/widgets/config/<widget-id>.json
+```
+
+Store entries without a reachable archive can still be shown as catalog metadata, but they are not runnable until the package is available locally.
+
 ### Runtime
 
 ```text

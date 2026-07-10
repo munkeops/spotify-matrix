@@ -69,11 +69,12 @@ The SDK currently provides:
 - `Widget` base class with `setup`, `render`, `teardown`, and `preview`.
 - `WidgetPreview`, `WidgetPermission`, and `WidgetTrigger` helpers for publishing metadata.
 - `assistant-matrix-widget` CLI for manifest, preview, validation, and packaging.
+- Local package execution for installed Python widgets that provide `widget.toml` and a Python entrypoint.
 
 Still future work:
 
-- Runtime package loading from installed store archives.
 - Store publishing CLI.
 - Event-driven widget execution.
+- Dependency isolation for third-party widget packages beyond the SDK and app dependencies.
 
 See [docs/examples/weather_badge_widget.py](examples/weather_badge_widget.py) for a complete example.

@@ -36,7 +36,8 @@ class RuntimeConfig(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    mode: Literal["spotify", "clock", "agent", "weather", "testPattern"] = "spotify"
+    mode: Literal["spotify", "clock", "agent", "weather", "testPattern", "widget"] = "spotify"
+    widgetId: str = ""
 
 
 class ClockConfig(BaseModel):
