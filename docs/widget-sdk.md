@@ -43,6 +43,8 @@ widget.preview("preview.png", WidgetContext(config={"message": "HI"}))
 The package exposes a small creator CLI:
 
 ```bash
+poetry run assistant-matrix-widget init user.hello --name "Hello Matrix" --category custom
+cd user.hello
 poetry run assistant-matrix-widget manifest docs.examples.weather_badge_widget:WeatherBadgeWidget --output widget.toml
 poetry run assistant-matrix-widget preview docs.examples.weather_badge_widget:WeatherBadgeWidget --output previews/matrix-64.png --config "{\"label\":\"HOME\",\"temperature\":72,\"condition\":\"sunny\"}"
 poetry run assistant-matrix-widget validate widget.toml
@@ -51,6 +53,18 @@ poetry run assistant-matrix-widget publish . --store-dir store-dist --base-url h
 ```
 
 For shells that make inline JSON awkward, `preview --config @config.json` reads the preview config from a file.
+
+`init` creates the recommended package structure:
+
+```text
+widget.toml
+README.md
+renderer/
+  __init__.py
+  widget.py
+previews/
+assets/
+```
 
 The generated `widget.toml` is the store contract. It contains:
 
@@ -117,13 +131,11 @@ The SDK currently provides:
 - `ConfigField` helpers for manifest-compatible config forms.
 - `Widget` base class with `setup`, `render`, `teardown`, and `preview`.
 - `WidgetPreview`, `WidgetPermission`, and `WidgetTrigger` helpers for publishing metadata.
-- `assistant-matrix-widget` CLI for manifest, preview, validation, packaging, and static-store publishing.
+- `assistant-matrix-widget` CLI for scaffolding, manifest, preview, validation, packaging, and static-store publishing.
 - Local package execution for installed Python widgets that provide `widget.toml` and a Python entrypoint.
 
 Still future work:
 
-- Store publishing CLI.
-- Event-driven widget execution.
 - Dependency isolation for third-party widget packages beyond the SDK and app dependencies.
 
 See [docs/examples/weather_badge_widget.py](examples/weather_badge_widget.py) for a complete example.

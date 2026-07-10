@@ -17,6 +17,16 @@ from assistant_matrix_sdk.context import WidgetContext
 from assistant_matrix_sdk.widget import Widget
 
 
+def class_name_from_widget_id(widget_id: str) -> str:
+    parts = [part for part in widget_id.replace("-", ".").replace("_", ".").split(".") if part]
+    return "".join(part[:1].upper() + part[1:] for part in parts) + "Widget"
+
+
+def display_name_from_widget_id(widget_id: str) -> str:
+    tail = widget_id.split(".")[-1]
+    return tail.replace("-", " ").replace("_", " ").title() or widget_id
+
+
 def load_widget(target: str) -> type[Widget]:
     if ":" not in target:
         raise ValueError("Widget target must use module.path:ClassName.")
@@ -106,6 +116,99 @@ def command_manifest(args: argparse.Namespace) -> int:
     manifest = widget_class.manifest(entrypoint=args.entrypoint or args.widget)
     write_manifest(Path(args.output), manifest)
     print(f"Wrote {args.output}")
+    return 0
+
+
+def command_init(args: argparse.Namespace) -> int:
+    widget_id = args.widget_id
+    target_dir = Path(args.directory or widget_id).resolve()
+    if target_dir.exists() and any(target_dir.iterdir()) and not args.force:
+        raise FileExistsError(f"{target_dir} is not empty. Use --force to write into it.")
+
+    name = args.name or display_name_from_widget_id(widget_id)
+    class_name = class_name_from_widget_id(widget_id)
+    summary = args.summary or f"{name} widget for Assistant Matrix."
+    target_dir.mkdir(parents=True, exist_ok=True)
+    (target_dir / "renderer").mkdir(parents=True, exist_ok=True)
+    (target_dir / "previews").mkdir(parents=True, exist_ok=True)
+    (target_dir / "assets").mkdir(parents=True, exist_ok=True)
+
+    manifest = {
+        "widget": {
+            "id": widget_id,
+            "name": name,
+            "version": args.version,
+            "summary": summary,
+            "author": args.author,
+            "category": args.category,
+            "runtime": "python",
+            "entrypoint": "renderer.widget:WidgetRenderer",
+            "matrix_size": "64x64",
+            "license": args.license,
+        },
+        "preview": {
+            "card_gif": "previews/card.gif",
+            "matrix_png": "previews/matrix-64.png",
+            "description": f"{name} matrix preview.",
+        },
+        "permissions": [],
+        "config": [
+            {
+                "key": "message",
+                "label": "Message",
+                "type": "string",
+                "default": "HI",
+                "placeholder": "HI",
+            }
+        ],
+        "triggers": [
+            {
+                "event": "schedule.rotation",
+                "default_enabled": True,
+                "priority": 10,
+            }
+        ],
+    }
+    write_manifest(target_dir / "widget.toml", manifest)
+
+    renderer = f'''"""Starter Assistant Matrix widget."""
+
+from __future__ import annotations
+
+from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
+
+
+class {class_name}(Widget):
+    def render(self, canvas: MatrixCanvas, context: WidgetContext) -> None:
+        message = str(context.config.get("message", "HI"))[:8].upper()
+        canvas.background("#050607")
+        canvas.rect(0, 0, 64, 16, "#203a5f")
+        canvas.text(4, 4, "{name[:8].upper()}", "#ffffff")
+        canvas.text(8, 28, message, "#9bd0d9")
+
+
+WidgetRenderer = {class_name}
+'''
+    (target_dir / "renderer" / "widget.py").write_text(renderer, encoding="utf-8")
+    (target_dir / "renderer" / "__init__.py").write_text("", encoding="utf-8")
+
+    readme = f"""# {name}
+
+{summary}
+
+## Develop
+
+```bash
+assistant-matrix-widget validate widget.toml
+assistant-matrix-widget preview renderer.widget:{class_name} --output previews/matrix-64.png --config '{{"message":"HI"}}'
+assistant-matrix-widget package . --output-dir dist
+assistant-matrix-widget publish . --store-dir store-dist --base-url https://store.example.com
+```
+"""
+    (target_dir / "README.md").write_text(readme, encoding="utf-8")
+
+    print(f"Created widget scaffold at {target_dir}")
+    print(f"Entrypoint renderer.widget:{class_name}")
     return 0
 
 
@@ -271,6 +374,18 @@ def command_publish(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="assistant-matrix-widget", description="Assistant Matrix widget author tools.")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    init = subparsers.add_parser("init", help="Create a starter widget package.")
+    init.add_argument("widget_id", help="Stable widget id, for example user.weather-badge.")
+    init.add_argument("--directory", default="", help="Target directory. Defaults to the widget id.")
+    init.add_argument("--name", default="", help="Display name. Defaults from widget id.")
+    init.add_argument("--summary", default="", help="Short store summary.")
+    init.add_argument("--author", default="Assistant Matrix")
+    init.add_argument("--category", default="custom", choices=("media", "time", "assistant", "information", "diagnostics", "custom"))
+    init.add_argument("--version", default="0.1.0")
+    init.add_argument("--license", default="MIT")
+    init.add_argument("--force", action="store_true", help="Allow writing into a non-empty directory.")
+    init.set_defaults(func=command_init)
 
     manifest = subparsers.add_parser("manifest", help="Generate widget.toml from a Widget subclass.")
     manifest.add_argument("widget", help="Widget class target, for example renderer.widget:WeatherWidget.")

@@ -427,3 +427,28 @@ Example:
 ```
 
 For richer widget behavior, prefer the widget and display policy APIs above.
+
+## Widget Author CLI
+
+The SDK command line tool supports the full local author workflow:
+
+```bash
+assistant-matrix-widget init user.hello --name "Hello Matrix"
+assistant-matrix-widget validate widget.toml
+assistant-matrix-widget preview renderer.widget:UserHelloWidget --output previews/matrix-64.png
+assistant-matrix-widget package . --output-dir dist
+assistant-matrix-widget publish . --store-dir store-dist --base-url https://store.example.com
+```
+
+`init` creates:
+
+```text
+widget.toml
+README.md
+renderer/widget.py
+renderer/__init__.py
+previews/
+assets/
+```
+
+That folder is the unit that gets packaged, published to the store, installed on the Pi, configured, and run.
