@@ -60,6 +60,16 @@ The generated `widget.toml` is the store contract. It contains:
 - config fields the Assistant Matrix UI can render
 - trigger hints for rotation or event-based display rules
 
+Trigger events are delivered through the display API:
+
+```bash
+curl -X POST http://<pi-host>:3000/api/display/events \
+  -H "Content-Type: application/json" \
+  -d '{"event":"spotify.playback_started","payload":{"source":"spotify"}}'
+```
+
+The app evaluates saved display policy trigger rules and temporarily runs the matching widget.
+
 Packaging writes `dist/<widget-id>-<version>.tar.gz` and prints a SHA256 that can be copied into the store index.
 
 Publishing writes an object-store-ready layout:

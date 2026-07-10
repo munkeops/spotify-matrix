@@ -168,11 +168,26 @@ class DisplayPolicyRuntimeState(BaseModel):
     schedulerRunning: bool = False
     activeWidgetId: str | None = None
     mode: DisplayPolicyMode = "single"
+    activeEvent: str | None = None
     lastError: str | None = None
 
 
 class DisplayPolicyApplyResponse(BaseModel):
     ok: bool
     policy: DisplayPolicy
+    state: DisplayPolicyRuntimeState
+    runtime: Any = None
+
+
+class DisplayEventRequest(BaseModel):
+    event: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class DisplayEventResponse(BaseModel):
+    ok: bool
+    matched: bool
+    event: str
+    widgetId: str | None = None
     state: DisplayPolicyRuntimeState
     runtime: Any = None

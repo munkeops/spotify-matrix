@@ -308,6 +308,25 @@ POST /api/display/playlist
 POST /api/display/trigger
 ```
 
+Current event trigger API:
+
+```text
+POST /api/display/events
+```
+
+Example:
+
+```json
+{
+  "event": "spotify.playback_started",
+  "payload": {
+    "source": "spotify"
+  }
+}
+```
+
+The runner compares the event with saved `policy.triggers`, chooses the enabled rule with the highest priority, applies that widget, and resumes the saved display policy after `minDurationSeconds`.
+
 ### Commands
 
 The existing `/api/commands` should evolve from fixed commands into a generic command bus:
