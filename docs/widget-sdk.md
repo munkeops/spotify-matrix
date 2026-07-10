@@ -74,6 +74,11 @@ The generated `widget.toml` is the store contract. It contains:
 - config fields the Assistant Matrix UI can render
 - trigger hints for rotation or event-based display rules
 
+Machine-readable contracts:
+
+- [Widget manifest schema](schemas/widget-manifest.schema.json)
+- [Widget store index schema](schemas/widget-store-index.schema.json)
+
 The Store and Plugins pages use `preview.card_gif` / `previewGifUrl` first and fall back to `preview.matrix_png` / `matrixPreviewUrl`. `preview.matrix_png` is the required baseline preview for packaging and publishing. `preview.card_gif` is optional; if the file is not present, the published store index leaves `previewGifUrl` empty and the UI uses the matrix PNG. If neither preview URL is available, the UI shows a generated placeholder based on the widget category/id.
 
 Trigger events are delivered through the display API:

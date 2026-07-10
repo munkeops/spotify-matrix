@@ -136,6 +136,11 @@ Package validation checks:
 - declared Python entrypoint file exists
 - required `preview.matrix_png` exists
 
+Machine-readable schemas are available for external tooling:
+
+- [Widget manifest schema](schemas/widget-manifest.schema.json)
+- [Widget store index schema](schemas/widget-store-index.schema.json)
+
 The package command writes:
 
 ```text

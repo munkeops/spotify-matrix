@@ -16,6 +16,8 @@ Widget platform docs:
 - [Widget store quickstart](docs/widget-store-quickstart.md)
 - [Widget SDK](docs/widget-sdk.md)
 - [Widget API reference](docs/widget-api-reference.md)
+- [Widget manifest schema](docs/schemas/widget-manifest.schema.json)
+- [Widget store index schema](docs/schemas/widget-store-index.schema.json)
 
 ## Layout
 

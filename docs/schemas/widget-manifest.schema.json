@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://assistant-matrix.local/schemas/widget-manifest.schema.json",
+  "title": "Assistant Matrix Widget Manifest",
+  "description": "Author-facing widget.toml/widget.json contract for Assistant Matrix widgets.",
+  "type": "object",
+  "required": ["widget"],
+  "additionalProperties": false,
+  "properties": {
+    "widget": {
+      "type": "object",
+      "required": ["id", "name", "version", "summary", "runtime", "entrypoint"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?$"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "author": {
+          "type": "string",
+          "default": "Assistant Matrix"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["media", "time", "assistant", "information", "diagnostics", "custom"],
+          "default": "custom"
+        },
+        "runtime": {
+          "type": "string",
+          "enum": ["python", "builtin"]
+        },
+        "entrypoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matrix_size": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*x[1-9][0-9]*$",
+          "default": "64x64"
+        },
+        "license": {
+          "type": "string",
+          "default": "MIT"
+        }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "card_gif": {
+          "type": "string",
+          "default": "previews/card.gif"
+        },
+        "matrix_png": {
+          "type": "string",
+          "default": "previews/matrix-64.png"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "default": []
+    },
+    "config": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/configField"
+      },
+      "default": []
+    },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event"],
+        "additionalProperties": false,
+        "properties": {
+          "event": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default_enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "priority": {
+            "type": "integer",
+            "default": 0
+          },
+          "min_duration_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        }
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "configField": {
+      "type": "object",
+      "required": ["key", "label", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "select", "secret", "location", "color"]
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "default": true,
+        "placeholder": {
+          "type": "string",
+          "default": ""
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "step": {
+          "type": "number"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": ["string", "number", "boolean"]
+              }
+            }
+          },
+          "default": []
+        },
+        "helpText": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "select"
+              }
+            },
+            "required": ["type"]
+          },
+          "then": {
+            "required": ["options"],
+            "properties": {
+              "options": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

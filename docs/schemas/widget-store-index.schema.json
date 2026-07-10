@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://assistant-matrix.local/schemas/widget-store-index.schema.json",
+  "title": "Assistant Matrix Widget Store Index",
+  "description": "Static object-store catalog consumed by Assistant Matrix devices.",
+  "type": "object",
+  "required": ["schemaVersion", "widgets"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "widgets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/storeWidget"
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "storeWidget": {
+      "type": "object",
+      "required": ["id", "name", "version", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?$"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "enum": ["media", "time", "assistant", "information", "diagnostics", "custom"],
+          "default": "custom"
+        },
+        "author": {
+          "type": "string",
+          "default": "Assistant Matrix"
+        },
+        "manifestUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "archiveUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "previewGifUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "matrixPreviewUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^$|^[A-Fa-f0-9]{64}$",
+          "default": ""
+        },
+        "installed": {
+          "type": "boolean",
+          "default": false,
+          "description": "Device-local response field. Static store indexes may omit it."
+        }
+      }
+    }
+  }
+}

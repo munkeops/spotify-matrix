@@ -494,3 +494,8 @@ Before packaging or publishing, the widget folder must contain:
 - Trigger hints with an `event` name.
 
 That folder is the unit that gets packaged, published to the store, installed on the Pi, configured, and run.
+
+Machine-readable contracts:
+
+- [Widget manifest schema](schemas/widget-manifest.schema.json)
+- [Widget store index schema](schemas/widget-store-index.schema.json)
