@@ -10,6 +10,12 @@ The project now uses a Python-only stack:
 - Runtime display script in `spotify_matrix.py`
 - TOML service config in `configs/base_config.toml`
 
+Widget platform docs:
+
+- [Widget store roadmap](docs/widget-store-roadmap.md)
+- [Widget SDK](docs/widget-sdk.md)
+- [Widget API reference](docs/widget-api-reference.md)
+
 ## Layout
 
 This repo follows the service structure used by the synthesis Python repos:

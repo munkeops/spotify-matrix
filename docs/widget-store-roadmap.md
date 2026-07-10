@@ -271,6 +271,8 @@ data/
 
 ## Fixed Local APIs
 
+For the current implemented API contract, see [docs/widget-api-reference.md](widget-api-reference.md).
+
 ### Store
 
 ```text
