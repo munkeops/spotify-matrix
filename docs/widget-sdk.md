@@ -47,6 +47,7 @@ poetry run assistant-matrix-widget manifest docs.examples.weather_badge_widget:W
 poetry run assistant-matrix-widget preview docs.examples.weather_badge_widget:WeatherBadgeWidget --output previews/matrix-64.png --config "{\"label\":\"HOME\",\"temperature\":72,\"condition\":\"sunny\"}"
 poetry run assistant-matrix-widget validate widget.toml
 poetry run assistant-matrix-widget package . --output-dir dist
+poetry run assistant-matrix-widget publish . --store-dir store-dist --base-url https://store.example.com --index store-index.json
 ```
 
 For shells that make inline JSON awkward, `preview --config @config.json` reads the preview config from a file.
@@ -61,6 +62,23 @@ The generated `widget.toml` is the store contract. It contains:
 
 Packaging writes `dist/<widget-id>-<version>.tar.gz` and prints a SHA256 that can be copied into the store index.
 
+Publishing writes an object-store-ready layout:
+
+```text
+store-dist/
+  store-index.json
+  widgets/
+    <widget-id>/
+      <version>/
+        widget.toml
+        <widget-id>-<version>.tar.gz
+        previews/
+          card.gif
+          matrix-64.png
+```
+
+The `--base-url` is used to generate public `manifestUrl`, `archiveUrl`, and preview URLs in the index. The resulting folder can be uploaded to GitHub Pages, S3, Cloudflare R2, or any static file host.
+
 The SDK currently provides:
 
 - `MatrixCanvas` backed by Pillow.
@@ -68,7 +86,7 @@ The SDK currently provides:
 - `ConfigField` helpers for manifest-compatible config forms.
 - `Widget` base class with `setup`, `render`, `teardown`, and `preview`.
 - `WidgetPreview`, `WidgetPermission`, and `WidgetTrigger` helpers for publishing metadata.
-- `assistant-matrix-widget` CLI for manifest, preview, validation, and packaging.
+- `assistant-matrix-widget` CLI for manifest, preview, validation, packaging, and static-store publishing.
 - Local package execution for installed Python widgets that provide `widget.toml` and a Python entrypoint.
 
 Still future work:

@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import shutil
 import sys
 import tarfile
 import tomllib
@@ -140,6 +141,28 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def widget_store_entry(manifest: dict[str, Any], *, base_url: str, archive_path: Path) -> dict[str, Any]:
+    widget = manifest["widget"]
+    preview = manifest.get("preview", {})
+    widget_id = widget["id"]
+    version = widget["version"]
+    base = base_url.rstrip("/")
+    widget_base = f"{base}/widgets/{widget_id}/{version}"
+    return {
+        "id": widget_id,
+        "name": widget["name"],
+        "version": version,
+        "summary": widget["summary"],
+        "category": widget.get("category", "custom"),
+        "author": widget.get("author", "Assistant Matrix"),
+        "manifestUrl": f"{widget_base}/widget.toml",
+        "archiveUrl": f"{widget_base}/{archive_path.name}",
+        "previewGifUrl": f"{widget_base}/{preview.get('card_gif', 'previews/card.gif')}",
+        "matrixPreviewUrl": f"{widget_base}/{preview.get('matrix_png', 'previews/matrix-64.png')}",
+        "sha256": sha256_file(archive_path),
+    }
+
+
 def command_package(args: argparse.Namespace) -> int:
     widget_dir = Path(args.widget_dir).resolve()
     manifest_path = widget_dir / "widget.toml"
@@ -164,6 +187,84 @@ def command_package(args: argparse.Namespace) -> int:
     digest = sha256_file(archive_path)
     print(f"Wrote {archive_path}")
     print(f"sha256 {digest}")
+    return 0
+
+
+def read_store_index(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {"schemaVersion": 1, "widgets": []}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.setdefault("schemaVersion", 1)
+    payload.setdefault("widgets", [])
+    return payload
+
+
+def write_store_index(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def package_widget(widget_dir: Path, output_dir: Path) -> Path:
+    manifest = read_manifest(widget_dir / "widget.toml")
+    errors = validate_manifest_data(manifest)
+    if errors:
+        raise ValueError("; ".join(errors))
+    widget = manifest["widget"]
+    output_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = output_dir / f"{widget['id']}-{widget['version']}.tar.gz"
+    with tarfile.open(archive_path, "w:gz") as archive:
+        for path in sorted(widget_dir.rglob("*")):
+            if path.is_file():
+                archive.add(path, arcname=path.relative_to(widget_dir))
+    return archive_path
+
+
+def command_publish(args: argparse.Namespace) -> int:
+    widget_dir = Path(args.widget_dir).resolve()
+    manifest_path = widget_dir / "widget.toml"
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"Expected {manifest_path}")
+    manifest = read_manifest(manifest_path)
+    errors = validate_manifest_data(manifest)
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+
+    widget = manifest["widget"]
+    publish_root = Path(args.store_dir)
+    publish_dir = publish_root / "widgets" / widget["id"] / widget["version"]
+    publish_dir.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy2(manifest_path, publish_dir / "widget.toml")
+    archive_path = package_widget(widget_dir, publish_dir)
+
+    preview = manifest.get("preview", {})
+    for preview_key in ("card_gif", "matrix_png"):
+        relative = preview.get(preview_key)
+        if not relative:
+            continue
+        source = widget_dir / relative
+        if source.exists():
+            target = publish_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+    index_path = Path(args.index)
+    if not index_path.is_absolute():
+        index_path = publish_root / index_path
+    index = read_store_index(index_path)
+    entry = widget_store_entry(manifest, base_url=args.base_url, archive_path=archive_path)
+    widgets = [item for item in index.get("widgets", []) if item.get("id") != entry["id"]]
+    widgets.append(entry)
+    widgets.sort(key=lambda item: item.get("name", item.get("id", "")))
+    index["widgets"] = widgets
+    write_store_index(index_path, index)
+
+    print(f"Published {entry['id']} {entry['version']}")
+    print(f"Archive {archive_path}")
+    print(f"Index {index_path}")
+    print(f"sha256 {entry['sha256']}")
     return 0
 
 
@@ -192,6 +293,13 @@ def build_parser() -> argparse.ArgumentParser:
     package.add_argument("widget_dir")
     package.add_argument("--output-dir", default="dist")
     package.set_defaults(func=command_package)
+
+    publish = subparsers.add_parser("publish", help="Publish a widget folder into an object-store-style directory and update an index JSON.")
+    publish.add_argument("widget_dir")
+    publish.add_argument("--store-dir", default="store-dist", help="Local directory that mirrors the object store root.")
+    publish.add_argument("--base-url", required=True, help="Public base URL for the store root.")
+    publish.add_argument("--index", default="store-index.json", help="Index path, relative to store-dir unless absolute.")
+    publish.set_defaults(func=command_publish)
     return parser
 
 

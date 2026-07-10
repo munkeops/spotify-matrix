@@ -218,6 +218,23 @@ Example `store-index.json`:
 
 Later, this can move to a database-backed service with user accounts, approvals, ratings, and private widgets.
 
+V1 publishing can write directly to a static object-store layout:
+
+```bash
+assistant-matrix-widget publish ./my-widget --store-dir ./store-dist --base-url https://store.example.com
+```
+
+This produces:
+
+```text
+store-dist/store-index.json
+store-dist/widgets/<widget-id>/<version>/widget.toml
+store-dist/widgets/<widget-id>/<version>/<widget-id>-<version>.tar.gz
+store-dist/widgets/<widget-id>/<version>/previews/...
+```
+
+The Pi only needs the public index URL. It can browse the index, install an archive, persist widget config, and run the package locally.
+
 ## Local Storage
 
 Recommended Pi local layout:
