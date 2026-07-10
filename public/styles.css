@@ -591,7 +591,8 @@ dd {
   margin-top: 14px;
 }
 
-.rotation-row {
+.rotation-row,
+.trigger-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 96px;
   gap: 10px;
@@ -602,11 +603,38 @@ dd {
   background: #111418;
 }
 
-.rotation-row label {
+.trigger-row {
+  grid-template-columns: 110px minmax(190px, 1.4fr) minmax(170px, 1fr) 110px 130px;
+}
+
+.trigger-list,
+.trigger-list-heading {
+  margin-top: 14px;
+}
+
+.trigger-list {
+  display: grid;
+  gap: 8px;
+}
+
+.trigger-list-heading h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.trigger-list-heading p {
+  margin: 0;
+  color: #aaa49b;
+  font-size: 13px;
+}
+
+.rotation-row label,
+.trigger-row label {
   margin: 0;
 }
 
-.rotation-row .check-row {
+.rotation-row .check-row,
+.trigger-row .check-row {
   min-height: auto;
 }
 
@@ -1680,7 +1708,8 @@ label {
     min-height: 210px;
   }
 
-  .rotation-row {
+  .rotation-row,
+  .trigger-row {
     grid-template-columns: 1fr;
   }
 }

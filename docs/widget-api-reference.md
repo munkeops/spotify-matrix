@@ -266,6 +266,8 @@ Request:
 
 The backend validates referenced widget ids.
 
+The Plugins page Display Policy panel edits `mode`, `activeWidgetId`, `rotation`, and `triggers`. Trigger rows map directly to `policy.triggers`.
+
 ### Apply Display Policy
 
 ```text

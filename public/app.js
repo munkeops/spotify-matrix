@@ -20,6 +20,7 @@ const applyPluginButton = document.querySelector("#applyPluginButton");
 const policyModeSelect = document.querySelector("#policyModeSelect");
 const policyActiveWidgetSelect = document.querySelector("#policyActiveWidgetSelect");
 const rotationList = document.querySelector("#rotationList");
+const triggerList = document.querySelector("#triggerList");
 const savePolicyButton = document.querySelector("#savePolicyButton");
 const applyPolicyButton = document.querySelector("#applyPolicyButton");
 const pairButton = document.querySelector("#pairButton");
@@ -511,7 +512,7 @@ async function refreshStoreWidgets() {
 }
 
 function renderDisplayPolicy(policy) {
-  if (!policyModeSelect || !policyActiveWidgetSelect || !rotationList) {
+  if (!policyModeSelect || !policyActiveWidgetSelect || !rotationList || !triggerList) {
     return;
   }
   displayPolicy = policy;
@@ -541,6 +542,39 @@ function renderDisplayPolicy(policy) {
         </label>
       </div>`;
   }).join("");
+
+  const widgetOptions = localWidgets.map((widget) => {
+    const id = escapeHtml(widget.manifest.id);
+    const name = escapeHtml(widget.manifest.name);
+    return { id, name };
+  });
+  triggerList.innerHTML = (policy.triggers || []).map((rule, index) => {
+    const selectedWidget = rule.widgetId || "core.spotify";
+    const options = widgetOptions.map((option) => `<option value="${option.id}" ${option.id === selectedWidget ? "selected" : ""}>${option.name}</option>`).join("");
+    return `
+      <div class="trigger-row" data-trigger-index="${index}">
+        <label class="check-row">
+          <input type="checkbox" name="triggerEnabled" ${rule.enabled ? "checked" : ""}>
+          <span>Enabled</span>
+        </label>
+        <label>
+          Event
+          <input name="triggerEvent" value="${escapeHtml(rule.event || "")}" placeholder="spotify.playback_started">
+        </label>
+        <label>
+          Widget
+          <select name="triggerWidgetId">${options}</select>
+        </label>
+        <label>
+          Priority
+          <input name="triggerPriority" type="number" step="1" value="${escapeHtml(rule.priority ?? 0)}">
+        </label>
+        <label>
+          Hold seconds
+          <input name="triggerMinDuration" type="number" min="0" max="86400" step="5" value="${escapeHtml(rule.minDurationSeconds ?? 15)}">
+        </label>
+      </div>`;
+  }).join("") || `<p class="muted">No trigger rules configured.</p>`;
 }
 
 function collectDisplayPolicy() {
@@ -549,11 +583,18 @@ function collectDisplayPolicy() {
     enabled: Boolean(row.querySelector("[name='rotationEnabled']")?.checked),
     durationSeconds: Number(row.querySelector("[name='rotationDuration']")?.value || 60)
   }));
+  const triggers = [...document.querySelectorAll(".trigger-row")].map((row) => ({
+    event: row.querySelector("[name='triggerEvent']")?.value || "",
+    widgetId: row.querySelector("[name='triggerWidgetId']")?.value || "core.spotify",
+    enabled: Boolean(row.querySelector("[name='triggerEnabled']")?.checked),
+    priority: Number(row.querySelector("[name='triggerPriority']")?.value || 0),
+    minDurationSeconds: Number(row.querySelector("[name='triggerMinDuration']")?.value || 0)
+  })).filter((rule) => rule.event);
   return {
     mode: policyModeSelect?.value || "single",
     activeWidgetId: policyActiveWidgetSelect?.value || "core.spotify",
     rotation,
-    triggers: displayPolicy?.triggers || []
+    triggers
   };
 }
 
