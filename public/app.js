@@ -1,8 +1,7 @@
 const navItems = [...document.querySelectorAll(".nav-item")];
 const sidebarToggle = document.querySelector("#sidebarToggle");
 const pages = [...document.querySelectorAll("[data-page-panel]")];
-const pluginCards = [...document.querySelectorAll(".plugin-card[data-plugin]")];
-const pluginSettingsButtons = [...document.querySelectorAll("[data-plugin-settings]")];
+const pluginGrid = document.querySelector("#pluginGrid");
 const configPanels = [...document.querySelectorAll("[data-config-panel]")];
 const spotifyPanel = document.querySelector("#spotifyPanel");
 const matrixPanel = document.querySelector("#matrixPanel");
@@ -186,9 +185,66 @@ const pluginLabels = {
 };
 
 let currentConfig = null;
+let localWidgets = [];
 let selectedPlugin = "spotify";
 let runtimeRunning = false;
 let browserAmericaTimezone = "";
+
+function pluginCards() {
+  return [...document.querySelectorAll(".plugin-card[data-plugin]")];
+}
+
+function modeFromWidgetId(widgetId) {
+  return widgetId?.startsWith("core.") ? widgetId.slice(5) : widgetId;
+}
+
+function widgetCategoryLabel(category) {
+  return {
+    media: "Music",
+    time: "Ambient",
+    assistant: "Assistant",
+    information: "Info",
+    diagnostics: "Diagnostic",
+    custom: "Widget"
+  }[category] || "Widget";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function previewMarkup(mode) {
+  if (mode === "clock") {
+    return `
+      <span class="plugin-preview preview-clock" aria-hidden="true">
+        <span class="plugin-clock-face">
+          <span class="plugin-clock-tick tick-12"></span>
+          <span class="plugin-clock-tick tick-3"></span>
+          <span class="plugin-clock-tick tick-6"></span>
+          <span class="plugin-clock-tick tick-9"></span>
+          <span class="plugin-clock-hand plugin-hour-hand"></span>
+          <span class="plugin-clock-hand plugin-minute-hand"></span>
+          <span class="plugin-clock-pin"></span>
+        </span>
+      </span>`;
+  }
+  if (mode === "weather") {
+    return `
+      <span class="plugin-preview preview-weather" aria-hidden="true">
+        <span class="weather-sun"></span>
+        <span class="weather-face-mini">
+          <span class="weather-glasses"></span>
+          <span class="weather-smile-mini"></span>
+        </span>
+      </span>`;
+  }
+  return `<span class="plugin-preview preview-${mode === "testPattern" ? "test" : mode}" aria-hidden="true"></span>`;
+}
 
 function populateTimezones() {
   if (!clockTimezoneSelect) {
@@ -274,7 +330,7 @@ function setPage(pageName) {
 
 function setSelectedPlugin(plugin) {
   selectedPlugin = plugin;
-  pluginCards.forEach((card) => card.classList.toggle("active", card.dataset.plugin === plugin));
+  pluginCards().forEach((card) => card.classList.toggle("active", card.dataset.plugin === plugin));
   configPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.configPanel === plugin));
   dialogTitle.textContent = pluginLabels[plugin] || "Plugin";
 }
@@ -282,7 +338,44 @@ function setSelectedPlugin(plugin) {
 function syncActiveMode(mode) {
   activeMode.textContent = pluginLabels[mode] || "Spotify";
   matrixPreview.dataset.mode = mode;
-  pluginCards.forEach((card) => card.classList.toggle("active", card.dataset.plugin === mode));
+  pluginCards().forEach((card) => card.classList.toggle("active", card.dataset.plugin === mode));
+}
+
+function renderLocalWidgets(widgets) {
+  if (!pluginGrid || !widgets.length) {
+    return;
+  }
+  localWidgets = widgets;
+  const plannedCards = [...pluginGrid.querySelectorAll(".plugin-card.planned")].map((card) => card.outerHTML).join("");
+  const cards = widgets.map((widget) => {
+    const manifest = widget.manifest || {};
+    const mode = modeFromWidgetId(manifest.id);
+    pluginLabels[mode] = manifest.name || pluginLabels[mode] || mode;
+    const name = escapeHtml(manifest.name || mode);
+    const summary = escapeHtml(manifest.summary || "Assistant Matrix widget.");
+    const meta = escapeHtml(widgetCategoryLabel(manifest.category));
+    const widgetId = escapeHtml(manifest.id || "");
+    const escapedMode = escapeHtml(mode);
+    return `
+      <article class="plugin-card${widget.active ? " active" : ""}" data-plugin="${escapedMode}" data-widget-id="${widgetId}" role="button" tabindex="0">
+        <span class="plugin-meta">${meta}</span>
+        <strong>${name}</strong>
+        <small>${summary}</small>
+        ${previewMarkup(mode)}
+        <button class="plugin-settings-button" type="button" data-plugin-settings="${escapedMode}">Settings</button>
+      </article>`;
+  }).join("");
+  pluginGrid.innerHTML = cards + plannedCards;
+  syncActiveMode(normalizeMode(currentConfig));
+}
+
+async function refreshLocalWidgets() {
+  try {
+    const response = await api("/api/widgets/local");
+    renderLocalWidgets(response.widgets || []);
+  } catch (error) {
+    console.warn("Unable to load local widget registry", error);
+  }
 }
 
 function fillPanel(form, values) {
@@ -462,26 +555,31 @@ sidebarToggle?.addEventListener("click", () => {
   sidebarToggle.setAttribute("aria-label", collapsed ? "Expand sidebar" : "Collapse sidebar");
 });
 
-pluginCards.forEach((card) => {
-  card.addEventListener("click", () => {
-    const plugin = card.dataset.plugin;
-    applyPlugin(plugin);
-  });
-  card.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      applyPlugin(card.dataset.plugin);
-    }
-  });
-});
-
-pluginSettingsButtons.forEach((button) => {
-  button.addEventListener("click", (event) => {
+pluginGrid?.addEventListener("click", (event) => {
+  const settingsButton = event.target.closest("[data-plugin-settings]");
+  if (settingsButton) {
     event.stopPropagation();
-    const plugin = button.dataset.pluginSettings;
+    const plugin = settingsButton.dataset.pluginSettings;
     setSelectedPlugin(plugin);
     pluginDialog.showModal();
-  });
+    return;
+  }
+  const card = event.target.closest(".plugin-card[data-plugin]");
+  if (card) {
+    applyPlugin(card.dataset.plugin);
+  }
+});
+
+pluginGrid?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  const card = event.target.closest(".plugin-card[data-plugin]");
+  if (!card) {
+    return;
+  }
+  event.preventDefault();
+  applyPlugin(card.dataset.plugin);
 });
 
 closeDialogButton?.addEventListener("click", () => pluginDialog.close());
@@ -548,6 +646,7 @@ fields(clockPanel, "clockFace").forEach((control) => {
 populateTimezones();
 
 refreshConfig()
+  .then(refreshLocalWidgets)
   .then(refreshStatus)
   .catch((error) => setMessage(error.message));
 
