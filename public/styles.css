@@ -847,8 +847,58 @@ dd {
   background:
     linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
-    linear-gradient(160deg, #204e76, #f0a947);
+    #080c14;
   background-size: calc(100% / 16) calc(100% / 16), calc(100% / 16) calc(100% / 16), auto;
+}
+
+.weather-metric-preview {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 2px;
+  padding: 4px;
+}
+
+.weather-metric-preview span {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.weather-metric-preview span:nth-child(1) {
+  background: rgba(255, 206, 70, 0.14);
+}
+
+.weather-metric-preview span:nth-child(2) {
+  background: rgba(190, 110, 255, 0.14);
+}
+
+.weather-metric-preview span:nth-child(3) {
+  background: rgba(90, 210, 110, 0.14);
+}
+
+.weather-metric-preview span:nth-child(4) {
+  background: rgba(110, 210, 255, 0.14);
+}
+
+.weather-metric-preview strong {
+  font-size: clamp(7px, 1.4vw, 11px);
+  line-height: 1;
+  color: #f3f0e8;
+  font-weight: 850;
+}
+
+.weather-metric-preview em {
+  margin-top: 5px;
+  font-style: normal;
+  font-size: clamp(13px, 2.7vw, 24px);
+  line-height: 1;
+  color: #f3f0e8;
 }
 
 .weather-sun {
@@ -1115,7 +1165,7 @@ label {
   background:
     linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px),
-    linear-gradient(160deg, #204e76, #f0a947);
+    #080c14;
   background-size: calc(100% / 16) calc(100% / 16), calc(100% / 16) calc(100% / 16), auto;
   overflow: hidden;
 }

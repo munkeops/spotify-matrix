@@ -145,12 +145,11 @@
               <span class="plugin-meta">Weather</span>
               <strong>Weather</strong>
               <small>Live conditions with playful assistant scenes.</small>
-              <span class="plugin-preview preview-weather" aria-hidden="true">
-                <span class="weather-sun"></span>
-                <span class="weather-face-mini">
-                  <span class="weather-glasses"></span>
-                  <span class="weather-smile-mini"></span>
-                </span>
+              <span class="plugin-preview preview-weather weather-metric-preview" aria-hidden="true">
+                <span><strong>TEMP</strong><em>72F</em></span>
+                <span><strong>UV</strong><em>4</em></span>
+                <span><strong>AQI</strong><em>38</em></span>
+                <span><strong>WIND</strong><em>8</em></span>
               </span>
               <button class="plugin-settings-button" type="button" data-plugin-settings="weather">Settings</button>
             </article>
@@ -366,7 +365,7 @@
           <div class="weather-config-layout">
             <div class="form-grid weather-settings-grid">
               <label>Location label <input name="weatherLabel" placeholder="Home"></label>
-              <label>ZIP / postal code <input name="weatherPostalCode" inputmode="text" placeholder="60601"></label>
+              <label>ZIP / PIN / postal code <input name="weatherPostalCode" inputmode="text" placeholder="60601"></label>
               <label>Country <select name="weatherCountryCode"><option value="US">United States</option><option value="CA">Canada</option><option value="GB">United Kingdom</option><option value="IN">India</option></select></label>
               <label>Temperature unit <select name="weatherTemperatureUnit"><option value="fahrenheit">Fahrenheit</option><option value="celsius">Celsius</option></select></label>
               <label>Face accessory <select name="weatherFaceAccessory"><option value="auto">Auto</option><option value="none">None</option><option value="sunglasses">Sunglasses</option><option value="umbrella">Umbrella</option></select></label>
@@ -374,14 +373,11 @@
               <label>Latitude override <input name="weatherLatitude" type="number" step="0.0001" placeholder="Optional"></label>
               <label>Longitude override <input name="weatherLongitude" type="number" step="0.0001" placeholder="Optional"></label>
             </div>
-            <div class="weather-preview-large" aria-hidden="true">
-              <span class="weather-sun"></span>
-              <span class="weather-rain one"></span>
-              <span class="weather-rain two"></span>
-              <span class="weather-face-mini">
-                <span class="weather-glasses"></span>
-                <span class="weather-smile-mini"></span>
-              </span>
+            <div class="weather-preview-large weather-metric-preview" aria-hidden="true">
+              <span><strong>TEMP</strong><em>72F</em></span>
+              <span><strong>UV</strong><em>4</em></span>
+              <span><strong>AQI</strong><em>38</em></span>
+              <span><strong>WIND</strong><em>8</em></span>
             </div>
           </div>
         </section>
@@ -398,6 +394,6 @@
       </form>
     </dialog>
 
-              <script src="/app.js?v=assistant-20260710f"></script>
+              <script src="/app.js?v=assistant-20260710g"></script>
   </body>
 </html>

@@ -247,12 +247,11 @@ function previewMarkup(mode) {
   }
   if (mode === "weather") {
     return `
-      <span class="plugin-preview preview-weather" aria-hidden="true">
-        <span class="weather-sun"></span>
-        <span class="weather-face-mini">
-          <span class="weather-glasses"></span>
-          <span class="weather-smile-mini"></span>
-        </span>
+      <span class="plugin-preview preview-weather weather-metric-preview" aria-hidden="true">
+        <span><strong>TEMP</strong><em>72F</em></span>
+        <span><strong>UV</strong><em>4</em></span>
+        <span><strong>AQI</strong><em>38</em></span>
+        <span><strong>WIND</strong><em>8</em></span>
       </span>`;
   }
   return `<span class="plugin-preview preview-${mode === "testPattern" ? "test" : mode}" aria-hidden="true"></span>`;

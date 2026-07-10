@@ -194,7 +194,7 @@ class WidgetRegistryService:
                 ],
                 config=[
                     WidgetConfigField(key="label", label="Location label", type="string", default="Local weather"),
-                    WidgetConfigField(key="postalCode", label="ZIP / postal code", type="string", placeholder="60601"),
+                    WidgetConfigField(key="postalCode", label="ZIP / PIN / postal code", type="string", placeholder="60601"),
                     WidgetConfigField(
                         key="countryCode",
                         label="Country",
