@@ -152,7 +152,7 @@
             <article class="plugin-card" data-plugin="weather" role="button" tabindex="0">
               <span class="plugin-meta">Weather</span>
               <strong>Weather</strong>
-              <small>Live conditions with playful assistant scenes.</small>
+              <small>Postal-code weather dashboard with playful assistant scenes.</small>
               <span class="plugin-preview preview-weather weather-metric-preview" aria-hidden="true">
                 <span><strong>TEMP</strong><em>72F</em></span>
                 <span><strong>UV</strong><em>4</em></span>
@@ -382,15 +382,18 @@
           <div class="weather-config-layout">
             <div class="form-grid weather-settings-grid">
               <label>Location label <input name="weatherLabel" placeholder="Home"></label>
-              <label>ZIP / PIN / postal code <input name="weatherPostalCode" inputmode="text" placeholder="60601"></label>
+              <label>ZIP / PIN / postal code <input name="weatherPostalCode" inputmode="text" autocomplete="postal-code" placeholder="60601 or 560001"></label>
               <label>Country <select name="weatherCountryCode"><option value="US">United States</option><option value="CA">Canada</option><option value="GB">United Kingdom</option><option value="IN">India</option></select></label>
               <label>Temperature unit <select name="weatherTemperatureUnit"><option value="fahrenheit">Fahrenheit</option><option value="celsius">Celsius</option></select></label>
               <label>Face accessory <select name="weatherFaceAccessory"><option value="auto">Auto</option><option value="none">None</option><option value="sunglasses">Sunglasses</option><option value="umbrella">Umbrella</option></select></label>
               <label>Refresh minutes <input name="weatherRefreshMinutes" type="number" min="5" max="120" step="1"></label>
-              <label>Metrics slide seconds <input name="weatherMetricsSeconds" type="number" min="5" max="120" step="1"></label>
-              <label>Face slide seconds <input name="weatherSceneSeconds" type="number" min="3" max="60" step="1"></label>
-              <label>Latitude override <input name="weatherLatitude" type="number" step="0.0001" placeholder="Optional"></label>
-              <label>Longitude override <input name="weatherLongitude" type="number" step="0.0001" placeholder="Optional"></label>
+              <label>Dashboard seconds <input name="weatherMetricsSeconds" type="number" min="30" max="120" step="1"></label>
+              <label>Scene seconds <input name="weatherSceneSeconds" type="number" min="15" max="60" step="1"></label>
+              <details class="advanced-fields">
+                <summary>Coordinate override</summary>
+                <label>Latitude <input name="weatherLatitude" type="number" step="0.0001" placeholder="Optional"></label>
+                <label>Longitude <input name="weatherLongitude" type="number" step="0.0001" placeholder="Optional"></label>
+              </details>
             </div>
             <div class="weather-preview-large weather-metric-preview" aria-hidden="true">
               <span><strong>TEMP</strong><em>72F</em></span>

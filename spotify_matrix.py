@@ -41,8 +41,8 @@ CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 SCOPE = "user-read-currently-playing"
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SPOTIFY_MATRIX_CONFIG", "data/config.json"))
 DEFAULT_TOKEN_CACHE = Path(os.environ.get("SPOTIFY_TOKEN_CACHE", "data/spotify_token.json"))
-WEATHER_METRICS_SECONDS = 20
-WEATHER_SCENE_SECONDS = 8
+WEATHER_METRICS_SECONDS = 45
+WEATHER_SCENE_SECONDS = 20
 
 
 @dataclass
@@ -1019,15 +1019,82 @@ def draw_aqi_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int) -> None:
         draw.rectangle((cx - 10 + index * 5, cy + 6 - index * 3, cx - 7 + index * 5, cy + 9), fill=color)
 
 
+DIGIT_FONT_3X5 = {
+    "0": ("111", "101", "101", "101", "111"),
+    "1": ("010", "110", "010", "010", "111"),
+    "2": ("111", "001", "111", "100", "111"),
+    "3": ("111", "001", "111", "001", "111"),
+    "4": ("101", "101", "111", "001", "001"),
+    "5": ("111", "100", "111", "001", "111"),
+    "6": ("111", "100", "111", "101", "111"),
+    "7": ("111", "001", "010", "010", "010"),
+    "8": ("111", "101", "111", "101", "111"),
+    "9": ("111", "101", "111", "001", "111"),
+    "-": ("000", "000", "111", "000", "000"),
+    ".": ("000", "000", "000", "000", "010"),
+}
+
+
+def compact_weather_value(value: float | None, suffix: str = "") -> str:
+    if value is None:
+        return "--"
+    rounded = round(value)
+    if abs(value) < 1 and value > 0:
+        text = f"{value:.1f}"
+    else:
+        text = f"{rounded:.0f}"
+    return f"{text}{suffix}"
+
+
+def draw_pixel_text(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, color: tuple[int, int, int], scale: int = 2) -> None:
+    cursor = x
+    for char in text:
+        glyph = DIGIT_FONT_3X5.get(char.upper())
+        if char == " ":
+            cursor += 2 * scale
+            continue
+        if not glyph:
+            draw.text((cursor, y), char, fill=color)
+            cursor += 6
+            continue
+        for row, pattern in enumerate(glyph):
+            for col, pixel in enumerate(pattern):
+                if pixel == "1":
+                    draw.rectangle(
+                        (
+                            cursor + col * scale,
+                            y + row * scale,
+                            cursor + (col + 1) * scale - 1,
+                            y + (row + 1) * scale - 1,
+                        ),
+                        fill=color,
+                    )
+        cursor += 4 * scale
+
+
+def pixel_text_width(text: str, scale: int = 2) -> int:
+    width = 0
+    for char in text:
+        if char == " ":
+            width += 2 * scale
+        elif char.upper() in DIGIT_FONT_3X5:
+            width += 4 * scale
+        else:
+            width += 6
+    return max(0, width - scale)
+
+
 def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int]) -> None:
     tile_size = 32
     title_bbox = draw.textbbox((0, 0), title)
     title_width = title_bbox[2] - title_bbox[0]
-    draw.text((x + max(1, (tile_size - title_width) // 2), y + 4), title, fill=(245, 248, 255))
+    draw.text((x + max(1, (tile_size - title_width) // 2), y + 3), title, fill=(245, 248, 255))
 
-    value_bbox = draw.textbbox((0, 0), value)
-    value_width = value_bbox[2] - value_bbox[0]
-    draw.text((x + max(1, (tile_size - value_width) // 2), y + 17), value, fill=color)
+    scale = 2 if len(value) <= 4 else 1
+    value_width = pixel_text_width(value, scale)
+    value_x = x + max(1, (tile_size - value_width) // 2)
+    value_y = y + 17 if scale == 2 else y + 19
+    draw_pixel_text(draw, value_x, value_y, value, color, scale=scale)
 
 
 def render_weather_quad(state: WeatherState, frame_index: int, size: int, temperature_unit: str) -> Image.Image:
@@ -1046,12 +1113,12 @@ def render_weather_quad(state: WeatherState, frame_index: int, size: int, temper
     draw.line((0, mid, size, mid), fill=(8, 12, 20))
 
     temp_unit = "F" if temperature_unit == "fahrenheit" else "C"
-    wind_unit = "MPH" if temperature_unit == "fahrenheit" else "KMH"
+    wind_unit = ""
     wind_speed = state.wind_speed if temperature_unit == "fahrenheit" else state.wind_speed * 1.609344
-    draw_weather_metric(draw, 0, 0, "TEMP", short_weather_value(state.temperature, temp_unit), (255, 235, 130))
-    draw_weather_metric(draw, mid, 0, "UV", short_weather_value(state.uv_index), (235, 205, 255))
-    draw_weather_metric(draw, 0, mid, "AQI", short_weather_value(state.aqi), (175, 235, 125))
-    draw_weather_metric(draw, mid, mid, "WIND", short_weather_value(wind_speed, wind_unit), (145, 225, 255))
+    draw_weather_metric(draw, 0, 0, "TEMP", compact_weather_value(state.temperature, temp_unit), (255, 235, 130))
+    draw_weather_metric(draw, mid, 0, "UV", compact_weather_value(state.uv_index), (235, 205, 255))
+    draw_weather_metric(draw, 0, mid, "AQI", compact_weather_value(state.aqi), (175, 235, 125))
+    draw_weather_metric(draw, mid, mid, "WIND", compact_weather_value(wind_speed, wind_unit), (145, 225, 255))
     return image
 
 
@@ -1145,8 +1212,8 @@ def render_weather(
     metrics_seconds: int,
     scene_seconds: int,
 ) -> Image.Image:
-    metrics_frames = max(1, int(round(fps * metrics_seconds)))
-    scene_frames = max(1, int(round(fps * scene_seconds)))
+    metrics_frames = max(1, int(round(fps * max(30, metrics_seconds))))
+    scene_frames = max(1, int(round(fps * max(15, scene_seconds))))
     cycle_frame = frame_index % (metrics_frames + scene_frames)
     if cycle_frame < metrics_frames:
         return render_weather_quad(state, frame_index, size, temperature_unit)

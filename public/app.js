@@ -707,8 +707,8 @@ function fillForms(config) {
     weatherTemperatureUnit: config.weather?.temperatureUnit || "fahrenheit",
     weatherFaceAccessory: config.weather?.faceAccessory || "auto",
     weatherRefreshMinutes: config.weather?.refreshMinutes || 15,
-    weatherMetricsSeconds: config.weather?.metricsSeconds || 20,
-    weatherSceneSeconds: config.weather?.sceneSeconds || 8
+    weatherMetricsSeconds: config.weather?.metricsSeconds || 45,
+    weatherSceneSeconds: config.weather?.sceneSeconds || 20
   });
   fillPanel(advancedPanel, {
     mockOutput: config.runtime?.mockOutput || "",
@@ -770,8 +770,8 @@ function collectConfig(modeOverride = null) {
       temperatureUnit: fieldValue(weatherPanel, "weatherTemperatureUnit", "fahrenheit"),
       faceAccessory: fieldValue(weatherPanel, "weatherFaceAccessory", "auto"),
       refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15),
-      metricsSeconds: Number(fieldValue(weatherPanel, "weatherMetricsSeconds", "20") || 20),
-      sceneSeconds: Number(fieldValue(weatherPanel, "weatherSceneSeconds", "8") || 8)
+      metricsSeconds: Number(fieldValue(weatherPanel, "weatherMetricsSeconds", "45") || 45),
+      sceneSeconds: Number(fieldValue(weatherPanel, "weatherSceneSeconds", "20") || 20)
     }
   };
 }
@@ -808,8 +808,8 @@ function collectWidgetConfig(plugin = selectedPlugin) {
       temperatureUnit: fieldValue(weatherPanel, "weatherTemperatureUnit", "fahrenheit"),
       faceAccessory: fieldValue(weatherPanel, "weatherFaceAccessory", "auto"),
       refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15),
-      metricsSeconds: Number(fieldValue(weatherPanel, "weatherMetricsSeconds", "20") || 20),
-      sceneSeconds: Number(fieldValue(weatherPanel, "weatherSceneSeconds", "8") || 8)
+      metricsSeconds: Number(fieldValue(weatherPanel, "weatherMetricsSeconds", "45") || 45),
+      sceneSeconds: Number(fieldValue(weatherPanel, "weatherSceneSeconds", "20") || 20)
     };
   }
   if (plugin === "testPattern") {

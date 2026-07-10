@@ -253,7 +253,7 @@ class WidgetRegistryService:
                 ],
                 config=[
                     WidgetConfigField(key="label", label="Location label", type="string", default="Local weather"),
-                    WidgetConfigField(key="postalCode", label="ZIP / PIN / postal code", type="string", placeholder="60601"),
+                    WidgetConfigField(key="postalCode", label="ZIP / PIN / postal code", type="string", placeholder="60601 or 560001"),
                     WidgetConfigField(
                         key="countryCode",
                         label="Country",
@@ -276,8 +276,8 @@ class WidgetRegistryService:
                         options=[_option("Auto", "auto"), _option("None", "none"), _option("Sunglasses", "sunglasses"), _option("Umbrella", "umbrella")],
                     ),
                     WidgetConfigField(key="refreshMinutes", label="Refresh minutes", type="number", default=15, min=5, max=120, step=1),
-                    WidgetConfigField(key="metricsSeconds", label="Metrics slide seconds", type="number", default=20, min=5, max=120, step=1),
-                    WidgetConfigField(key="sceneSeconds", label="Face slide seconds", type="number", default=8, min=3, max=60, step=1),
+                    WidgetConfigField(key="metricsSeconds", label="Dashboard seconds", type="number", default=45, min=30, max=120, step=1),
+                    WidgetConfigField(key="sceneSeconds", label="Scene seconds", type="number", default=20, min=15, max=60, step=1),
                     WidgetConfigField(key="latitude", label="Latitude override", type="number", required=False),
                     WidgetConfigField(key="longitude", label="Longitude override", type="number", required=False),
                 ],
