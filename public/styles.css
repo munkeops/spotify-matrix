@@ -563,6 +563,53 @@ dd {
   gap: 16px;
 }
 
+.policy-panel {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: #171b1f;
+}
+
+.policy-panel .panel-heading p {
+  margin: 4px 0 0;
+  color: #aaa49b;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.policy-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.rotation-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.rotation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 7px;
+  background: #111418;
+}
+
+.rotation-row label {
+  margin: 0;
+}
+
+.rotation-row .check-row {
+  min-height: auto;
+}
+
 .plugin-card {
   display: grid;
   gap: 8px;
@@ -1548,6 +1595,7 @@ label {
   }
 
   .plugin-grid,
+  .policy-controls,
   .form-grid,
   .form-grid.dense,
   .clock-config-layout,
@@ -1558,6 +1606,10 @@ label {
 
   .plugin-card {
     min-height: 210px;
+  }
+
+  .rotation-row {
+    grid-template-columns: 1fr;
   }
 }
 

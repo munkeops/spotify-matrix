@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260710d">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260710e">
   </head>
   <body>
     <main class="app-frame">
@@ -81,6 +81,30 @@
               <h1>Choose what runs</h1>
             </div>
           </header>
+
+          <section class="policy-panel" id="displayPolicyPanel">
+            <div class="panel-heading">
+              <div>
+                <h2>Display Policy</h2>
+                <p>Choose one widget to run, or rotate through selected local widgets.</p>
+              </div>
+              <button type="button" id="savePolicyButton">Save Policy</button>
+            </div>
+            <div class="policy-controls">
+              <label>
+                Mode
+                <select id="policyModeSelect">
+                  <option value="single">Single widget</option>
+                  <option value="rotation">Rotate widgets</option>
+                </select>
+              </label>
+              <label>
+                Active widget
+                <select id="policyActiveWidgetSelect"></select>
+              </label>
+            </div>
+            <div class="rotation-list" id="rotationList" aria-label="Rotation widgets"></div>
+          </section>
 
           <section class="plugin-grid" id="pluginGrid" aria-label="Display plugins">
             <article class="plugin-card active" data-plugin="spotify" role="button" tabindex="0">
@@ -371,6 +395,6 @@
       </form>
     </dialog>
 
-              <script src="/app.js?v=assistant-20260710d"></script>
+              <script src="/app.js?v=assistant-20260710e"></script>
   </body>
 </html>

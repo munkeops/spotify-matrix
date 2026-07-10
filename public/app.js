@@ -14,6 +14,10 @@ const pluginDialog = document.querySelector("#pluginDialog");
 const closeDialogButton = document.querySelector("#closeDialogButton");
 const savePluginButton = document.querySelector("#savePluginButton");
 const applyPluginButton = document.querySelector("#applyPluginButton");
+const policyModeSelect = document.querySelector("#policyModeSelect");
+const policyActiveWidgetSelect = document.querySelector("#policyActiveWidgetSelect");
+const rotationList = document.querySelector("#rotationList");
+const savePolicyButton = document.querySelector("#savePolicyButton");
 const pairButton = document.querySelector("#pairButton");
 const directAuthButton = document.querySelector("#directAuthButton");
 const pairCommand = document.querySelector("#pairCommand");
@@ -188,6 +192,7 @@ const pluginLabels = {
 let currentConfig = null;
 let localWidgets = [];
 let storeWidgets = [];
+let displayPolicy = null;
 let selectedPlugin = "spotify";
 let runtimeRunning = false;
 let browserAmericaTimezone = "";
@@ -385,6 +390,9 @@ function renderLocalWidgets(widgets) {
   }).join("");
   pluginGrid.innerHTML = cards;
   syncActiveMode(normalizeMode(currentConfig));
+  if (displayPolicy) {
+    renderDisplayPolicy(displayPolicy);
+  }
 }
 
 async function refreshLocalWidgets() {
@@ -440,6 +448,71 @@ async function refreshStoreWidgets() {
     console.warn("Unable to load widget store", error);
     renderStoreWidgets([]);
   }
+}
+
+function renderDisplayPolicy(policy) {
+  if (!policyModeSelect || !policyActiveWidgetSelect || !rotationList) {
+    return;
+  }
+  displayPolicy = policy;
+  policyModeSelect.value = policy.mode || "single";
+  policyActiveWidgetSelect.innerHTML = localWidgets.map((widget) => {
+    const id = escapeHtml(widget.manifest.id);
+    const name = escapeHtml(widget.manifest.name);
+    return `<option value="${id}">${name}</option>`;
+  }).join("");
+  policyActiveWidgetSelect.value = policy.activeWidgetId || "core.spotify";
+
+  const rotationById = new Map((policy.rotation || []).map((item) => [item.widgetId, item]));
+  rotationList.innerHTML = localWidgets.map((widget) => {
+    const id = widget.manifest.id;
+    const item = rotationById.get(id);
+    const enabled = item?.enabled ?? false;
+    const duration = item?.durationSeconds ?? 60;
+    return `
+      <div class="rotation-row" data-rotation-widget-id="${escapeHtml(id)}">
+        <label class="check-row">
+          <input type="checkbox" name="rotationEnabled" ${enabled ? "checked" : ""}>
+          <span>${escapeHtml(widget.manifest.name)}</span>
+        </label>
+        <label>
+          Seconds
+          <input name="rotationDuration" type="number" min="5" max="86400" step="5" value="${escapeHtml(duration)}">
+        </label>
+      </div>`;
+  }).join("");
+}
+
+function collectDisplayPolicy() {
+  const rotation = [...document.querySelectorAll(".rotation-row")].map((row) => ({
+    widgetId: row.dataset.rotationWidgetId,
+    enabled: Boolean(row.querySelector("[name='rotationEnabled']")?.checked),
+    durationSeconds: Number(row.querySelector("[name='rotationDuration']")?.value || 60)
+  }));
+  return {
+    mode: policyModeSelect?.value || "single",
+    activeWidgetId: policyActiveWidgetSelect?.value || "core.spotify",
+    rotation,
+    triggers: displayPolicy?.triggers || []
+  };
+}
+
+async function refreshDisplayPolicy() {
+  try {
+    const response = await api("/api/display/policy");
+    renderDisplayPolicy(response.policy);
+  } catch (error) {
+    console.warn("Unable to load display policy", error);
+  }
+}
+
+async function saveDisplayPolicy() {
+  const response = await api("/api/display/policy", {
+    method: "POST",
+    body: JSON.stringify({ policy: collectDisplayPolicy() })
+  });
+  renderDisplayPolicy(response.policy);
+  setMessage("Display policy saved.");
 }
 
 function fillPanel(form, values) {
@@ -726,6 +799,17 @@ storeGrid?.addEventListener("click", async (event) => {
   }
 });
 
+savePolicyButton?.addEventListener("click", async () => {
+  savePolicyButton.disabled = true;
+  try {
+    await saveDisplayPolicy();
+  } catch (error) {
+    setMessage(error.message);
+  } finally {
+    savePolicyButton.disabled = false;
+  }
+});
+
 closeDialogButton?.addEventListener("click", () => pluginDialog.close());
 savePluginButton?.addEventListener("click", async () => {
   await saveWidgetConfig(selectedPlugin);
@@ -791,6 +875,7 @@ populateTimezones();
 
 refreshConfig()
   .then(refreshLocalWidgets)
+  .then(refreshDisplayPolicy)
   .then(refreshStoreWidgets)
   .then(refreshStatus)
   .catch((error) => setMessage(error.message));
