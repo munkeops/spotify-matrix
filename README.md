@@ -13,6 +13,7 @@ The project now uses a Python-only stack:
 Widget platform docs:
 
 - [Widget store roadmap](docs/widget-store-roadmap.md)
+- [Widget store quickstart](docs/widget-store-quickstart.md)
 - [Widget SDK](docs/widget-sdk.md)
 - [Widget API reference](docs/widget-api-reference.md)
 

@@ -30,6 +30,8 @@ The repo already has useful foundations:
 
 The current branch has introduced that widget registry and the supporting store, SDK, install, policy, and command APIs. The remaining work is mostly product hardening, richer UI polish, dependency isolation for third-party widgets, and an optional hosted database-backed store.
 
+For a command-by-command walkthrough, see [Widget Store Quickstart](widget-store-quickstart.md).
+
 ## Implementation Status
 
 Implemented in this branch:
@@ -612,19 +614,14 @@ Trigger rules need priorities so urgent display events can temporarily override 
 - Add private widgets.
 - Add moderation/approval if public.
 
-## Recommended Near-Term Implementation
+## Recommended Next Work
 
-The next concrete branch should not start with a remote store. It should start with a **local widget registry**.
+The local widget registry, static store, SDK, install lifecycle, config APIs, policy APIs, and trigger APIs are now in place.
 
-Build this first:
+The next useful branches should focus on:
 
-```text
-src/domain/models/widget_schemas.py
-src/domain/services/widget_registry_service.py
-src/api/http/rest/widgets.py
-data/widgets/configs/
-```
-
-Then convert the UI plugin cards to render from `/api/widgets/local`.
-
-That gives the app the shape of a widget platform before adding remote download and publishing complexity.
+- UI polish for the Store and Display Policy pages.
+- Event producers, such as emitting `spotify.playback_started` automatically from the Spotify runtime.
+- Event history in the UI.
+- Dependency isolation for third-party Python widgets.
+- A hosted store service if static object-store publishing becomes limiting.
