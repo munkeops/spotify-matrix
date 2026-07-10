@@ -130,3 +130,35 @@ class WidgetInstallRequest(BaseModel):
 class WidgetInstallResponse(BaseModel):
     ok: bool
     widget: LocalWidget
+
+
+DisplayPolicyMode = Literal["single", "rotation"]
+
+
+class DisplayRotationItem(BaseModel):
+    widgetId: str
+    durationSeconds: int = Field(default=60, ge=5, le=86400)
+    enabled: bool = True
+
+
+class DisplayTriggerRule(BaseModel):
+    event: str
+    widgetId: str
+    enabled: bool = True
+    priority: int = 0
+    minDurationSeconds: int = Field(default=15, ge=0, le=86400)
+
+
+class DisplayPolicy(BaseModel):
+    mode: DisplayPolicyMode = "single"
+    activeWidgetId: str = "core.spotify"
+    rotation: list[DisplayRotationItem] = Field(default_factory=list)
+    triggers: list[DisplayTriggerRule] = Field(default_factory=list)
+
+
+class DisplayPolicyResponse(BaseModel):
+    policy: DisplayPolicy
+
+
+class DisplayPolicyUpdateRequest(BaseModel):
+    policy: DisplayPolicy
