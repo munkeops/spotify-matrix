@@ -278,6 +278,12 @@ POST   /api/widgets/local/{widget_id}/config
 POST   /api/widgets/local/{widget_id}/apply
 ```
 
+Lifecycle behavior:
+
+- `POST /api/widgets/install` installs or updates the store widget by id.
+- `DELETE /api/widgets/local/{widget_id}` uninstalls downloaded widgets, removes package files, removes saved widget config, removes display policy references, and falls back away from the removed widget if it was active.
+- Built-in `core.*` widgets are part of the app and are not uninstallable.
+
 Installed Python widgets become runnable when the store entry points to a reachable `.tar.gz` archive. The archive is unpacked under:
 
 ```text

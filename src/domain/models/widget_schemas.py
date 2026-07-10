@@ -132,6 +132,11 @@ class WidgetInstallResponse(BaseModel):
     widget: LocalWidget
 
 
+class WidgetUninstallResponse(BaseModel):
+    ok: bool
+    widgetId: str
+
+
 DisplayPolicyMode = Literal["single", "rotation"]
 
 

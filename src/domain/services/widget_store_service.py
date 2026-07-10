@@ -14,6 +14,7 @@ from pathlib import Path
 
 from src.domain.models.widget_schemas import StoreWidget, WidgetStoreIndex
 from src.domain.services.config_service import config_service
+from src.domain.services.display_policy_service import display_policy_service
 from src.domain.services.widget_registry_service import widget_registry_service
 
 
@@ -47,6 +48,24 @@ class WidgetStoreService:
         widget.installed = True
         return widget
 
+    def uninstall_widget(self, widget_id: str) -> None:
+        installed = self.read_installed_widgets()
+        if widget_id not in {widget.id for widget in installed}:
+            raise ValueError(f"Widget {widget_id} is not installed.")
+
+        self._write_installed_widgets([widget for widget in installed if widget.id != widget_id])
+        self._remove_path(config_service.data_dir / "widgets" / "packages" / widget_id)
+        self._remove_path(config_service.data_dir / "widgets" / "config" / f"{widget_id}.json")
+        self._remove_path(config_service.data_dir / "widgets" / "downloads" / f"{widget_id}.tar.gz")
+        display_policy_service.remove_widget_references(widget_id)
+
+        config = config_service.get_config()
+        if config.display.mode == "widget" and config.display.widgetId == widget_id:
+            config.display.mode = "spotify"
+            config.display.widgetId = ""
+            config.runtime.testPattern = False
+            config_service.save_config(config)
+
     def read_installed_widgets(self) -> list[StoreWidget]:
         try:
             with self.installed_path.open("r", encoding="utf-8") as file:
@@ -68,6 +87,12 @@ class WidgetStoreService:
         with self.installed_path.open("w", encoding="utf-8") as file:
             json.dump({"schemaVersion": 1, "widgets": [widget.model_dump() for widget in widgets]}, file, indent=2)
             file.write("\n")
+
+    def _remove_path(self, path: Path) -> None:
+        if path.is_dir():
+            shutil.rmtree(path)
+        elif path.exists():
+            path.unlink()
 
     def _install_archive_if_available(self, widget: StoreWidget) -> None:
         if not widget.archiveUrl:

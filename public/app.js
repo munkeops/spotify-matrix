@@ -433,6 +433,7 @@ function renderLocalWidgets(widgets) {
         <small>${summary}</small>
         ${preview}
         <button class="plugin-settings-button" type="button" data-plugin-settings="${escapedMode}">Settings</button>
+        ${widget.builtIn ? "" : `<button class="plugin-settings-button danger" type="button" data-widget-uninstall="${widgetId}">Uninstall</button>`}
       </article>`;
   }).join("");
   pluginGrid.innerHTML = cards;
@@ -482,7 +483,7 @@ function renderStoreWidgets(widgets) {
         <small>${summary}</small>
         <span class="plugin-preview ${previewClass}" aria-hidden="true"></span>
         <small>v${version} - ${author}</small>
-        <button class="plugin-settings-button" type="button" data-store-install="${id}" ${installed ? "disabled" : ""}>${installed ? "Installed" : "Install"}</button>
+        <button class="plugin-settings-button" type="button" data-store-install="${id}">${installed ? "Update" : "Install"}</button>
       </article>`;
   }).join("");
 }
@@ -843,6 +844,27 @@ sidebarToggle?.addEventListener("click", () => {
 });
 
 pluginGrid?.addEventListener("click", (event) => {
+  const uninstallButton = event.target.closest("[data-widget-uninstall]");
+  if (uninstallButton) {
+    event.stopPropagation();
+    uninstallButton.disabled = true;
+    uninstallButton.textContent = "Removing...";
+    api(`/api/widgets/local/${encodeURIComponent(uninstallButton.dataset.widgetUninstall)}`, { method: "DELETE" })
+      .then(async () => {
+        setMessage("Widget uninstalled.");
+        await refreshConfig();
+        await refreshLocalWidgets();
+        await refreshStoreWidgets();
+        await refreshDisplayPolicy();
+        await refreshStatus();
+      })
+      .catch((error) => {
+        uninstallButton.disabled = false;
+        uninstallButton.textContent = "Uninstall";
+        setMessage(error.message);
+      });
+    return;
+  }
   const settingsButton = event.target.closest("[data-plugin-settings]");
   if (settingsButton) {
     event.stopPropagation();
@@ -870,11 +892,12 @@ pluginGrid?.addEventListener("keydown", (event) => {
 
 storeGrid?.addEventListener("click", async (event) => {
   const installButton = event.target.closest("[data-store-install]");
-  if (!installButton || installButton.disabled) {
+  if (!installButton) {
     return;
   }
   installButton.disabled = true;
-  installButton.textContent = "Installing...";
+  const wasInstalled = installButton.textContent === "Update";
+  installButton.textContent = wasInstalled ? "Updating..." : "Installing...";
   try {
     await api("/api/widgets/install", {
       method: "POST",
@@ -882,10 +905,10 @@ storeGrid?.addEventListener("click", async (event) => {
     });
     await refreshLocalWidgets();
     await refreshStoreWidgets();
-    setMessage("Widget installed locally.");
+    setMessage(wasInstalled ? "Widget updated locally." : "Widget installed locally.");
   } catch (error) {
     installButton.disabled = false;
-    installButton.textContent = "Install";
+    installButton.textContent = wasInstalled ? "Update" : "Install";
     setMessage(error.message);
   }
 });

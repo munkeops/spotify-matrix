@@ -28,6 +28,19 @@ class DisplayPolicyService:
             file.write("\n")
         return policy
 
+    def remove_widget_references(self, widget_id: str) -> DisplayPolicy:
+        policy = self.get_policy()
+        if policy.activeWidgetId == widget_id:
+            policy.activeWidgetId = "core.spotify"
+            policy.mode = "single"
+        policy.rotation = [item for item in policy.rotation if item.widgetId != widget_id]
+        policy.triggers = [rule for rule in policy.triggers if rule.widgetId != widget_id]
+        self.policy_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.policy_path.open("w", encoding="utf-8") as file:
+            json.dump(policy.model_dump(), file, indent=2)
+            file.write("\n")
+        return policy
+
     def default_policy(self) -> DisplayPolicy:
         local_ids = {widget.manifest.id for widget in widget_registry_service.list_local_widgets()}
         rotation = [

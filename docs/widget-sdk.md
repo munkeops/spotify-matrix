@@ -89,6 +89,17 @@ store-dist/
 
 The `--base-url` is used to generate public `manifestUrl`, `archiveUrl`, and preview URLs in the index. The resulting folder can be uploaded to GitHub Pages, S3, Cloudflare R2, or any static file host.
 
+On the Pi, the lifecycle APIs are:
+
+```text
+POST   /api/widgets/install
+DELETE /api/widgets/local/<widget-id>
+POST   /api/widgets/local/<widget-id>/config
+POST   /api/widgets/local/<widget-id>/apply
+```
+
+Calling install again for the same widget id updates the local package and store metadata.
+
 The SDK currently provides:
 
 - `MatrixCanvas` backed by Pillow.

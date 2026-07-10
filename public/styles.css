@@ -696,6 +696,15 @@ dd {
   opacity: 0.62;
 }
 
+.plugin-settings-button.danger {
+  background: #3a2525;
+  color: #ffd7d7;
+}
+
+.plugin-settings-button.danger:hover {
+  background: #4a2d2d;
+}
+
 .store-note {
   display: flex;
   align-items: center;

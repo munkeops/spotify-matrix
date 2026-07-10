@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, StoreWidget, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest, WidgetInstallRequest, WidgetInstallResponse, WidgetStoreListResponse
+from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, StoreWidget, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest, WidgetInstallRequest, WidgetInstallResponse, WidgetStoreListResponse, WidgetUninstallResponse
 from src.domain.services.display_policy_runner_service import display_policy_runner_service
+from src.domain.services.runtime_service import runtime_service
 from src.domain.services.widget_registry_service import widget_registry_service
 from src.domain.services.widget_store_service import widget_store_service
 
@@ -46,6 +47,14 @@ async def get_local_widget(widget_id: str) -> LocalWidget:
     if widget is None:
         raise ValueError(f"Unknown widget {widget_id}.")
     return widget
+
+
+@router.delete("/api/widgets/local/{widget_id}", response_model=WidgetUninstallResponse)
+async def uninstall_widget(widget_id: str) -> WidgetUninstallResponse:
+    display_policy_runner_service.stop()
+    runtime_service.stop()
+    widget_store_service.uninstall_widget(widget_id)
+    return WidgetUninstallResponse(ok=True, widgetId=widget_id)
 
 
 @router.get("/api/widgets/local/{widget_id}/config", response_model=WidgetConfigResponse)
