@@ -414,8 +414,10 @@ POST /api/commands
 Current commands:
 
 - `set_mode`
+- `set_widget`
 - `set_clock_face`
 - `set_brightness`
+- `trigger_event`
 - `start_runtime`
 - `stop_runtime`
 
@@ -425,6 +427,34 @@ Example:
 {
   "command": "set_brightness",
   "value": 35
+}
+```
+
+Run any local widget continuously:
+
+```json
+{
+  "command": "set_widget",
+  "value": "core.weather"
+}
+```
+
+Submit an event through the saved display policy trigger rules:
+
+```json
+{
+  "command": "trigger_event",
+  "value": "spotify.playback_started"
+}
+```
+
+`trigger_event` reports whether a policy rule matched and which widget was applied:
+
+```json
+{
+  "ok": true,
+  "matched": true,
+  "widgetId": "core.spotify"
 }
 ```
 

@@ -145,11 +145,13 @@ class RuntimeActionResponse(BaseModel):
 
 
 class CommandRequest(BaseModel):
-    command: Literal["set_mode", "set_clock_face", "set_brightness", "start_runtime", "stop_runtime"]
+    command: Literal["set_mode", "set_widget", "set_clock_face", "set_brightness", "trigger_event", "start_runtime", "stop_runtime"]
     value: str | int | None = None
 
 
 class CommandResponse(BaseModel):
     ok: bool
     config: AppConfig
-    runtime: RuntimeState
+    runtime: Any = None
+    matched: bool | None = None
+    widgetId: str | None = None
