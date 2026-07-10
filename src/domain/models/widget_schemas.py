@@ -77,3 +77,22 @@ class LocalWidget(BaseModel):
 
 class LocalWidgetListResponse(BaseModel):
     widgets: list[LocalWidget]
+
+
+class WidgetConfigResponse(BaseModel):
+    widgetId: str
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class WidgetConfigUpdateRequest(BaseModel):
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class WidgetApplyRequest(BaseModel):
+    config: dict[str, Any] | None = None
+
+
+class WidgetApplyResponse(BaseModel):
+    ok: bool
+    widget: LocalWidget
+    runtime: Any

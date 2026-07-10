@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from pydantic import BaseModel
+
+from src.domain.models.api_schemas import AgentConfig, ClockConfig, SpotifyConfig, WeatherConfig
 from src.domain.models.widget_schemas import LocalWidget, WidgetConfigField, WidgetConfigOption, WidgetManifest, WidgetPermission, WidgetPreview, WidgetTrigger
 from src.domain.services.config_service import config_service
+from src.domain.services.runtime_service import runtime_service
 
 
 def _option(label: str, value: str | int | float | bool) -> WidgetConfigOption:
     return WidgetConfigOption(label=label, value=value)
+
+
+WIDGET_MODE_MAP = {
+    "core.spotify": "spotify",
+    "core.clock": "clock",
+    "core.agent": "agent",
+    "core.weather": "weather",
+    "core.testPattern": "testPattern",
+}
 
 
 class WidgetRegistryService:
@@ -21,6 +36,64 @@ class WidgetRegistryService:
             if widget.manifest.id == widget_id:
                 return widget
         return None
+
+    def get_widget_config(self, widget_id: str) -> dict[str, Any]:
+        self._require_widget(widget_id)
+        config = config_service.get_public_config()
+        if widget_id == "core.spotify":
+            return config.spotify.model_dump()
+        if widget_id == "core.clock":
+            return config.clock.model_dump()
+        if widget_id == "core.agent":
+            return config.agent.model_dump()
+        if widget_id == "core.weather":
+            return config.weather.model_dump()
+        if widget_id == "core.testPattern":
+            return {"testPattern": config.runtime.testPattern}
+        raise ValueError(f"Widget {widget_id} is not configurable.")
+
+    def update_widget_config(self, widget_id: str, values: dict[str, Any]) -> dict[str, Any]:
+        self._require_widget(widget_id)
+        config = config_service.get_config()
+        if widget_id == "core.spotify":
+            if values.get("clientSecret") == "********":
+                values = {key: value for key, value in values.items() if key != "clientSecret"}
+            config.spotify = self._merge_model(config.spotify, values, SpotifyConfig)
+        elif widget_id == "core.clock":
+            config.clock = self._merge_model(config.clock, values, ClockConfig)
+        elif widget_id == "core.agent":
+            config.agent = self._merge_model(config.agent, values, AgentConfig)
+        elif widget_id == "core.weather":
+            config.weather = self._merge_model(config.weather, values, WeatherConfig)
+        elif widget_id == "core.testPattern":
+            config.runtime.testPattern = bool(values.get("testPattern", config.runtime.testPattern))
+        else:
+            raise ValueError(f"Widget {widget_id} is not configurable.")
+        config_service.save_config(config)
+        return self.get_widget_config(widget_id)
+
+    def apply_widget(self, widget_id: str, values: dict[str, Any] | None = None):
+        widget = self._require_widget(widget_id)
+        if values:
+            self.update_widget_config(widget_id, values)
+        config = config_service.get_config()
+        mode = WIDGET_MODE_MAP[widget_id]
+        config.display.mode = mode
+        config.runtime.testPattern = mode == "testPattern"
+        config_service.save_config(config)
+        runtime = runtime_service.apply()
+        return self.get_local_widget(widget.manifest.id), runtime
+
+    def _require_widget(self, widget_id: str) -> LocalWidget:
+        widget = self.get_local_widget(widget_id)
+        if widget is None:
+            raise ValueError(f"Unknown widget {widget_id}.")
+        return widget
+
+    def _merge_model(self, current: BaseModel, values: dict[str, Any], model_type: type[BaseModel]) -> Any:
+        payload = current.model_dump()
+        payload.update(values)
+        return model_type.model_validate(payload)
 
     def _local_widget(self, manifest: WidgetManifest, active_mode: str) -> LocalWidget:
         return LocalWidget(

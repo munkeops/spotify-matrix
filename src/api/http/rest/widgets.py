@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse
+from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest
 from src.domain.services.widget_registry_service import widget_registry_service
 
 router = APIRouter(tags=["assistant-matrix-widgets"])
@@ -21,3 +21,21 @@ async def get_local_widget(widget_id: str) -> LocalWidget:
     if widget is None:
         raise ValueError(f"Unknown widget {widget_id}.")
     return widget
+
+
+@router.get("/api/widgets/local/{widget_id}/config", response_model=WidgetConfigResponse)
+async def get_widget_config(widget_id: str) -> WidgetConfigResponse:
+    return WidgetConfigResponse(widgetId=widget_id, config=widget_registry_service.get_widget_config(widget_id))
+
+
+@router.post("/api/widgets/local/{widget_id}/config", response_model=WidgetConfigResponse)
+async def update_widget_config(widget_id: str, body: WidgetConfigUpdateRequest) -> WidgetConfigResponse:
+    return WidgetConfigResponse(widgetId=widget_id, config=widget_registry_service.update_widget_config(widget_id, body.config))
+
+
+@router.post("/api/widgets/local/{widget_id}/apply", response_model=WidgetApplyResponse)
+async def apply_widget(widget_id: str, body: WidgetApplyRequest) -> WidgetApplyResponse:
+    widget, runtime = widget_registry_service.apply_widget(widget_id, body.config)
+    if widget is None:
+        raise ValueError(f"Unknown widget {widget_id}.")
+    return WidgetApplyResponse(ok=True, widget=widget, runtime=runtime)
