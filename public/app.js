@@ -18,6 +18,7 @@ const policyModeSelect = document.querySelector("#policyModeSelect");
 const policyActiveWidgetSelect = document.querySelector("#policyActiveWidgetSelect");
 const rotationList = document.querySelector("#rotationList");
 const savePolicyButton = document.querySelector("#savePolicyButton");
+const applyPolicyButton = document.querySelector("#applyPolicyButton");
 const pairButton = document.querySelector("#pairButton");
 const directAuthButton = document.querySelector("#directAuthButton");
 const pairCommand = document.querySelector("#pairCommand");
@@ -515,6 +516,19 @@ async function saveDisplayPolicy() {
   setMessage("Display policy saved.");
 }
 
+async function applyDisplayPolicy() {
+  await saveDisplayPolicy();
+  const response = await api("/api/display/policy/apply", { method: "POST", body: "{}" });
+  if (response.state?.schedulerRunning) {
+    setMessage("Display rotation started.");
+  } else {
+    setMessage("Display policy applied.");
+  }
+  await refreshConfig();
+  await refreshLocalWidgets();
+  await refreshStatus();
+}
+
 function fillPanel(form, values) {
   for (const [key, value] of Object.entries(values || {})) {
     const control = field(form, key);
@@ -807,6 +821,17 @@ savePolicyButton?.addEventListener("click", async () => {
     setMessage(error.message);
   } finally {
     savePolicyButton.disabled = false;
+  }
+});
+
+applyPolicyButton?.addEventListener("click", async () => {
+  applyPolicyButton.disabled = true;
+  try {
+    await applyDisplayPolicy();
+  } catch (error) {
+    setMessage(error.message);
+  } finally {
+    applyPolicyButton.disabled = false;
   }
 });
 

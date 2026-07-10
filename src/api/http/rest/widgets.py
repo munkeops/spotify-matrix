@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, StoreWidget, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest, WidgetInstallRequest, WidgetInstallResponse, WidgetStoreListResponse
+from src.domain.services.display_policy_runner_service import display_policy_runner_service
 from src.domain.services.widget_registry_service import widget_registry_service
 from src.domain.services.widget_store_service import widget_store_service
 
@@ -59,6 +60,7 @@ async def update_widget_config(widget_id: str, body: WidgetConfigUpdateRequest) 
 
 @router.post("/api/widgets/local/{widget_id}/apply", response_model=WidgetApplyResponse)
 async def apply_widget(widget_id: str, body: WidgetApplyRequest) -> WidgetApplyResponse:
+    display_policy_runner_service.stop()
     widget, runtime = widget_registry_service.apply_widget(widget_id, body.config)
     if widget is None:
         raise ValueError(f"Unknown widget {widget_id}.")

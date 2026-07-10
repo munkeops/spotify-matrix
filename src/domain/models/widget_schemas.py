@@ -162,3 +162,17 @@ class DisplayPolicyResponse(BaseModel):
 
 class DisplayPolicyUpdateRequest(BaseModel):
     policy: DisplayPolicy
+
+
+class DisplayPolicyRuntimeState(BaseModel):
+    schedulerRunning: bool = False
+    activeWidgetId: str | None = None
+    mode: DisplayPolicyMode = "single"
+    lastError: str | None = None
+
+
+class DisplayPolicyApplyResponse(BaseModel):
+    ok: bool
+    policy: DisplayPolicy
+    state: DisplayPolicyRuntimeState
+    runtime: Any = None
