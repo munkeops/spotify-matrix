@@ -121,3 +121,12 @@ class WidgetStoreIndex(BaseModel):
 class WidgetStoreListResponse(BaseModel):
     schemaVersion: int = 1
     widgets: list[StoreWidget] = Field(default_factory=list)
+
+
+class WidgetInstallRequest(BaseModel):
+    widgetId: str
+
+
+class WidgetInstallResponse(BaseModel):
+    ok: bool
+    widget: LocalWidget

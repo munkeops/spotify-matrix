@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, StoreWidget, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest, WidgetStoreListResponse
+from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, StoreWidget, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest, WidgetInstallRequest, WidgetInstallResponse, WidgetStoreListResponse
 from src.domain.services.widget_registry_service import widget_registry_service
 from src.domain.services.widget_store_service import widget_store_service
 
@@ -23,6 +23,15 @@ async def get_store_widget(widget_id: str) -> StoreWidget:
     if widget is None:
         raise ValueError(f"Unknown store widget {widget_id}.")
     return widget
+
+
+@router.post("/api/widgets/install", response_model=WidgetInstallResponse)
+async def install_widget(body: WidgetInstallRequest) -> WidgetInstallResponse:
+    store_widget = widget_store_service.install_widget(body.widgetId)
+    local_widget = widget_registry_service.get_local_widget(store_widget.id)
+    if local_widget is None:
+        raise ValueError(f"Installed widget {store_widget.id} is unavailable locally.")
+    return WidgetInstallResponse(ok=True, widget=local_widget)
 
 
 @router.get("/api/widgets/local", response_model=LocalWidgetListResponse)

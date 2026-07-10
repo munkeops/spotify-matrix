@@ -426,8 +426,8 @@ function renderStoreWidgets(widgets) {
         <strong>${name}</strong>
         <small>${summary}</small>
         <span class="plugin-preview ${previewClass}" aria-hidden="true"></span>
-        <small>v${version} · ${author}</small>
-        <button class="plugin-settings-button" type="button" disabled>${installed ? "Installed" : "Install soon"}</button>
+        <small>v${version} - ${author}</small>
+        <button class="plugin-settings-button" type="button" data-store-install="${id}" ${installed ? "disabled" : ""}>${installed ? "Installed" : "Install"}</button>
       </article>`;
   }).join("");
 }
@@ -702,6 +702,28 @@ pluginGrid?.addEventListener("keydown", (event) => {
   }
   event.preventDefault();
   applyPlugin(card.dataset.plugin);
+});
+
+storeGrid?.addEventListener("click", async (event) => {
+  const installButton = event.target.closest("[data-store-install]");
+  if (!installButton || installButton.disabled) {
+    return;
+  }
+  installButton.disabled = true;
+  installButton.textContent = "Installing...";
+  try {
+    await api("/api/widgets/install", {
+      method: "POST",
+      body: JSON.stringify({ widgetId: installButton.dataset.storeInstall })
+    });
+    await refreshLocalWidgets();
+    await refreshStoreWidgets();
+    setMessage("Widget installed locally.");
+  } catch (error) {
+    installButton.disabled = false;
+    installButton.textContent = "Install";
+    setMessage(error.message);
+  }
 });
 
 closeDialogButton?.addEventListener("click", () => pluginDialog.close());

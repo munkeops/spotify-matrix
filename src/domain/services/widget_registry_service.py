@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from pydantic import BaseModel
 
 from src.domain.models.api_schemas import AgentConfig, ClockConfig, SpotifyConfig, WeatherConfig
-from src.domain.models.widget_schemas import LocalWidget, WidgetConfigField, WidgetConfigOption, WidgetManifest, WidgetPermission, WidgetPreview, WidgetTrigger
+from src.domain.models.widget_schemas import LocalWidget, StoreWidget, WidgetConfigField, WidgetConfigOption, WidgetManifest, WidgetPermission, WidgetPreview, WidgetTrigger
 from src.domain.services.config_service import config_service
 from src.domain.services.runtime_service import runtime_service
 
@@ -29,7 +30,9 @@ class WidgetRegistryService:
     def list_local_widgets(self) -> list[LocalWidget]:
         config = config_service.get_config()
         active_mode = "testPattern" if config.runtime.testPattern else config.display.mode
-        return [self._local_widget(manifest, active_mode) for manifest in self._built_in_manifests()]
+        widgets = [self._local_widget(manifest, active_mode) for manifest in self._built_in_manifests()]
+        widgets.extend(self._installed_store_widgets())
+        return widgets
 
     def get_local_widget(self, widget_id: str) -> LocalWidget | None:
         for widget in self.list_local_widgets():
@@ -74,6 +77,8 @@ class WidgetRegistryService:
 
     def apply_widget(self, widget_id: str, values: dict[str, Any] | None = None):
         widget = self._require_widget(widget_id)
+        if widget_id not in WIDGET_MODE_MAP:
+            raise ValueError(f"Widget {widget_id} is installed but does not have a runnable package yet.")
         if values:
             self.update_widget_config(widget_id, values)
         config = config_service.get_config()
@@ -229,6 +234,39 @@ class WidgetRegistryService:
                 config=[],
             ),
         ]
+
+    def _installed_store_widgets(self) -> list[LocalWidget]:
+        installed_path = config_service.data_dir / "widgets" / "installed.json"
+        try:
+            with installed_path.open("r", encoding="utf-8") as file:
+                payload = json.load(file)
+        except FileNotFoundError:
+            return []
+        raw_widgets = payload.get("widgets", payload if isinstance(payload, list) else [])
+        widgets: list[LocalWidget] = []
+        for raw_widget in raw_widgets:
+            store_widget = StoreWidget.model_validate(raw_widget)
+            widgets.append(
+                LocalWidget(
+                    manifest=WidgetManifest(
+                        id=store_widget.id,
+                        name=store_widget.name,
+                        version=store_widget.version,
+                        summary=store_widget.summary,
+                        author=store_widget.author,
+                        category=store_widget.category,
+                        runtime="python",
+                        matrixSize="64x64",
+                        preview=WidgetPreview(cardGif=store_widget.previewGifUrl, matrixPreview=store_widget.matrixPreviewUrl),
+                    ),
+                    installed=True,
+                    builtIn=False,
+                    enabled=True,
+                    configurable=False,
+                    active=False,
+                )
+            )
+        return widgets
 
 
 widget_registry_service = WidgetRegistryService()
