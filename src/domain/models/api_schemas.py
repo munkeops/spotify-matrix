@@ -61,6 +61,8 @@ class WeatherConfig(BaseModel):
     temperatureUnit: Literal["fahrenheit", "celsius"] = "fahrenheit"
     faceAccessory: Literal["auto", "none", "sunglasses", "umbrella"] = "auto"
     refreshMinutes: int = 15
+    metricsSeconds: int = 20
+    sceneSeconds: int = 8
 
 
 class StoreConfig(BaseModel):

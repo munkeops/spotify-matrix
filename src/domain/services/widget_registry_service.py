@@ -276,6 +276,8 @@ class WidgetRegistryService:
                         options=[_option("Auto", "auto"), _option("None", "none"), _option("Sunglasses", "sunglasses"), _option("Umbrella", "umbrella")],
                     ),
                     WidgetConfigField(key="refreshMinutes", label="Refresh minutes", type="number", default=15, min=5, max=120, step=1),
+                    WidgetConfigField(key="metricsSeconds", label="Metrics slide seconds", type="number", default=20, min=5, max=120, step=1),
+                    WidgetConfigField(key="sceneSeconds", label="Face slide seconds", type="number", default=8, min=3, max=60, step=1),
                     WidgetConfigField(key="latitude", label="Latitude override", type="number", required=False),
                     WidgetConfigField(key="longitude", label="Longitude override", type="number", required=False),
                 ],

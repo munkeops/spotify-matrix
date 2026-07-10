@@ -680,7 +680,9 @@ function fillForms(config) {
     weatherLongitude: config.weather?.longitude ?? "",
     weatherTemperatureUnit: config.weather?.temperatureUnit || "fahrenheit",
     weatherFaceAccessory: config.weather?.faceAccessory || "auto",
-    weatherRefreshMinutes: config.weather?.refreshMinutes || 15
+    weatherRefreshMinutes: config.weather?.refreshMinutes || 15,
+    weatherMetricsSeconds: config.weather?.metricsSeconds || 20,
+    weatherSceneSeconds: config.weather?.sceneSeconds || 8
   });
   fillPanel(advancedPanel, {
     mockOutput: config.runtime?.mockOutput || "",
@@ -741,7 +743,9 @@ function collectConfig(modeOverride = null) {
       longitude: fieldValue(weatherPanel, "weatherLongitude") === "" ? null : Number(fieldValue(weatherPanel, "weatherLongitude")),
       temperatureUnit: fieldValue(weatherPanel, "weatherTemperatureUnit", "fahrenheit"),
       faceAccessory: fieldValue(weatherPanel, "weatherFaceAccessory", "auto"),
-      refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15)
+      refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15),
+      metricsSeconds: Number(fieldValue(weatherPanel, "weatherMetricsSeconds", "20") || 20),
+      sceneSeconds: Number(fieldValue(weatherPanel, "weatherSceneSeconds", "8") || 8)
     }
   };
 }
@@ -777,7 +781,9 @@ function collectWidgetConfig(plugin = selectedPlugin) {
       longitude: fieldValue(weatherPanel, "weatherLongitude") === "" ? null : Number(fieldValue(weatherPanel, "weatherLongitude")),
       temperatureUnit: fieldValue(weatherPanel, "weatherTemperatureUnit", "fahrenheit"),
       faceAccessory: fieldValue(weatherPanel, "weatherFaceAccessory", "auto"),
-      refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15)
+      refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15),
+      metricsSeconds: Number(fieldValue(weatherPanel, "weatherMetricsSeconds", "20") || 20),
+      sceneSeconds: Number(fieldValue(weatherPanel, "weatherSceneSeconds", "8") || 8)
     };
   }
   if (plugin === "testPattern") {

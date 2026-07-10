@@ -41,8 +41,8 @@ CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 SCOPE = "user-read-currently-playing"
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SPOTIFY_MATRIX_CONFIG", "data/config.json"))
 DEFAULT_TOKEN_CACHE = Path(os.environ.get("SPOTIFY_TOKEN_CACHE", "data/spotify_token.json"))
-WEATHER_METRICS_SECONDS = 12
-WEATHER_SCENE_SECONDS = 6
+WEATHER_METRICS_SECONDS = 20
+WEATHER_SCENE_SECONDS = 8
 
 
 @dataclass
@@ -238,6 +238,8 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         "temperatureUnit": ("weather_temperature_unit", str),
         "faceAccessory": ("weather_face_accessory", str),
         "refreshMinutes": ("weather_refresh_minutes", int),
+        "metricsSeconds": ("weather_metrics_seconds", int),
+        "sceneSeconds": ("weather_scene_seconds", int),
     }
     weather_flags = {
         "label": ("--weather-label",),
@@ -248,6 +250,8 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         "temperatureUnit": ("--weather-temperature-unit",),
         "faceAccessory": ("--weather-face-accessory",),
         "refreshMinutes": ("--weather-refresh-minutes",),
+        "metricsSeconds": ("--weather-metrics-seconds",),
+        "sceneSeconds": ("--weather-scene-seconds",),
     }
     for config_name, (attr_name, caster) in weather_fields.items():
         if any(flag in sys.argv[1:] for flag in weather_flags[config_name]):
@@ -1000,20 +1004,15 @@ def draw_aqi_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int) -> None:
         draw.rectangle((cx - 10 + index * 5, cy + 6 - index * 3, cx - 7 + index * 5, cy + 9), fill=color)
 
 
-def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int], unit: str = "") -> None:
+def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int]) -> None:
     tile_size = 32
     title_bbox = draw.textbbox((0, 0), title)
     title_width = title_bbox[2] - title_bbox[0]
-    draw.text((x + max(1, (tile_size - title_width) // 2), y + 2), title, fill=(245, 248, 255))
+    draw.text((x + max(1, (tile_size - title_width) // 2), y + 4), title, fill=(245, 248, 255))
 
     value_bbox = draw.textbbox((0, 0), value)
     value_width = value_bbox[2] - value_bbox[0]
-    draw.text((x + max(2, (tile_size - value_width) // 2), y + 13), value, fill=color)
-
-    if unit:
-        unit_bbox = draw.textbbox((0, 0), unit)
-        unit_width = unit_bbox[2] - unit_bbox[0]
-        draw.text((x + max(2, (tile_size - unit_width) // 2), y + 23), unit, fill=(205, 214, 224))
+    draw.text((x + max(1, (tile_size - value_width) // 2), y + 17), value, fill=color)
 
 
 def render_weather_quad(state: WeatherState, frame_index: int, size: int, temperature_unit: str) -> Image.Image:
@@ -1032,10 +1031,12 @@ def render_weather_quad(state: WeatherState, frame_index: int, size: int, temper
     draw.line((0, mid, size, mid), fill=(8, 12, 20))
 
     temp_unit = "F" if temperature_unit == "fahrenheit" else "C"
-    draw_weather_metric(draw, 0, 0, "TEMP", short_weather_value(state.temperature), (255, 235, 130), temp_unit)
+    wind_unit = "MPH" if temperature_unit == "fahrenheit" else "KMH"
+    wind_speed = state.wind_speed if temperature_unit == "fahrenheit" else state.wind_speed * 1.609344
+    draw_weather_metric(draw, 0, 0, "TEMP", short_weather_value(state.temperature, temp_unit), (255, 235, 130))
     draw_weather_metric(draw, mid, 0, "UV", short_weather_value(state.uv_index), (235, 205, 255))
     draw_weather_metric(draw, 0, mid, "AQI", short_weather_value(state.aqi), (175, 235, 125))
-    draw_weather_metric(draw, mid, mid, "WIND", short_weather_value(state.wind_speed), (145, 225, 255), "MPH")
+    draw_weather_metric(draw, mid, mid, "WIND", short_weather_value(wind_speed, wind_unit), (145, 225, 255))
     return image
 
 
@@ -1119,9 +1120,18 @@ def render_weather_scene(state: WeatherState, frame_index: int, size: int, acces
     return image
 
 
-def render_weather(state: WeatherState, frame_index: int, size: int, accessory: str, temperature_unit: str, fps: float) -> Image.Image:
-    metrics_frames = max(1, int(round(fps * WEATHER_METRICS_SECONDS)))
-    scene_frames = max(1, int(round(fps * WEATHER_SCENE_SECONDS)))
+def render_weather(
+    state: WeatherState,
+    frame_index: int,
+    size: int,
+    accessory: str,
+    temperature_unit: str,
+    fps: float,
+    metrics_seconds: int,
+    scene_seconds: int,
+) -> Image.Image:
+    metrics_frames = max(1, int(round(fps * metrics_seconds)))
+    scene_frames = max(1, int(round(fps * scene_seconds)))
     cycle_frame = frame_index % (metrics_frames + scene_frames)
     if cycle_frame < metrics_frames:
         return render_weather_quad(state, frame_index, size, temperature_unit)
@@ -1241,7 +1251,18 @@ def run_weather(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, 
                     print(f"Weather fetch failed: {exc}", flush=True)
                 next_fetch = now + max(60, args.weather_refresh_minutes * 60)
 
-            display.show(render_weather(state, frame_index, size, args.weather_face_accessory, args.weather_temperature_unit, args.fps))
+            display.show(
+                render_weather(
+                    state,
+                    frame_index,
+                    size,
+                    args.weather_face_accessory,
+                    args.weather_temperature_unit,
+                    args.fps,
+                    args.weather_metrics_seconds,
+                    args.weather_scene_seconds,
+                )
+            )
             frame_index += 1
             if args.once:
                 break
@@ -1495,6 +1516,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--weather-temperature-unit", choices=("fahrenheit", "celsius"), default="fahrenheit")
     parser.add_argument("--weather-face-accessory", choices=("auto", "none", "sunglasses", "umbrella"), default="auto")
     parser.add_argument("--weather-refresh-minutes", type=int, default=15)
+    parser.add_argument("--weather-metrics-seconds", type=int, default=WEATHER_METRICS_SECONDS)
+    parser.add_argument("--weather-scene-seconds", type=int, default=WEATHER_SCENE_SECONDS)
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")
