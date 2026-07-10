@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from assistant_matrix_sdk import ConfigField, MatrixCanvas, Widget, WidgetContext
+from assistant_matrix_sdk import ConfigField, MatrixCanvas, Widget, WidgetContext, WidgetPermission, WidgetPreview, WidgetTrigger
 
 
 class WeatherBadgeWidget(Widget):
@@ -17,11 +17,18 @@ class WeatherBadgeWidget(Widget):
     summary = "Tiny weather-style badge for SDK preview."
     author = "Assistant Matrix"
     category = "information"
+    preview_media = WidgetPreview(description="Simple matrix weather badge preview.")
+    permissions = [
+        WidgetPermission("network", "Future versions may fetch live weather data."),
+    ]
 
     config = [
         ConfigField.string("label", label="Label", default="HOME"),
         ConfigField.number("temperature", label="Temperature", default=72),
         ConfigField.select("condition", ["sunny", "rain", "cloud"], label="Condition", default="sunny"),
+    ]
+    triggers = [
+        WidgetTrigger("schedule.rotation", default_enabled=True, priority=20),
     ]
 
     def render(self, canvas: MatrixCanvas, context: WidgetContext) -> None:

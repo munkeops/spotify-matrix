@@ -7,6 +7,7 @@ from pathlib import Path
 from assistant_matrix_sdk.canvas import MatrixCanvas
 from assistant_matrix_sdk.config import ConfigField
 from assistant_matrix_sdk.context import WidgetContext
+from assistant_matrix_sdk.manifest import WidgetPermission, WidgetPreview, WidgetTrigger, build_widget_manifest
 
 
 class Widget:
@@ -16,7 +17,13 @@ class Widget:
     summary = ""
     author = ""
     category = "custom"
+    runtime = "python"
+    matrix_size = "64x64"
+    license = "MIT"
+    preview_media = WidgetPreview()
+    permissions: list[WidgetPermission] = []
     config: list[ConfigField] = []
+    triggers: list[WidgetTrigger] = []
 
     def setup(self, context: WidgetContext) -> None:
         return None
@@ -35,3 +42,22 @@ class Widget:
     @classmethod
     def manifest_config(cls) -> list[dict[str, object]]:
         return [field.to_manifest() for field in cls.config]
+
+    @classmethod
+    def manifest(cls, *, entrypoint: str = "") -> dict[str, object]:
+        return build_widget_manifest(
+            widget_id=cls.id,
+            name=cls.name,
+            version=cls.version,
+            summary=cls.summary,
+            author=cls.author or "Assistant Matrix",
+            category=cls.category,
+            runtime=cls.runtime,
+            entrypoint=entrypoint,
+            matrix_size=cls.matrix_size,
+            license=cls.license,
+            preview=cls.preview_media,
+            permissions=cls.permissions,
+            config=cls.config,
+            triggers=cls.triggers,
+        )

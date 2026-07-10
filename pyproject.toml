@@ -17,6 +17,9 @@ pydantic = "^2.10.0"
 toml = "^0.10.2"
 loguru = "^0.7.3"
 
+[tool.poetry.scripts]
+assistant-matrix-widget = "assistant_matrix_sdk.cli:main"
+
 [tool.poetry.group.test.dependencies]
 pytest = "^8.0.0"
 
