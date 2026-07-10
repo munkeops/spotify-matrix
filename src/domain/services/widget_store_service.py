@@ -7,6 +7,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -109,11 +110,8 @@ class WidgetStoreService:
 
     def _install_archive_if_available(self, widget: StoreWidget) -> None:
         if not widget.archiveUrl:
-            return
-        try:
-            archive_path = self._resolve_archive(widget.archiveUrl)
-        except Exception:
-            return
+            raise ValueError(f"Store widget {widget.id} does not provide an archiveUrl.")
+        archive_path = self._resolve_archive(widget.archiveUrl)
         if widget.sha256:
             digest = self._sha256(archive_path)
             if digest.lower() != widget.sha256.lower():
@@ -123,6 +121,7 @@ class WidgetStoreService:
             extract_dir = Path(temp_dir) / "extract"
             extract_dir.mkdir(parents=True, exist_ok=True)
             self._safe_extract(archive_path, extract_dir)
+            self._validate_extracted_package(extract_dir, widget)
             if package_dir.exists():
                 shutil.rmtree(package_dir)
             package_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -156,12 +155,34 @@ class WidgetStoreService:
         target_root = target_dir.resolve()
         with tarfile.open(archive_path, "r:gz") as archive:
             for member in archive.getmembers():
+                if member.issym() or member.islnk():
+                    raise ValueError(f"Unsafe archive link {member.name}.")
                 destination = (target_dir / member.name).resolve()
                 try:
                     destination.relative_to(target_root)
                 except ValueError:
                     raise ValueError(f"Unsafe archive path {member.name}.")
             archive.extractall(target_dir)
+
+    def _validate_extracted_package(self, package_dir: Path, widget: StoreWidget) -> None:
+        manifest_path = package_dir / "widget.toml"
+        if not manifest_path.exists():
+            raise ValueError(f"Archive for {widget.id} is missing widget.toml.")
+        with manifest_path.open("rb") as file:
+            manifest = tomllib.load(file)
+        metadata = manifest.get("widget", {})
+        if metadata.get("id") != widget.id:
+            raise ValueError(f"Archive widget id {metadata.get('id')} does not match store id {widget.id}.")
+        if str(metadata.get("version", "")) != widget.version:
+            raise ValueError(f"Archive widget version {metadata.get('version')} does not match store version {widget.version}.")
+        if metadata.get("runtime") == "python":
+            entrypoint = str(metadata.get("entrypoint", ""))
+            module_name = entrypoint.split(":", 1)[0]
+            if not module_name:
+                raise ValueError(f"Archive for {widget.id} is missing a Python entrypoint.")
+            module_path = package_dir / Path(*module_name.split(".")).with_suffix(".py")
+            if not module_path.exists():
+                raise ValueError(f"Archive for {widget.id} is missing entrypoint file {module_path.relative_to(package_dir)}.")
 
 
 widget_store_service = WidgetStoreService()

@@ -104,6 +104,10 @@ def write_store_index(path: Path, archive_path: Path, widget_id: str = "example.
     )
 
 
+def write_store_index_payload(path: Path, widgets: list[dict]) -> None:
+    path.write_text(json.dumps({"schemaVersion": 1, "widgets": widgets}), encoding="utf-8")
+
+
 def test_store_index_can_come_from_saved_config(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     index_path = tmp_path / "store-index.json"
@@ -169,6 +173,89 @@ def test_install_configure_apply_and_uninstall_widget(tmp_path, monkeypatch):
     assert policy.activeWidgetId == "core.spotify"
     assert policy.rotation == []
     assert policy.triggers == []
+
+
+def test_install_rejects_store_widget_without_archive(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    index_path = tmp_path / "store-index.json"
+    write_store_index_payload(
+        index_path,
+        [
+            {
+                "id": "example.missing",
+                "name": "Missing",
+                "version": "0.1.0",
+                "summary": "No package.",
+                "category": "custom",
+            }
+        ],
+    )
+    _, registry_module, store_module, _, _ = reload_services(monkeypatch, data_dir, index_path)
+
+    try:
+        store_module.widget_store_service.install_widget("example.missing")
+    except ValueError as exc:
+        assert "archiveUrl" in str(exc)
+    else:
+        raise AssertionError("Expected missing archiveUrl to fail install.")
+
+    assert registry_module.widget_registry_service.get_local_widget("example.missing") is None
+    assert store_module.widget_store_service.read_installed_widgets() == []
+
+
+def test_install_rejects_archive_with_mismatched_manifest_id(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    archive_path = create_widget_archive(tmp_path, widget_id="example.actual")
+    index_path = tmp_path / "store-index.json"
+    write_store_index(index_path, archive_path, widget_id="example.expected")
+    _, registry_module, store_module, _, _ = reload_services(monkeypatch, data_dir, index_path)
+
+    try:
+        store_module.widget_store_service.install_widget("example.expected")
+    except ValueError as exc:
+        assert "does not match store id" in str(exc)
+    else:
+        raise AssertionError("Expected mismatched manifest id to fail install.")
+
+    assert registry_module.widget_registry_service.get_local_widget("example.expected") is None
+    assert not (data_dir / "widgets" / "packages" / "example.expected").exists()
+    assert store_module.widget_store_service.read_installed_widgets() == []
+
+
+def test_install_rejects_unsafe_archive_links(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    archive_path = tmp_path / "unsafe.tar.gz"
+    with tarfile.open(archive_path, "w:gz") as archive:
+        info = tarfile.TarInfo("widget.toml")
+        content = b"""[widget]
+id = "example.unsafe"
+name = "Unsafe"
+version = "0.1.0"
+summary = "Unsafe archive."
+runtime = "python"
+entrypoint = "renderer.widget:LocalWidget"
+"""
+        info.size = len(content)
+        import io
+
+        archive.addfile(info, io.BytesIO(content))
+        link = tarfile.TarInfo("renderer/link.py")
+        link.type = tarfile.SYMTYPE
+        link.linkname = "../../outside.py"
+        archive.addfile(link)
+    index_path = tmp_path / "store-index.json"
+    write_store_index(index_path, archive_path, widget_id="example.unsafe")
+    _, _, store_module, _, _ = reload_services(monkeypatch, data_dir, index_path)
+
+    try:
+        store_module.widget_store_service.install_widget("example.unsafe")
+    except ValueError as exc:
+        assert "Unsafe archive link" in str(exc)
+    else:
+        raise AssertionError("Expected unsafe archive link to fail install.")
+
+    assert not (data_dir / "widgets" / "packages" / "example.unsafe").exists()
+    assert store_module.widget_store_service.read_installed_widgets() == []
 
 
 def test_display_event_uses_highest_priority_trigger(tmp_path, monkeypatch):
