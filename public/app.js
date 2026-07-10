@@ -198,6 +198,10 @@ function modeFromWidgetId(widgetId) {
   return widgetId?.startsWith("core.") ? widgetId.slice(5) : widgetId;
 }
 
+function widgetIdForMode(mode) {
+  return mode?.startsWith("core.") ? mode : `core.${mode}`;
+}
+
 function widgetCategoryLabel(category) {
   return {
     media: "Music",
@@ -489,6 +493,48 @@ function collectConfig(modeOverride = null) {
   };
 }
 
+function collectWidgetConfig(plugin = selectedPlugin) {
+  if (plugin === "spotify") {
+    return {
+      clientId: fieldValue(spotifyPanel, "clientId"),
+      clientSecret: fieldValue(spotifyPanel, "clientSecret"),
+      redirectUri: fieldValue(spotifyPanel, "redirectUri")
+    };
+  }
+  if (plugin === "clock") {
+    return {
+      face: fieldValue(clockPanel, "clockFace", "analog") || "analog",
+      use24Hour: fieldChecked(clockPanel, "clock24Hour"),
+      showSeconds: fieldChecked(clockPanel, "clockShowSeconds"),
+      timezone: fieldValue(clockPanel, "clockTimezone") || browserAmericaTimezone
+    };
+  }
+  if (plugin === "agent") {
+    return {
+      faceStyle: fieldValue(agentPanel, "agentFaceStyle", "classic"),
+      animationSpeed: fieldValue(agentPanel, "agentAnimationSpeed", "normal")
+    };
+  }
+  if (plugin === "weather") {
+    return {
+      label: fieldValue(weatherPanel, "weatherLabel", "Local weather") || "Local weather",
+      postalCode: fieldValue(weatherPanel, "weatherPostalCode", ""),
+      countryCode: fieldValue(weatherPanel, "weatherCountryCode", "US"),
+      latitude: fieldValue(weatherPanel, "weatherLatitude") === "" ? null : Number(fieldValue(weatherPanel, "weatherLatitude")),
+      longitude: fieldValue(weatherPanel, "weatherLongitude") === "" ? null : Number(fieldValue(weatherPanel, "weatherLongitude")),
+      temperatureUnit: fieldValue(weatherPanel, "weatherTemperatureUnit", "fahrenheit"),
+      faceAccessory: fieldValue(weatherPanel, "weatherFaceAccessory", "auto"),
+      refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15)
+    };
+  }
+  if (plugin === "testPattern") {
+    return {
+      testPattern: true
+    };
+  }
+  return {};
+}
+
 async function saveConfig(modeOverride = null) {
   const saved = await api("/api/config", {
     method: "POST",
@@ -498,13 +544,29 @@ async function saveConfig(modeOverride = null) {
   return saved;
 }
 
+async function saveWidgetConfig(plugin = selectedPlugin) {
+  const widgetId = widgetIdForMode(plugin);
+  const response = await api(`/api/widgets/local/${encodeURIComponent(widgetId)}/config`, {
+    method: "POST",
+    body: JSON.stringify({ config: collectWidgetConfig(plugin) })
+  });
+  await refreshConfig();
+  await refreshLocalWidgets();
+  return response;
+}
+
 async function applyPlugin(plugin = selectedPlugin) {
   applyButton.disabled = true;
   applyPluginButton.disabled = true;
   applyButton.textContent = "Applying...";
   try {
-    await saveConfig(plugin);
-    await api("/api/runtime/apply", { method: "POST", body: "{}" });
+    const widgetId = widgetIdForMode(plugin);
+    await api(`/api/widgets/local/${encodeURIComponent(widgetId)}/apply`, {
+      method: "POST",
+      body: JSON.stringify({ config: collectWidgetConfig(plugin) })
+    });
+    await refreshConfig();
+    await refreshLocalWidgets();
     syncActiveMode(plugin);
     if (pluginDialog.open) {
       pluginDialog.close();
@@ -584,7 +646,7 @@ pluginGrid?.addEventListener("keydown", (event) => {
 
 closeDialogButton?.addEventListener("click", () => pluginDialog.close());
 savePluginButton?.addEventListener("click", async () => {
-  await saveConfig(selectedPlugin);
+  await saveWidgetConfig(selectedPlugin);
   pluginDialog.close();
   await refreshStatus();
 });
