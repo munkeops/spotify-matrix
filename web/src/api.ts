@@ -36,3 +36,54 @@ export interface StatusResponse {
   runtime: RuntimeState;
   dataDir: string;
 }
+
+export interface WidgetConfigOption {
+  label: string;
+  value: string | number | boolean;
+}
+
+export interface WidgetConfigField {
+  key: string;
+  label: string;
+  type: "string" | "secret" | "number" | "boolean" | "select";
+  default?: unknown;
+  options?: WidgetConfigOption[];
+  required?: boolean;
+  placeholder?: string;
+  min?: number;
+  max?: number;
+  step?: number;
+  helpText?: string;
+}
+
+export interface WidgetManifest {
+  id: string;
+  name: string;
+  version: string;
+  summary: string;
+  author: string;
+  category: string;
+  runtime: string;
+  config: WidgetConfigField[];
+}
+
+export interface LocalWidget {
+  manifest: WidgetManifest;
+  installed: boolean;
+  builtIn: boolean;
+  enabled: boolean;
+  configurable: boolean;
+  active: boolean;
+}
+
+export const listLocalWidgets = () => apiGet<{ widgets: LocalWidget[] }>("/api/widgets/local");
+export const getWidgetConfig = (id: string) =>
+  apiGet<{ widgetId: string; config: Record<string, unknown> }>(`/api/widgets/local/${encodeURIComponent(id)}/config`);
+export const saveWidgetConfig = (id: string, config: Record<string, unknown>) =>
+  apiPost(`/api/widgets/local/${encodeURIComponent(id)}/config`, { config });
+export const applyWidget = (id: string, config: Record<string, unknown> | null = null) =>
+  apiPost(`/api/widgets/local/${encodeURIComponent(id)}/apply`, { config });
+export const previewWidget = (widgetId: string, config: Record<string, unknown>) =>
+  apiPost<{ dataUrl: string }>("/api/widgets/preview", { widgetId, config });
+
+export const PREVIEWABLE = new Set(["core.text", "core.image", "core.draw", "core.slideshow"]);

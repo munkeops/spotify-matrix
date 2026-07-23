@@ -317,12 +317,23 @@ class WidgetRegistryService:
                     WidgetConfigField(key="color", label="Text color", type="string", default="#ffffff", placeholder="#ffffff"),
                     WidgetConfigField(key="background", label="Background color", type="string", default="#000000", placeholder="#000000"),
                     WidgetConfigField(
+                        key="fontFamily",
+                        label="Font",
+                        type="select",
+                        default="pixel",
+                        options=[_option("Pixel", "pixel"), _option("Sans", "sans"), _option("Mono", "mono"), _option("Devanagari", "devanagari")],
+                    ),
+                    WidgetConfigField(
                         key="fontSize",
                         label="Font size",
                         type="select",
                         default="medium",
                         options=[_option("Small", "small"), _option("Medium", "medium"), _option("Large", "large")],
                     ),
+                    WidgetConfigField(key="bold", label="Bold", type="boolean", default=False),
+                    WidgetConfigField(key="italic", label="Italic", type="boolean", default=False),
+                    WidgetConfigField(key="wrap", label="Wrap text", type="boolean", default=False),
+                    WidgetConfigField(key="fit", label="Fit to screen", type="boolean", default=False),
                     WidgetConfigField(
                         key="align",
                         label="Alignment",

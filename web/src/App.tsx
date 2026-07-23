@@ -5,6 +5,7 @@ import BrushRoundedIcon from "@mui/icons-material/BrushRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
+import Plugins from "./pages/Plugins";
 import Placeholder from "./pages/Placeholder";
 
 const NAV = [
@@ -31,7 +32,7 @@ export default function App() {
       <Container maxWidth="sm" sx={{ flex: 1, py: 2, pb: 12 }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/plugins" element={<Placeholder title="Plugins" note="Migrating from the classic UI next." />} />
+          <Route path="/plugins" element={<Plugins />} />
           <Route path="/studio" element={<Placeholder title="Meme Studio" note="Opens the canvas editor." link="/studio/" />} />
           <Route path="/settings" element={<Placeholder title="Settings" note="Matrix, store, and Bluetooth coming here." />} />
           <Route path="*" element={<Navigate to="/" replace />} />
