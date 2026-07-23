@@ -1129,7 +1129,7 @@ async function refreshStatus() {
   displayPowerButton.setAttribute("aria-pressed", String(running));
 }
 
-navItems.forEach((item) => item.addEventListener("click", () => setPage(item.dataset.page)));
+navItems.forEach((item) => item.addEventListener("click", () => item.dataset.page && setPage(item.dataset.page)));
 
 sidebarToggle?.addEventListener("click", () => {
   const collapsed = document.body.classList.toggle("sidebar-collapsed");

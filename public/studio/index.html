@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Meme Studio · Assistant Matrix</title>
+    <link rel="stylesheet" href="/studio/studio.css?v=studio-1">
+  </head>
+  <body>
+    <header class="app-bar">
+      <a class="back" href="/">← Back</a>
+      <h1>Meme Studio</h1>
+      <button id="applyBtn" class="btn-primary">Send to matrix</button>
+    </header>
+
+    <div class="studio">
+      <nav class="toolbar" id="toolbar" aria-label="Tools">
+        <button class="tool" data-tool="select" title="Move / select">✥</button>
+        <button class="tool active" data-tool="pen" title="Freehand draw">✎</button>
+        <button class="tool" data-tool="eraser" title="Eraser">⌫</button>
+        <button class="tool" data-tool="text" title="Add text">T</button>
+        <button class="tool" data-tool="rect" title="Rectangle">▭</button>
+        <button class="tool" data-tool="circle" title="Circle">◯</button>
+        <button class="tool" data-tool="line" title="Line">╱</button>
+      </nav>
+
+      <main class="stage-wrap">
+        <canvas id="stage" width="384" height="384"></canvas>
+      </main>
+
+      <aside class="props" id="props">
+        <section class="card">
+          <h2>Style</h2>
+          <label>Color <input type="color" id="color" value="#ffffff"></label>
+          <label>Brush / stroke <input type="range" id="size" min="1" max="40" value="6"></label>
+          <label class="check"><input type="checkbox" id="fill"> Fill shapes</label>
+        </section>
+
+        <section class="card" id="textCard">
+          <h2>Text</h2>
+          <label>Content <input type="text" id="textInput" placeholder="Type… emoji ok 🎉"></label>
+          <label>Font
+            <select id="textFont">
+              <option value="sans-serif">Sans</option>
+              <option value="monospace">Mono</option>
+              <option value="serif">Serif</option>
+            </select>
+          </label>
+          <label>Size <input type="range" id="textSize" min="8" max="140" value="52"></label>
+          <label class="check"><input type="checkbox" id="textBold"> Bold</label>
+        </section>
+
+        <section class="card">
+          <h2>Background</h2>
+          <label class="file">Upload image <input type="file" id="bgFile" accept="image/*"></label>
+          <label>Fill color <input type="color" id="bgColor" value="#000000"></label>
+          <label>Fit
+            <select id="bgFit">
+              <option value="cover">Cover</option>
+              <option value="contain">Contain</option>
+              <option value="stretch">Stretch</option>
+            </select>
+          </label>
+          <label>Rotate <input type="range" id="bgRotate" min="0" max="270" step="90" value="0"></label>
+          <button class="btn-ghost" id="clearBg">Remove image</button>
+        </section>
+
+        <section class="card actions">
+          <button class="btn-ghost" id="undoBtn">Undo</button>
+          <button class="btn-ghost danger" id="clearBtn">Clear</button>
+          <button class="btn-ghost" id="downloadBtn">Download</button>
+        </section>
+
+        <section class="card preview">
+          <h2>Matrix preview · 64×64</h2>
+          <canvas id="preview" width="64" height="64"></canvas>
+        </section>
+      </aside>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+    <script src="/studio/studio.js?v=studio-1"></script>
+  </body>
+</html>
