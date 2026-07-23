@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from time import perf_counter
 
+from pathlib import Path
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
@@ -71,6 +73,21 @@ def create_app() -> FastAPI:
     app.include_router(display.router)
     app.include_router(assets.router)
     app.include_router(bluetooth.router)
+
+    # React + MUI app (built into web-dist) served at /app, with SPA fallback.
+    web_dist = Path("web-dist")
+    if (web_dist / "index.html").exists():
+        assets_dir = web_dist / "assets"
+        if assets_dir.exists():
+            app.mount("/app/assets", StaticFiles(directory=str(assets_dir)), name="web-assets")
+
+        @app.get("/app")
+        async def _web_root() -> FileResponse:
+            return FileResponse(str(web_dist / "index.html"))
+
+        @app.get("/app/{full_path:path}")
+        async def _web_spa(full_path: str) -> FileResponse:
+            return FileResponse(str(web_dist / "index.html"))
 
     public_dir = str(base_config["paths"]["public_dir"])
     app.mount("/", StaticFiles(directory=public_dir, html=True), name="public")

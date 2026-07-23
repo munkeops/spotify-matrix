@@ -1,3 +1,11 @@
+# --- Web build stage: compile the React + MUI UI to static files ---
+FROM node:20-slim AS web
+WORKDIR /web
+COPY web/package.json ./
+RUN npm install
+COPY web/ ./
+RUN npm run build
+
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
@@ -60,6 +68,9 @@ COPY scripts ./scripts
 COPY src ./src
 COPY assistant_matrix_sdk ./assistant_matrix_sdk
 COPY spotify_matrix.py requirements.txt ./
+
+# Built React UI (served at /app by FastAPI).
+COPY --from=web /web/dist ./web-dist
 
 RUN mkdir -p /app/data
 
