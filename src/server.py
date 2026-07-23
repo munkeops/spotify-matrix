@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from configs import base_config
-from src.api.http.rest import assets, auth, commands, config, display, runtime, status, widgets
+from src.api.http.rest import assets, auth, bluetooth, commands, config, display, runtime, status, widgets
 from src.domain.models.response import ErrorResponse, SuccessResponse
 from src.utils.logging_setup import initialize_logging
 
@@ -70,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(widgets.router)
     app.include_router(display.router)
     app.include_router(assets.router)
+    app.include_router(bluetooth.router)
 
     public_dir = str(base_config["paths"]["public_dir"])
     app.mount("/", StaticFiles(directory=public_dir, html=True), name="public")

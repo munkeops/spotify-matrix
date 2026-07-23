@@ -12,9 +12,11 @@ WORKDIR /app
 # System build tools and fonts. Cached until this list changes.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        bluez \
         build-essential \
         cmake \
         cython3 \
+        dbus \
         fonts-dejavu-core \
         fonts-noto-color-emoji \
         fonts-noto-core \

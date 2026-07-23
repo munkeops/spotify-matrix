@@ -144,6 +144,44 @@ class AssetListResponse(BaseModel):
     assets: list[AssetItem] = Field(default_factory=list)
 
 
+class BluetoothDevice(BaseModel):
+    mac: str
+    name: str = ""
+    paired: bool = False
+    connected: bool = False
+    trusted: bool = False
+    icon: str = ""
+
+
+class BluetoothStatusResponse(BaseModel):
+    available: bool
+    powered: bool = False
+    adapter: str = ""
+
+
+class BluetoothDevicesResponse(BaseModel):
+    available: bool
+    devices: list[BluetoothDevice] = Field(default_factory=list)
+
+
+class BluetoothScanRequest(BaseModel):
+    seconds: int = 8
+
+
+class BluetoothPowerRequest(BaseModel):
+    on: bool = True
+
+
+class BluetoothActionRequest(BaseModel):
+    mac: str
+
+
+class BluetoothActionResponse(BaseModel):
+    ok: bool
+    message: str = ""
+    device: BluetoothDevice | None = None
+
+
 class AppConfig(BaseModel):
     spotify: SpotifyConfig = Field(default_factory=SpotifyConfig)
     matrix: MatrixConfig = Field(default_factory=MatrixConfig)

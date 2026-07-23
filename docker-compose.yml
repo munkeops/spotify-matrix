@@ -13,6 +13,8 @@ services:
       SPOTIFY_TOKEN_CACHE: /app/data/spotify_token.json
     volumes:
       - ./data:/app/data
+      # Bluetooth: reach the host BlueZ daemon over the system D-Bus socket.
+      - /var/run/dbus:/var/run/dbus
 
   cloudflared:
     image: cloudflare/cloudflared:latest

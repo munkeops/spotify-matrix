@@ -23,6 +23,10 @@ const slideshowPanel = document.querySelector("#slideshowPanel");
 const slideshowGallery = document.querySelector("#slideshowGallery");
 const widgetLivePreview = document.querySelector("#widgetLivePreview");
 const widgetPreviewImg = document.querySelector("#widgetPreviewImg");
+const bluetoothPanel = document.querySelector("#bluetoothPanel");
+const bluetoothStatus = document.querySelector("#bluetoothStatus");
+const bluetoothScanButton = document.querySelector("#bluetoothScanButton");
+const bluetoothDeviceList = document.querySelector("#bluetoothDeviceList");
 const advancedPanel = document.querySelector("#advancedPanel");
 const externalWidgetPanel = document.querySelector("#externalWidgetPanel");
 const externalWidgetFields = document.querySelector("#externalWidgetFields");
@@ -1266,6 +1270,91 @@ async function refreshStatus() {
   displayPowerButton.setAttribute("aria-pressed", String(running));
 }
 
+function renderBluetooth(status, devices) {
+  if (!bluetoothStatus || !bluetoothDeviceList) {
+    return;
+  }
+  if (!status.available) {
+    bluetoothStatus.textContent = "Bluetooth is not available on this device.";
+    bluetoothDeviceList.innerHTML = "";
+    if (bluetoothScanButton) bluetoothScanButton.disabled = true;
+    return;
+  }
+  bluetoothStatus.textContent = `Adapter ${status.adapter || "ready"} · power ${status.powered ? "on" : "off"}`;
+  const sorted = [...devices].sort((a, b) => Number(b.connected) - Number(a.connected) || Number(b.paired) - Number(a.paired));
+  if (!sorted.length) {
+    bluetoothDeviceList.innerHTML = `<p class="muted">No devices yet. Put your speaker in pairing mode and tap Scan.</p>`;
+    return;
+  }
+  bluetoothDeviceList.innerHTML = sorted.map((device) => {
+    const label = escapeHtml(device.name || device.mac);
+    const mac = escapeHtml(device.mac);
+    const state = device.connected ? "Connected" : device.paired ? "Paired" : "";
+    const primary = device.connected
+      ? `<button type="button" class="secondary" data-bt-disconnect="${mac}">Disconnect</button>`
+      : `<button type="button" data-bt-connect="${mac}">Connect</button>`;
+    const forget = device.paired ? `<button type="button" class="secondary danger" data-bt-remove="${mac}">Forget</button>` : "";
+    return `
+      <div class="bt-device${device.connected ? " connected" : ""}">
+        <div class="bt-device-info">
+          <strong>${label}</strong>
+          <small>${mac}${state ? ` · ${state}` : ""}</small>
+        </div>
+        <div class="bt-device-actions">${primary}${forget}</div>
+      </div>`;
+  }).join("");
+}
+
+async function refreshBluetooth() {
+  if (!bluetoothPanel) {
+    return;
+  }
+  try {
+    const [status, devices] = await Promise.all([api("/api/bluetooth/status"), api("/api/bluetooth/devices")]);
+    renderBluetooth(status, devices.devices || []);
+  } catch (error) {
+    if (bluetoothStatus) bluetoothStatus.textContent = "Bluetooth status unavailable.";
+  }
+}
+
+bluetoothScanButton?.addEventListener("click", async () => {
+  bluetoothScanButton.disabled = true;
+  bluetoothScanButton.textContent = "Scanning…";
+  try {
+    const response = await api("/api/bluetooth/scan", { method: "POST", body: JSON.stringify({ seconds: 8 }) });
+    const status = await api("/api/bluetooth/status");
+    renderBluetooth(status, response.devices || []);
+  } catch (error) {
+    setMessage(error.message);
+  } finally {
+    bluetoothScanButton.disabled = false;
+    bluetoothScanButton.textContent = "Scan";
+  }
+});
+
+bluetoothDeviceList?.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-bt-connect], [data-bt-disconnect], [data-bt-remove]");
+  if (!button) {
+    return;
+  }
+  const connect = button.dataset.btConnect;
+  const disconnect = button.dataset.btDisconnect;
+  const remove = button.dataset.btRemove;
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = connect ? "Connecting…" : disconnect ? "Disconnecting…" : "Forgetting…";
+  try {
+    if (connect) await api("/api/bluetooth/connect", { method: "POST", body: JSON.stringify({ mac: connect }) });
+    else if (disconnect) await api("/api/bluetooth/disconnect", { method: "POST", body: JSON.stringify({ mac: disconnect }) });
+    else if (remove) await api("/api/bluetooth/remove", { method: "POST", body: JSON.stringify({ mac: remove }) });
+    await refreshBluetooth();
+  } catch (error) {
+    setMessage(error.message);
+    button.disabled = false;
+    button.textContent = original;
+  }
+});
+
 navItems.forEach((item) => item.addEventListener("click", () => item.dataset.page && setPage(item.dataset.page)));
 
 sidebarToggle?.addEventListener("click", () => {
@@ -1529,6 +1618,7 @@ refreshConfig()
   .then(refreshStoreWidgets)
   .then(refreshStatus)
   .then(loadGallery)
+  .then(refreshBluetooth)
   .catch((error) => setMessage(error.message));
 
 setInterval(refreshStatus, 5000);

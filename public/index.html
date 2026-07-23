@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260723h">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260723i">
   </head>
   <body>
     <main class="app-frame">
@@ -234,6 +234,14 @@
                 <label class="wide">Store index URL <input name="storeIndexUrl" autocomplete="off" placeholder="https://store.example.com/store-index.json"></label>
               </div>
             </form>
+            <section class="settings-panel" id="bluetoothPanel">
+              <div class="panel-heading">
+                <h2>Bluetooth Audio</h2>
+                <button type="button" id="bluetoothScanButton" class="secondary">Scan</button>
+              </div>
+              <p class="muted" id="bluetoothStatus">Checking Bluetooth…</p>
+              <div class="bt-device-list" id="bluetoothDeviceList"></div>
+            </section>
           </section>
         </section>
       </section>
@@ -478,6 +486,6 @@
       </form>
     </dialog>
 
-              <script src="/app.js?v=assistant-20260723h"></script>
+              <script src="/app.js?v=assistant-20260723i"></script>
   </body>
 </html>

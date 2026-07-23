@@ -793,6 +793,29 @@ dd {
 
 .studio-card { text-decoration: none; color: inherit; }
 
+.bt-device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bt-device {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.bt-device.connected { border-color: rgba(75, 224, 192, 0.5); }
+.bt-device-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bt-device-info small { color: #93a0b4; font-size: 0.72rem; }
+.bt-device-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.bt-device-actions button { padding: 7px 12px; font-size: 0.8rem; }
+button.danger { color: #ff6b6b; }
+
 .gallery-head {
   margin: 14px 0 8px;
   font-size: 0.72rem;
