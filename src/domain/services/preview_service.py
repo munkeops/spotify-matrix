@@ -42,6 +42,7 @@ class PreviewService:
                 asset_path,
                 cfg.get("fit", "contain"),
                 runtime.parse_color(cfg.get("background", "#000000"), (0, 0, 0)),
+                int(cfg.get("rotate", 0) or 0),
             )
         if widget_id == "core.draw":
             return runtime.render_draw_frame(SIZE, cfg)

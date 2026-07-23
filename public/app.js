@@ -875,6 +875,7 @@ function fillForms(config) {
   fillPanel(imagePanel, {
     assetPath: imageAsset,
     fit: config.image?.fit || "contain",
+    rotate: String(config.image?.rotate ?? 0),
     background: config.image?.background || "#000000"
   });
   setImagePreview(imageAsset ? `/api/assets/${encodeURIComponent(imageAsset)}` : "");
@@ -971,6 +972,7 @@ function collectWidgetConfig(plugin = selectedPlugin) {
     return {
       assetPath: fieldValue(imagePanel, "assetPath", ""),
       fit: fieldValue(imagePanel, "fit", "contain"),
+      rotate: Number(fieldValue(imagePanel, "rotate", "0")) || 0,
       background: fieldValue(imagePanel, "background", "#000000") || "#000000"
     };
   }

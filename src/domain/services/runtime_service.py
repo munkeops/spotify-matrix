@@ -178,7 +178,7 @@ class RuntimeService:
             args.append("--text-wrap")
         if config.text.fit:
             args.append("--text-fit")
-        args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background])
+        args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background, "--image-rotate", str(config.image.rotate)])
         if config.image.assetPath:
             asset_file = config_service.data_dir / "widgets" / "assets" / config.image.assetPath
             args.extend(["--image-asset", str(asset_file)])

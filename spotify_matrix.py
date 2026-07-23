@@ -1831,14 +1831,17 @@ def _fit_image(source: Image.Image, size: int, mode: str, background: tuple[int,
     return canvas
 
 
-def render_image_frame(size: int, asset_path: str, fit: str, background: tuple[int, int, int]) -> Image.Image:
+def render_image_frame(size: int, asset_path: str, fit: str, background: tuple[int, int, int], rotate: int = 0) -> Image.Image:
     if not asset_path or not Path(asset_path).exists():
         placeholder = Image.new("RGB", (size, size), background)
         draw = ImageDraw.Draw(placeholder)
         message = "NO IMG"
         draw_pixel_text(draw, max(1, (size - pixel_text_width(message, 1)) // 2), size // 2 - 3, message, (200, 200, 200), 1)
         return placeholder
-    return _fit_image(Image.open(asset_path), size, fit, background)
+    source = Image.open(asset_path)
+    if rotate:
+        source = source.rotate(-int(rotate), expand=True)
+    return _fit_image(source, size, fit, background)
 
 
 def render_image(args: argparse.Namespace, size: int) -> Image.Image:
@@ -1846,12 +1849,13 @@ def render_image(args: argparse.Namespace, size: int) -> Image.Image:
     image_cfg = config.get("image", {}) if isinstance(config.get("image"), dict) else {}
     fit = args.image_fit or image_cfg.get("fit", "contain")
     background = parse_color(args.image_background or image_cfg.get("background", "#000000"), (0, 0, 0))
+    rotate = args.image_rotate if args.image_rotate is not None else int(image_cfg.get("rotate", 0) or 0)
     asset = args.image_asset
     if not asset:
         asset_name = image_cfg.get("assetPath", "")
         if asset_name:
             asset = str(args.config_path.parent / "widgets" / "assets" / asset_name)
-    return render_image_frame(size, asset or "", fit, background)
+    return render_image_frame(size, asset or "", fit, background, rotate)
 
 
 def run_image(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
@@ -2196,6 +2200,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--image-asset", default="", help="Absolute path to the image file for image mode.")
     parser.add_argument("--image-fit", choices=("contain", "cover", "stretch"), default="", help="How the image is scaled to the panel.")
     parser.add_argument("--image-background", default="", help="Background color behind a contained image.")
+    parser.add_argument("--image-rotate", type=int, choices=(0, 90, 180, 270), default=None, help="Rotate the image before fitting.")
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")

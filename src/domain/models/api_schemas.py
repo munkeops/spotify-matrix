@@ -84,6 +84,7 @@ class ImageConfig(BaseModel):
     assetPath: str = ""
     fit: Literal["contain", "cover", "stretch"] = "contain"
     background: str = "#000000"
+    rotate: Literal[0, 90, 180, 270] = 0
 
 
 class DrawShape(BaseModel):
