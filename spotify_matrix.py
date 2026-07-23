@@ -1153,7 +1153,17 @@ FONT_CANDIDATES = {
     ("sans", True, True): ["NotoSans-BoldItalic.ttf", "DejaVuSans-BoldOblique.ttf", "arialbi.ttf"],
     ("devanagari", False, False): ["NotoSansDevanagari-Regular.ttf", "Nirmala.ttf", "Nirmala.ttc", "mangal.ttf"],
     ("devanagari", True, False): ["NotoSansDevanagari-Bold.ttf", "NirmalaB.ttf", "Nirmala.ttc", "mangalb.ttf"],
+    ("mono", False, False): ["DejaVuSansMono.ttf", "NotoSansMono-Regular.ttf", "cour.ttf", "consola.ttf"],
+    ("mono", True, False): ["DejaVuSansMono-Bold.ttf", "NotoSansMono-Bold.ttf", "courbd.ttf", "consolab.ttf"],
+    ("mono", False, True): ["DejaVuSansMono-Oblique.ttf", "cour.ttf", "consolai.ttf"],
+    ("mono", True, True): ["DejaVuSansMono-BoldOblique.ttf", "courbd.ttf", "consolaz.ttf"],
 }
+
+EMOJI_FONT_CANDIDATES = ["NotoColorEmoji.ttf", "seguiemj.ttf", "AppleColorEmoji.ttc", "TwitterColorEmoji-SVGinOT.ttf", "EmojiOneColor.otf"]
+EMOJI_STRIKE_SIZES = [109, 128, 136, 96, 64, 48, 32]
+
+_emoji_font_cache: dict[int, tuple[Any, int] | None] = {}
+_emoji_glyph_cache: dict[tuple[str, int], Any] = {}
 
 _font_file_cache: dict[tuple[str, ...], Path | None] = {}
 _font_cache: dict[tuple[str, bool, bool, int], Any] = {}
@@ -1213,30 +1223,140 @@ def load_font(family: str, bold: bool, italic: bool, size: int) -> Any:
     return font
 
 
-def _text_backend(draw: ImageDraw.ImageDraw, family: str, bold: bool, italic: bool, size_key: str):
-    """Return (measure, line_height, render_line) for the chosen font family."""
+def _is_emoji_char(char: str) -> bool:
+    code = ord(char)
+    return (
+        0x1F000 <= code <= 0x1FAFF
+        or 0x2600 <= code <= 0x27BF
+        or 0x2B00 <= code <= 0x2BFF
+        or 0x2300 <= code <= 0x23FF
+        or 0x1F1E6 <= code <= 0x1F1FF
+        or code in (0x2049, 0x203C, 0x2122, 0x2139)
+    )
+
+
+def _is_emoji_joiner(char: str) -> bool:
+    code = ord(char)
+    return code in (0x200D, 0xFE0F, 0xFE0E) or 0x1F3FB <= code <= 0x1F3FF
+
+
+def _tokenize_text(text: str) -> list[tuple[str, str]]:
+    tokens: list[tuple[str, str]] = []
+    buffer = ""
+    index = 0
+    length = len(text)
+    while index < length:
+        char = text[index]
+        if _is_emoji_char(char):
+            if buffer:
+                tokens.append(("text", buffer))
+                buffer = ""
+            cluster = char
+            index += 1
+            while index < length and (_is_emoji_char(text[index]) or _is_emoji_joiner(text[index])):
+                cluster += text[index]
+                index += 1
+            tokens.append(("emoji", cluster))
+        else:
+            buffer += char
+            index += 1
+    if buffer:
+        tokens.append(("text", buffer))
+    return tokens
+
+
+def _load_emoji_font(target_px: int) -> tuple[Any, int] | None:
+    if target_px in _emoji_font_cache:
+        return _emoji_font_cache[target_px]
+    path = _find_font_file(EMOJI_FONT_CANDIDATES)
+    result: tuple[Any, int] | None = None
+    if path is not None:
+        for size in (target_px, *EMOJI_STRIKE_SIZES):
+            try:
+                font = ImageFont.truetype(str(path), size)
+                result = (font, size)
+                break
+            except OSError:
+                continue
+    _emoji_font_cache[target_px] = result
+    return result
+
+
+def render_emoji_image(cluster: str, target_px: int) -> Any:
+    key = (cluster, target_px)
+    if key in _emoji_glyph_cache:
+        return _emoji_glyph_cache[key]
+    loaded = _load_emoji_font(target_px)
+    glyph = None
+    if loaded is not None:
+        font, base = loaded
+        canvas = Image.new("RGBA", (base * len(cluster) + base, base * 2), (0, 0, 0, 0))
+        drawer = ImageDraw.Draw(canvas)
+        try:
+            drawer.text((base // 4, base // 4), cluster, font=font, embedded_color=True)
+            bbox = canvas.getbbox()
+            if bbox:
+                cropped = canvas.crop(bbox)
+                scale = target_px / cropped.height
+                width = max(1, round(cropped.width * scale))
+                glyph = cropped.resize((width, target_px), Image.LANCZOS)
+        except Exception:
+            glyph = None
+    _emoji_glyph_cache[key] = glyph
+    return glyph
+
+
+def _text_backend(image: Image.Image, draw: ImageDraw.ImageDraw, family: str, bold: bool, italic: bool, size_key: str):
+    """Return (measure, line_height, render_line); handles inline emoji for any family."""
+    font = None
     if family != "pixel":
         font = load_font(family, bold, italic, TTF_FONT_SIZES.get(size_key, 18))
-        if font is not None:
-            ascent, descent = font.getmetrics()
-            line_height = ascent + descent + 2
+    if font is not None:
+        ascent, descent = font.getmetrics()
+        line_height = ascent + descent + 2
+        emoji_px = max(6, int((ascent + descent) * 0.85))
 
-            def measure(value: str) -> int:
-                return int(draw.textlength(value, font=font))
+        def text_measure(value: str) -> int:
+            return int(draw.textlength(value, font=font))
 
-            def render_line(x: int, y: int, value: str, color: tuple[int, int, int]) -> None:
-                draw.text((x, y), value, fill=color, font=font)
+        def text_render(x: int, y: int, value: str, color: tuple[int, int, int]) -> None:
+            draw.text((x, y), value, fill=color, font=font)
+    else:
+        scale = TEXT_FONT_SCALES.get(size_key, 2)
+        line_height = 5 * scale + scale
+        emoji_px = 6 * scale
 
-            return measure, line_height, render_line
+        def text_measure(value: str) -> int:
+            return pixel_text_width(value, scale)
 
-    scale = TEXT_FONT_SCALES.get(size_key, 2)
-    line_height = 5 * scale + scale
+        def text_render(x: int, y: int, value: str, color: tuple[int, int, int]) -> None:
+            draw_pixel_text(draw, x, y, value, color, scale)
 
     def measure(value: str) -> int:
-        return pixel_text_width(value, scale)
+        width = 0
+        for kind, chunk in _tokenize_text(value):
+            if kind == "text":
+                width += text_measure(chunk)
+            else:
+                glyph = render_emoji_image(chunk, emoji_px)
+                width += (glyph.width + 1) if glyph is not None else text_measure(chunk)
+        return width
 
     def render_line(x: int, y: int, value: str, color: tuple[int, int, int]) -> None:
-        draw_pixel_text(draw, x, y, value, color, scale)
+        cursor = x
+        for kind, chunk in _tokenize_text(value):
+            if kind == "text":
+                text_render(cursor, y, chunk, color)
+                cursor += text_measure(chunk)
+            else:
+                glyph = render_emoji_image(chunk, emoji_px)
+                if glyph is not None:
+                    offset_y = y + max(0, (line_height - glyph.height) // 2)
+                    image.paste(glyph, (int(cursor), int(offset_y)), glyph)
+                    cursor += glyph.width + 1
+                else:
+                    text_render(cursor, y, chunk, color)
+                    cursor += text_measure(chunk)
 
     return measure, line_height, render_line
 
@@ -1270,6 +1390,37 @@ def _wrap_text(text: str, measure, max_width: int) -> list[str]:
     return wrapped or [""]
 
 
+def _draw_text_block(
+    canvas_width: int,
+    canvas_height: int,
+    text: str,
+    color: tuple[int, int, int],
+    background: tuple[int, int, int],
+    family: str,
+    bold: bool,
+    italic: bool,
+    size_key: str,
+    align: str,
+    lines: list[str],
+) -> Image.Image:
+    image = Image.new("RGB", (canvas_width, canvas_height), background)
+    draw = ImageDraw.Draw(image)
+    measure, line_height, render_line = _text_backend(image, draw, family, bold, italic, size_key)
+    total_height = line_height * len(lines)
+    y = max(0, (canvas_height - total_height) // 2)
+    for line in lines:
+        width = measure(line)
+        if align == "left":
+            x = 1
+        elif align == "right":
+            x = canvas_width - width - 1
+        else:
+            x = (canvas_width - width) // 2
+        render_line(x, y, line, color)
+        y += line_height
+    return image
+
+
 def render_text(
     size: int,
     text: str,
@@ -1282,39 +1433,49 @@ def render_text(
     size_key: str = "medium",
     align: str = "center",
     wrap: bool = False,
+    fit: bool = False,
     scroll_offset: int | None = None,
 ) -> Image.Image:
-    image = Image.new("RGB", (size, size), background)
-    draw = ImageDraw.Draw(image)
     text = text or ""
-    measure, line_height, render_line = _text_backend(draw, family, bold, italic, size_key)
 
-    if scroll_offset is not None and not wrap:
-        y = (size - line_height) // 2
-        render_line(size - scroll_offset, y, text, color)
+    if scroll_offset is not None and not wrap and not fit:
+        image = Image.new("RGB", (size, size), background)
+        draw = ImageDraw.Draw(image)
+        measure, line_height, render_line = _text_backend(image, draw, family, bold, italic, size_key)
+        render_line(size - scroll_offset, (size - line_height) // 2, text, color)
         return image
 
+    probe = Image.new("RGB", (1, 1))
+    measure, line_height, _ = _text_backend(probe, ImageDraw.Draw(probe), family, bold, italic, size_key)
     lines = _wrap_text(text, measure, size - 2) if wrap else text.split("\n")
-    total_height = line_height * len(lines)
-    y = max(0, (size - total_height) // 2)
-    for line in lines:
-        width = measure(line)
-        if align == "left":
-            x = 1
-        elif align == "right":
-            x = size - width - 1
-        else:
-            x = (size - width) // 2
-        render_line(x, y, line, color)
-        y += line_height
-    return image
+
+    if fit:
+        content_width = max((measure(line) for line in lines), default=1) + 2
+        content_height = line_height * len(lines) + 2
+        block = _draw_text_block(max(content_width, 1), max(content_height, 1), text, color, background, family, bold, italic, size_key, align, lines)
+        if block.width <= size and block.height <= size:
+            canvas = Image.new("RGB", (size, size), background)
+            canvas.paste(block, ((size - block.width) // 2, (size - block.height) // 2))
+            return canvas
+        scale = min(size / block.width, size / block.height)
+        scaled = block.resize((max(1, round(block.width * scale)), max(1, round(block.height * scale))), Image.LANCZOS)
+        canvas = Image.new("RGB", (size, size), background)
+        canvas.paste(scaled, ((size - scaled.width) // 2, (size - scaled.height) // 2))
+        return canvas
+
+    return _draw_text_block(size, size, text, color, background, family, bold, italic, size_key, align, lines)
 
 
 def text_line_width(text: str, family: str, bold: bool, italic: bool, size_key: str) -> int:
     probe = Image.new("RGB", (1, 1))
     draw = ImageDraw.Draw(probe)
-    measure, _, _ = _text_backend(draw, family, bold, italic, size_key)
-    return measure(text)
+    measure, _, _ = _text_backend(probe, draw, family, bold, italic, size_key)
+    return max((measure(line) for line in (text or "").split("\n")), default=0)
+
+
+def draw_rich_text(image: Image.Image, draw: ImageDraw.ImageDraw, x: int, y: int, value: str, color: tuple[int, int, int], family: str, bold: bool, italic: bool, size_key: str) -> None:
+    _, _, render_line = _text_backend(image, draw, family, bold, italic, size_key)
+    render_line(x, y, value, color)
 
 
 def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int]) -> None:
@@ -1633,13 +1794,14 @@ def run_text(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
     italic = bool(args.text_italic)
     size_key = args.text_font_size
     wrap = bool(args.text_wrap)
+    fit = bool(args.text_fit)
     width = text_line_width(text.strip(), family, bold, italic, size_key)
-    scroll = bool(args.text_scroll) and not wrap and width > size
+    scroll = bool(args.text_scroll) and not wrap and not fit and width > size
     speeds = {"slow": 1.0, "normal": 2.0, "fast": 4.0}
     pixels_per_frame = max(1, round(speeds.get(args.text_scroll_speed, 2.0)))
     travel = width + size
     offset = 0
-    common = dict(family=family, bold=bold, italic=italic, size_key=size_key, align=args.text_align, wrap=wrap)
+    common = dict(family=family, bold=bold, italic=italic, size_key=size_key, align=args.text_align, wrap=wrap, fit=fit)
     try:
         while True:
             if scroll:
@@ -1733,16 +1895,18 @@ def render_draw_frame(size: int, draw_cfg: dict[str, Any]) -> Image.Image:
         elif kind == "pixel":
             draw.point((x, y), fill=color)
         elif kind == "text":
-            size_key = shape.get("size", "small")
-            value = str(shape.get("text", ""))
-            family = shape.get("fontFamily", "pixel")
-            font = None
-            if family != "pixel":
-                font = load_font(family, bool(shape.get("bold", False)), bool(shape.get("italic", False)), TTF_FONT_SIZES.get(size_key, 12))
-            if font is not None:
-                draw.text((x, y), value, fill=color, font=font)
-            else:
-                draw_pixel_text(draw, x, y, value, color, DRAW_FONT_SCALES.get(size_key, 1))
+            draw_rich_text(
+                image,
+                draw,
+                x,
+                y,
+                str(shape.get("text", "")),
+                color,
+                shape.get("fontFamily", "pixel"),
+                bool(shape.get("bold", False)),
+                bool(shape.get("italic", False)),
+                shape.get("size", "small"),
+            )
     return image
 
 
@@ -2024,10 +2188,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--text-scroll-speed", choices=("slow", "normal", "fast"), default="normal")
     parser.add_argument("--text-font-size", choices=("small", "medium", "large"), default="medium")
     parser.add_argument("--text-align", choices=("left", "center", "right"), default="center")
-    parser.add_argument("--text-font-family", choices=("pixel", "sans", "devanagari"), default="pixel")
+    parser.add_argument("--text-font-family", choices=("pixel", "sans", "mono", "devanagari"), default="pixel")
     parser.add_argument("--text-bold", action="store_true", help="Render text with a bold font weight.")
     parser.add_argument("--text-italic", action="store_true", help="Render text with an italic font style.")
     parser.add_argument("--text-wrap", action="store_true", help="Wrap long text onto multiple lines.")
+    parser.add_argument("--text-fit", action="store_true", help="Scale the whole text block to fit the panel (good for ASCII art).")
     parser.add_argument("--image-asset", default="", help="Absolute path to the image file for image mode.")
     parser.add_argument("--image-fit", choices=("contain", "cover", "stretch"), default="", help="How the image is scaled to the panel.")
     parser.add_argument("--image-background", default="", help="Background color behind a contained image.")
