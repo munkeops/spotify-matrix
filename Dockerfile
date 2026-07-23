@@ -15,6 +15,8 @@ RUN apt-get update \
         build-essential \
         cmake \
         cython3 \
+        fonts-dejavu-core \
+        fonts-noto-color-emoji \
         fonts-noto-core \
         git \
         python3-dev \

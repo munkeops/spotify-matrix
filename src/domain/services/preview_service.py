@@ -32,6 +32,7 @@ class PreviewService:
                 size_key=cfg.get("fontSize", "medium"),
                 align=cfg.get("align", "center"),
                 wrap=bool(cfg.get("wrap", False)),
+                fit=bool(cfg.get("fit", False)),
             )
         if widget_id == "core.image":
             asset_name = cfg.get("assetPath", "")

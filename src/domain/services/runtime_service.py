@@ -176,6 +176,8 @@ class RuntimeService:
             args.append("--text-italic")
         if config.text.wrap:
             args.append("--text-wrap")
+        if config.text.fit:
+            args.append("--text-fit")
         args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background])
         if config.image.assetPath:
             asset_file = config_service.data_dir / "widgets" / "assets" / config.image.assetPath
