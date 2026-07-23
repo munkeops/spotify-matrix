@@ -359,7 +359,8 @@ $("applyBtn").addEventListener("click", async () => {
     const dataUrl = compose(64).toDataURL("image/png");
     const uploaded = await api("/api/assets/upload", { name: "studio.png", data: dataUrl });
     await api("/api/widgets/local/core.image/apply", { config: { assetPath: uploaded.assetPath, fit: "stretch", background: "#000000" } });
-    toast("Sent to matrix ✓");
+    toast("Saved & sent to matrix ✓");
+    loadMemes();
   } catch (error) {
     toast(error.message, true);
   } finally {
@@ -367,4 +368,71 @@ $("applyBtn").addEventListener("click", async () => {
   }
 });
 
+// ---------- my memes gallery ----------
+async function loadMemes() {
+  const gallery = $("memeGallery");
+  try {
+    const response = await fetch("/api/assets");
+    const payload = await response.json();
+    const assets = payload.assets || [];
+    if (!assets.length) {
+      gallery.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;margin:0">No saved memes yet.</p>';
+      return;
+    }
+    gallery.innerHTML = assets
+      .map(
+        (a) => `<div class="studio-thumb" data-name="${a.name}" title="Load to edit">
+          <img src="${a.url}" alt="">
+          ${a.animated ? '<span class="thumb-gif">GIF</span>' : ""}
+          <button class="thumb-delete" data-del="${a.name}" aria-label="Delete">×</button>
+        </div>`,
+      )
+      .join("");
+  } catch (error) {
+    gallery.innerHTML = '<p style="color:var(--muted);font-size:0.82rem;margin:0">Could not load gallery.</p>';
+  }
+}
+
+$("memeGallery").addEventListener("click", async (event) => {
+  const del = event.target.closest("[data-del]");
+  if (del) {
+    event.stopPropagation();
+    try {
+      await fetch(`/api/assets/${encodeURIComponent(del.dataset.del)}`, { method: "DELETE" });
+      toast("Deleted");
+      loadMemes();
+    } catch (error) {
+      toast("Delete failed", true);
+    }
+    return;
+  }
+  const thumb = event.target.closest("[data-name]");
+  if (!thumb) return;
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    snapshot();
+    state.objects = [];
+    state.selected = -1;
+    state.background.img = img;
+    state.background.fit = "cover";
+    state.background.rotate = 0;
+    rotatedBgCache = null;
+    render();
+    toast("Loaded — draw on top, then send");
+  };
+  img.src = `/api/assets/${encodeURIComponent(thumb.dataset.name)}?edit=1`;
+});
+
+$("newBtn").addEventListener("click", () => {
+  snapshot();
+  state.objects = [];
+  state.selected = -1;
+  state.background.img = null;
+  rotatedBgCache = null;
+  render();
+  toast("New canvas");
+});
+
+loadMemes();
 render();

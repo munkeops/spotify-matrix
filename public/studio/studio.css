@@ -205,6 +205,60 @@ button { font-family: inherit; cursor: pointer; }
   border: 1px solid var(--line);
 }
 
+.studio-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.studio-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: #050607;
+  cursor: pointer;
+}
+.studio-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  display: block;
+}
+.studio-thumb .thumb-gif {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  padding: 1px 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #ffd166;
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+.studio-thumb .thumb-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.studio-thumb:hover .thumb-delete { opacity: 1; }
+
 .toast {
   position: fixed;
   left: 50%;

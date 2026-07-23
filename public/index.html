@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260723g">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260723h">
   </head>
   <body>
     <main class="app-frame">
@@ -441,6 +441,18 @@
               <span class="muted" id="imagePreviewEmpty">No image uploaded yet.</span>
             </div>
           </div>
+          <div class="gallery-head"><span class="muted">Gallery — tap to use</span></div>
+          <div class="asset-gallery" id="imageGallery"></div>
+        </section>
+
+        <section class="plugin-config" data-config-panel="slideshow" id="slideshowPanel">
+          <div class="form-grid">
+            <label>Seconds per image <input name="intervalSeconds" type="number" min="1" max="120" step="1"></label>
+            <label>Fit <select name="fit"><option value="contain">Contain</option><option value="cover">Cover</option><option value="stretch">Stretch</option></select></label>
+            <label>Background <input name="background" type="color"></label>
+          </div>
+          <div class="gallery-head"><span class="muted">Tap images to include</span></div>
+          <div class="asset-gallery" id="slideshowGallery"></div>
         </section>
 
         <section class="plugin-config" data-config-panel="draw" id="drawPanel">
@@ -467,6 +479,6 @@
       </form>
     </dialog>
 
-              <script src="/app.js?v=assistant-20260723g"></script>
+              <script src="/app.js?v=assistant-20260723h"></script>
   </body>
 </html>

@@ -18,6 +18,9 @@ const imagePreviewEmpty = document.querySelector("#imagePreviewEmpty");
 const drawPanel = document.querySelector("#drawPanel");
 const drawShapeList = document.querySelector("#drawShapeList");
 const addShapeButton = document.querySelector("#addShapeButton");
+const imageGallery = document.querySelector("#imageGallery");
+const slideshowPanel = document.querySelector("#slideshowPanel");
+const slideshowGallery = document.querySelector("#slideshowGallery");
 const widgetLivePreview = document.querySelector("#widgetLivePreview");
 const widgetPreviewImg = document.querySelector("#widgetPreviewImg");
 const advancedPanel = document.querySelector("#advancedPanel");
@@ -205,6 +208,7 @@ const pluginLabels = {
   text: "Custom Message",
   image: "Image",
   draw: "Draw",
+  slideshow: "Slideshow",
   testPattern: "Test Pattern"
 };
 
@@ -464,7 +468,14 @@ function renderLocalWidgets(widgets) {
         ${widget.builtIn ? "" : `<button class="plugin-settings-button danger" type="button" data-widget-uninstall="${widgetId}">Uninstall</button>`}
       </article>`;
   }).join("");
-  pluginGrid.innerHTML = cards;
+  const studioCard = `
+      <a class="plugin-card studio-card" href="/studio/">
+        <span class="plugin-meta">Create</span>
+        <strong>Meme Studio</strong>
+        <small>Draw, add text, and store memes. Tap to open the editor.</small>
+        <span class="plugin-preview preview-text" aria-hidden="true"></span>
+      </a>`;
+  pluginGrid.innerHTML = cards + studioCard;
   syncActiveMode(normalizeMode(currentConfig));
   if (displayPolicy) {
     renderDisplayPolicy(displayPolicy);
@@ -703,7 +714,7 @@ function setImagePreview(url) {
   }
 }
 
-const PREVIEW_WIDGETS = new Set(["text", "image", "draw"]);
+const PREVIEW_WIDGETS = new Set(["text", "image", "draw", "slideshow"]);
 let previewTimer = null;
 
 async function updateWidgetPreview() {
@@ -738,6 +749,110 @@ function scheduleWidgetPreview() {
   }
   previewTimer = setTimeout(updateWidgetPreview, 250);
 }
+
+let galleryAssets = [];
+let slideshowItems = [];
+
+function galleryThumb(asset, badge) {
+  const name = escapeHtml(asset.name);
+  const badgeMarkup = badge ? `<span class="thumb-badge">${escapeHtml(badge)}</span>` : "";
+  const gif = asset.animated ? `<span class="thumb-gif">GIF</span>` : "";
+  return `
+    <div class="asset-thumb" data-asset="${name}">
+      <img src="${escapeHtml(asset.url)}" alt="${name}" loading="lazy">
+      ${badgeMarkup}${gif}
+      <button type="button" class="thumb-delete" data-delete-asset="${name}" aria-label="Delete">×</button>
+    </div>`;
+}
+
+function renderImageGallery() {
+  if (!imageGallery) {
+    return;
+  }
+  if (!galleryAssets.length) {
+    imageGallery.innerHTML = `<p class="muted">No saved images yet. Upload one or make a meme in the Studio.</p>`;
+    return;
+  }
+  const current = fieldValue(imagePanel, "assetPath", "");
+  imageGallery.innerHTML = galleryAssets.map((asset) => galleryThumb(asset).replace("asset-thumb", asset.name === current ? "asset-thumb selected" : "asset-thumb")).join("");
+}
+
+function renderSlideshowGallery() {
+  if (!slideshowGallery) {
+    return;
+  }
+  if (!galleryAssets.length) {
+    slideshowGallery.innerHTML = `<p class="muted">No saved images yet. Upload some or make memes in the Studio.</p>`;
+    return;
+  }
+  slideshowGallery.innerHTML = galleryAssets.map((asset) => {
+    const order = slideshowItems.indexOf(asset.name);
+    const html = galleryThumb(asset, order >= 0 ? String(order + 1) : "");
+    return order >= 0 ? html.replace("asset-thumb", "asset-thumb selected") : html;
+  }).join("");
+}
+
+async function loadGallery() {
+  try {
+    const response = await api("/api/assets");
+    galleryAssets = response.assets || [];
+  } catch (error) {
+    galleryAssets = [];
+  }
+  renderImageGallery();
+  renderSlideshowGallery();
+}
+
+async function deleteAsset(name) {
+  try {
+    await api(`/api/assets/${encodeURIComponent(name)}`, { method: "DELETE" });
+    slideshowItems = slideshowItems.filter((item) => item !== name);
+    await loadGallery();
+    scheduleWidgetPreview();
+  } catch (error) {
+    setMessage(error.message);
+  }
+}
+
+imageGallery?.addEventListener("click", (event) => {
+  const del = event.target.closest("[data-delete-asset]");
+  if (del) {
+    deleteAsset(del.dataset.deleteAsset);
+    return;
+  }
+  const thumb = event.target.closest("[data-asset]");
+  if (!thumb) {
+    return;
+  }
+  const assetInput = field(imagePanel, "assetPath");
+  if (assetInput) {
+    assetInput.value = thumb.dataset.asset;
+  }
+  setImagePreview(`/api/assets/${encodeURIComponent(thumb.dataset.asset)}`);
+  renderImageGallery();
+  scheduleWidgetPreview();
+});
+
+slideshowGallery?.addEventListener("click", (event) => {
+  const del = event.target.closest("[data-delete-asset]");
+  if (del) {
+    deleteAsset(del.dataset.deleteAsset);
+    return;
+  }
+  const thumb = event.target.closest("[data-asset]");
+  if (!thumb) {
+    return;
+  }
+  const name = thumb.dataset.asset;
+  const index = slideshowItems.indexOf(name);
+  if (index >= 0) {
+    slideshowItems.splice(index, 1);
+  } else {
+    slideshowItems.push(name);
+  }
+  renderSlideshowGallery();
+  scheduleWidgetPreview();
+});
 
 let drawShapes = [];
 
@@ -882,6 +997,14 @@ function fillForms(config) {
   fillPanel(drawPanel, { background: config.draw?.background || "#000000" });
   drawShapes = (config.draw?.shapes || []).map((shape) => ({ ...shapeDefaults(shape.type || "rect"), ...shape }));
   renderDrawShapes();
+  fillPanel(slideshowPanel, {
+    intervalSeconds: config.slideshow?.intervalSeconds ?? 8,
+    fit: config.slideshow?.fit || "cover",
+    background: config.slideshow?.background || "#000000"
+  });
+  slideshowItems = [...(config.slideshow?.items || [])];
+  renderImageGallery();
+  renderSlideshowGallery();
   fillPanel(advancedPanel, {
     mockOutput: config.runtime?.mockOutput || "",
     testPattern: Boolean(config.runtime?.testPattern)
@@ -947,7 +1070,8 @@ function collectConfig(modeOverride = null) {
     },
     text: collectWidgetConfig("text"),
     image: collectWidgetConfig("image"),
-    draw: collectWidgetConfig("draw")
+    draw: collectWidgetConfig("draw"),
+    slideshow: collectWidgetConfig("slideshow")
   };
 }
 
@@ -980,6 +1104,14 @@ function collectWidgetConfig(plugin = selectedPlugin) {
     return {
       background: fieldValue(drawPanel, "background", "#000000") || "#000000",
       shapes: collectDrawShapes()
+    };
+  }
+  if (plugin === "slideshow") {
+    return {
+      items: [...slideshowItems],
+      intervalSeconds: Number(fieldValue(slideshowPanel, "intervalSeconds", "8")) || 8,
+      fit: fieldValue(slideshowPanel, "fit", "cover"),
+      background: fieldValue(slideshowPanel, "background", "#000000") || "#000000"
     };
   }
   if (plugin === "spotify") {
@@ -1095,6 +1227,9 @@ async function refreshConfig() {
 
 async function openPluginSettings(plugin) {
   setSelectedPlugin(plugin);
+  if (plugin === "image" || plugin === "slideshow") {
+    loadGallery();
+  }
   if (plugin?.includes(".") && !plugin?.startsWith("core.")) {
     try {
       const response = await api(`/api/widgets/local/${encodeURIComponent(widgetIdForMode(plugin))}/config`);
@@ -1331,6 +1466,7 @@ imageFileInput?.addEventListener("change", async () => {
     }
     setImagePreview(response.url);
     setMessage("Image uploaded. Apply to show it on the matrix.");
+    loadGallery();
     scheduleWidgetPreview();
   } catch (error) {
     setMessage(error.message);
@@ -1342,6 +1478,7 @@ imageFileInput?.addEventListener("change", async () => {
 textPanel?.addEventListener("input", scheduleWidgetPreview);
 imagePanel?.addEventListener("input", scheduleWidgetPreview);
 drawPanel?.addEventListener("input", scheduleWidgetPreview);
+slideshowPanel?.addEventListener("input", scheduleWidgetPreview);
 
 addShapeButton?.addEventListener("click", () => {
   drawShapes.push(shapeDefaults("rect"));
@@ -1391,6 +1528,7 @@ refreshConfig()
   .then(refreshDisplayPolicy)
   .then(refreshStoreWidgets)
   .then(refreshStatus)
+  .then(loadGallery)
   .catch((error) => setMessage(error.message));
 
 setInterval(refreshStatus, 5000);
