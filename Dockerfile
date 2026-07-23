@@ -9,6 +9,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
+# System build tools and fonts. Cached until this list changes.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -22,18 +23,19 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir "poetry>=1.8,<2"
 
-COPY pyproject.toml ./
-COPY README.md ./
-COPY configs ./configs
-COPY public ./public
-COPY scripts ./scripts
-COPY src ./src
-COPY assistant_matrix_sdk ./assistant_matrix_sdk
-COPY spotify_matrix.py requirements.txt ./
-
+# --- Dependency layer -------------------------------------------------------
+# Only pyproject.toml (and README, referenced by it) land here, so editing
+# application code below does NOT invalidate the dependency install or the
+# native matrix build. --no-root installs just the dependencies, not the
+# project itself (the app runs from /app via PYTHONPATH, so it does not need
+# to be pip-installed as a package).
+COPY pyproject.toml README.md ./
 RUN poetry config virtualenvs.in-project true \
-    && poetry install --only main --no-ansi
+    && poetry install --only main --no-root --no-ansi
 
+# --- Native rpi-rgb-led-matrix build ----------------------------------------
+# Depends only on the installed dependencies (Pillow headers), so it is cached
+# across code changes and only rebuilds when dependencies change.
 RUN PILLOW_VERSION="$(poetry run python -c 'import PIL; print(PIL.__version__)')" \
     && mkdir -p /tmp/pillow-src \
     && poetry run pip download --no-binary=:all: --no-deps "Pillow==${PILLOW_VERSION}" -d /tmp/pillow-src \
@@ -44,6 +46,16 @@ RUN PILLOW_VERSION="$(poetry run python -c 'import PIL; print(PIL.__version__)')
     && echo "Using Pillow ${PILLOW_VERSION} header path: ${PILLOW_INCLUDE}" \
     && CFLAGS="-I${PILLOW_INCLUDE}" poetry run pip install --no-cache-dir git+https://github.com/hzeller/rpi-rgb-led-matrix \
     && rm -rf /tmp/pillow-src
+
+# --- Application code --------------------------------------------------------
+# Everything below rebuilds on a code change, but these are fast COPY layers;
+# the expensive layers above stay cached.
+COPY configs ./configs
+COPY public ./public
+COPY scripts ./scripts
+COPY src ./src
+COPY assistant_matrix_sdk ./assistant_matrix_sdk
+COPY spotify_matrix.py requirements.txt ./
 
 RUN mkdir -p /app/data
 
