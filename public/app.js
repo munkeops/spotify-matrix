@@ -11,6 +11,13 @@ const clockPanel = document.querySelector("#clockPanel");
 const agentPanel = document.querySelector("#agentPanel");
 const weatherPanel = document.querySelector("#weatherPanel");
 const textPanel = document.querySelector("#textPanel");
+const imagePanel = document.querySelector("#imagePanel");
+const imageFileInput = document.querySelector("#imageFileInput");
+const imagePreviewImg = document.querySelector("#imagePreviewImg");
+const imagePreviewEmpty = document.querySelector("#imagePreviewEmpty");
+const drawPanel = document.querySelector("#drawPanel");
+const drawShapeList = document.querySelector("#drawShapeList");
+const addShapeButton = document.querySelector("#addShapeButton");
 const advancedPanel = document.querySelector("#advancedPanel");
 const externalWidgetPanel = document.querySelector("#externalWidgetPanel");
 const externalWidgetFields = document.querySelector("#externalWidgetFields");
@@ -194,6 +201,8 @@ const pluginLabels = {
   agent: "Agent Face",
   weather: "Weather",
   text: "Custom Message",
+  image: "Image",
+  draw: "Draw",
   testPattern: "Test Pattern"
 };
 
@@ -676,6 +685,93 @@ function fillPanel(form, values) {
   }
 }
 
+function setImagePreview(url) {
+  if (!imagePreviewImg || !imagePreviewEmpty) {
+    return;
+  }
+  if (url) {
+    imagePreviewImg.src = url;
+    imagePreviewImg.hidden = false;
+    imagePreviewEmpty.hidden = true;
+  } else {
+    imagePreviewImg.removeAttribute("src");
+    imagePreviewImg.hidden = true;
+    imagePreviewEmpty.hidden = false;
+  }
+}
+
+let drawShapes = [];
+
+const SHAPE_TYPES = ["rect", "circle", "line", "text", "pixel"];
+const SHAPE_FIELDS = {
+  rect: ["x", "y", "w", "h"],
+  circle: ["x", "y", "radius"],
+  line: ["x", "y", "x2", "y2"],
+  text: ["x", "y", "text", "size"],
+  pixel: ["x", "y"]
+};
+const SHAPE_FIELD_META = {
+  x: { label: "X", type: "number" },
+  y: { label: "Y", type: "number" },
+  w: { label: "W", type: "number" },
+  h: { label: "H", type: "number" },
+  radius: { label: "R", type: "number" },
+  x2: { label: "X2", type: "number" },
+  y2: { label: "Y2", type: "number" },
+  text: { label: "Text", type: "text" },
+  size: { label: "Size", type: "select", options: ["small", "medium", "large"] }
+};
+const NUMERIC_SHAPE_FIELDS = new Set(["x", "y", "w", "h", "radius", "x2", "y2"]);
+
+function shapeDefaults(type = "rect") {
+  return { type, color: "#ffffff", x: 8, y: 8, w: 16, h: 12, radius: 8, x2: 24, y2: 24, text: "HI", size: "small", fill: true };
+}
+
+function renderDrawShapes() {
+  if (!drawShapeList) {
+    return;
+  }
+  if (!drawShapes.length) {
+    drawShapeList.innerHTML = `<p class="muted">No shapes yet. Add a rectangle, circle, line, text, or pixel.</p>`;
+    return;
+  }
+  drawShapeList.innerHTML = drawShapes.map((shape, index) => {
+    const typeOptions = SHAPE_TYPES.map((type) => `<option value="${type}" ${shape.type === type ? "selected" : ""}>${type}</option>`).join("");
+    const inputs = (SHAPE_FIELDS[shape.type] || SHAPE_FIELDS.rect).map((key) => {
+      const meta = SHAPE_FIELD_META[key];
+      if (meta.type === "select") {
+        const options = meta.options.map((option) => `<option value="${option}" ${shape[key] === option ? "selected" : ""}>${option}</option>`).join("");
+        return `<label class="shape-field">${meta.label}<select data-shape-field="${key}">${options}</select></label>`;
+      }
+      return `<label class="shape-field">${meta.label}<input data-shape-field="${key}" type="${meta.type}" value="${escapeHtml(shape[key])}"></label>`;
+    }).join("");
+    const fillControl = (shape.type === "rect" || shape.type === "circle")
+      ? `<label class="shape-field check"><input data-shape-field="fill" type="checkbox" ${shape.fill ? "checked" : ""}><span>Fill</span></label>`
+      : "";
+    return `
+      <div class="draw-shape-row" data-shape-index="${index}">
+        <select data-shape-field="type" class="shape-type">${typeOptions}</select>
+        ${inputs}
+        <label class="shape-field color"><input data-shape-field="color" type="color" value="${escapeHtml(shape.color)}"></label>
+        ${fillControl}
+        <button type="button" class="icon-button danger" data-shape-remove="${index}" aria-label="Remove shape">x</button>
+      </div>`;
+  }).join("");
+}
+
+function collectDrawShapes() {
+  return drawShapes.map((shape) => {
+    const cleaned = { type: shape.type, color: shape.color || "#ffffff" };
+    for (const key of SHAPE_FIELDS[shape.type] || SHAPE_FIELDS.rect) {
+      cleaned[key] = NUMERIC_SHAPE_FIELDS.has(key) ? Number(shape[key]) || 0 : shape[key];
+    }
+    if (shape.type === "rect" || shape.type === "circle") {
+      cleaned.fill = Boolean(shape.fill);
+    }
+    return cleaned;
+  });
+}
+
 function fillForms(config) {
   currentConfig = config;
   const mode = normalizeMode(config);
@@ -721,6 +817,16 @@ function fillForms(config) {
     scroll: Boolean(config.text?.scroll),
     scrollSpeed: config.text?.scrollSpeed || "normal"
   });
+  const imageAsset = config.image?.assetPath || "";
+  fillPanel(imagePanel, {
+    assetPath: imageAsset,
+    fit: config.image?.fit || "contain",
+    background: config.image?.background || "#000000"
+  });
+  setImagePreview(imageAsset ? `/api/assets/${encodeURIComponent(imageAsset)}` : "");
+  fillPanel(drawPanel, { background: config.draw?.background || "#000000" });
+  drawShapes = (config.draw?.shapes || []).map((shape) => ({ ...shapeDefaults(shape.type || "rect"), ...shape }));
+  renderDrawShapes();
   fillPanel(advancedPanel, {
     mockOutput: config.runtime?.mockOutput || "",
     testPattern: Boolean(config.runtime?.testPattern)
@@ -784,7 +890,9 @@ function collectConfig(modeOverride = null) {
       metricsSeconds: Number(fieldValue(weatherPanel, "weatherMetricsSeconds", "45") || 45),
       sceneSeconds: Number(fieldValue(weatherPanel, "weatherSceneSeconds", "20") || 20)
     },
-    text: collectWidgetConfig("text")
+    text: collectWidgetConfig("text"),
+    image: collectWidgetConfig("image"),
+    draw: collectWidgetConfig("draw")
   };
 }
 
@@ -798,6 +906,19 @@ function collectWidgetConfig(plugin = selectedPlugin) {
       align: fieldValue(textPanel, "align", "center"),
       scroll: fieldChecked(textPanel, "scroll"),
       scrollSpeed: fieldValue(textPanel, "scrollSpeed", "normal")
+    };
+  }
+  if (plugin === "image") {
+    return {
+      assetPath: fieldValue(imagePanel, "assetPath", ""),
+      fit: fieldValue(imagePanel, "fit", "contain"),
+      background: fieldValue(imagePanel, "background", "#000000") || "#000000"
+    };
+  }
+  if (plugin === "draw") {
+    return {
+      background: fieldValue(drawPanel, "background", "#000000") || "#000000",
+      shapes: collectDrawShapes()
     };
   }
   if (plugin === "spotify") {
@@ -1127,6 +1248,74 @@ fields(clockPanel, "clockFace").forEach((control) => {
       selectedPlugin = "clock";
     }
   });
+});
+
+imageFileInput?.addEventListener("change", async () => {
+  const file = imageFileInput.files?.[0];
+  if (!file) {
+    return;
+  }
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("Could not read the selected file."));
+      reader.readAsDataURL(file);
+    });
+    setMessage("Uploading image...");
+    const response = await api("/api/assets/upload", { method: "POST", body: JSON.stringify({ name: file.name, data: dataUrl }) });
+    const assetInput = field(imagePanel, "assetPath");
+    if (assetInput) {
+      assetInput.value = response.assetPath;
+    }
+    setImagePreview(response.url);
+    setMessage("Image uploaded. Apply to show it on the matrix.");
+  } catch (error) {
+    setMessage(error.message);
+  } finally {
+    imageFileInput.value = "";
+  }
+});
+
+addShapeButton?.addEventListener("click", () => {
+  drawShapes.push(shapeDefaults("rect"));
+  renderDrawShapes();
+});
+
+function onShapeFieldChange(event) {
+  const control = event.target.closest("[data-shape-field]");
+  if (!control) {
+    return;
+  }
+  const row = control.closest("[data-shape-index]");
+  const index = Number(row?.dataset.shapeIndex);
+  if (!Number.isInteger(index) || !drawShapes[index]) {
+    return;
+  }
+  const key = control.dataset.shapeField;
+  if (key === "type") {
+    const current = drawShapes[index];
+    drawShapes[index] = { ...shapeDefaults(control.value), color: current.color, x: current.x, y: current.y };
+    renderDrawShapes();
+    return;
+  }
+  if (key === "fill") {
+    drawShapes[index].fill = control.checked;
+  } else {
+    drawShapes[index][key] = control.value;
+  }
+}
+
+drawShapeList?.addEventListener("input", onShapeFieldChange);
+drawShapeList?.addEventListener("change", onShapeFieldChange);
+
+drawShapeList?.addEventListener("click", (event) => {
+  const removeButton = event.target.closest("[data-shape-remove]");
+  if (!removeButton) {
+    return;
+  }
+  drawShapes.splice(Number(removeButton.dataset.shapeRemove), 1);
+  renderDrawShapes();
 });
 
 populateTimezones();

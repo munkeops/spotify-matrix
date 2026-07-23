@@ -734,9 +734,83 @@ dd {
   content: "AaB";
 }
 
-.text-settings-grid input[type="color"] {
+.text-settings-grid input[type="color"],
+.image-settings-grid input[type="color"],
+.draw-settings-grid input[type="color"] {
   min-height: 2.2rem;
   padding: 2px;
+}
+
+.image-config-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.image-preview-box {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: #050607;
+  padding: 12px;
+}
+
+.image-preview-box img {
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  background: #000;
+  border-radius: 6px;
+}
+
+.draw-shape-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.draw-shape-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.draw-shape-row .shape-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.72rem;
+  min-width: 52px;
+}
+
+.draw-shape-row .shape-field.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.draw-shape-row .shape-field input,
+.draw-shape-row .shape-field select,
+.draw-shape-row .shape-type {
+  min-width: 48px;
+}
+
+.draw-shape-row .shape-field.color input {
+  min-height: 2rem;
+  padding: 2px;
+}
+
+.draw-shape-row .icon-button.danger {
+  margin-left: auto;
 }
 
 .media-preview {

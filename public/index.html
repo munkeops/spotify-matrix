@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260723a">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260723b">
   </head>
   <body>
     <main class="app-frame">
@@ -421,6 +421,29 @@
           </div>
         </section>
 
+        <section class="plugin-config" data-config-panel="image" id="imagePanel">
+          <div class="image-config-layout">
+            <div class="form-grid image-settings-grid">
+              <label class="wide">Image file <input name="imageFile" id="imageFileInput" type="file" accept="image/*"></label>
+              <input name="assetPath" type="hidden">
+              <label>Fit <select name="fit"><option value="contain">Contain</option><option value="cover">Cover</option><option value="stretch">Stretch</option></select></label>
+              <label>Background <input name="background" type="color"></label>
+            </div>
+            <div class="image-preview-box" id="imagePreviewBox">
+              <img id="imagePreviewImg" alt="Uploaded image preview" hidden>
+              <span class="muted" id="imagePreviewEmpty">No image uploaded yet.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="plugin-config" data-config-panel="draw" id="drawPanel">
+          <div class="form-grid draw-settings-grid">
+            <label>Background <input name="background" type="color"></label>
+            <button type="button" class="secondary" id="addShapeButton">Add shape</button>
+          </div>
+          <div class="draw-shape-list" id="drawShapeList"></div>
+        </section>
+
         <section class="plugin-config" data-config-panel="external" id="externalWidgetPanel">
           <div class="external-widget-fields" id="externalWidgetFields"></div>
         </section>
@@ -432,6 +455,6 @@
       </form>
     </dialog>
 
-              <script src="/app.js?v=assistant-20260723a"></script>
+              <script src="/app.js?v=assistant-20260723b"></script>
   </body>
 </html>
