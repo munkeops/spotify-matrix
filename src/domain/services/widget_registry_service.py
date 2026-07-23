@@ -290,9 +290,9 @@ class WidgetRegistryService:
             ),
             WidgetManifest(
                 id="core.text",
-                name="Text",
+                name="Custom Message",
                 version="1.0.0",
-                summary="Displays a custom static or scrolling text message.",
+                summary="Show your own static or scrolling text message.",
                 category="custom",
                 runtime="builtin",
                 entrypoint="spotify_matrix:run_text",

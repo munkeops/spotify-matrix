@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260710f">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260723a">
   </head>
   <body>
     <main class="app-frame">
@@ -409,6 +409,18 @@
           <label class="check-row"><input name="testPattern" type="checkbox"><span>Force test pattern mode</span></label>
         </section>
 
+        <section class="plugin-config" data-config-panel="text" id="textPanel">
+          <div class="form-grid text-settings-grid">
+            <label class="wide">Message <input name="text" maxlength="120" autocomplete="off" placeholder="HELLO"></label>
+            <label>Text color <input name="color" type="color"></label>
+            <label>Background <input name="background" type="color"></label>
+            <label>Font size <select name="fontSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+            <label>Alignment <select name="align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
+            <label>Scroll speed <select name="scrollSpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
+            <label class="check-row wide"><input name="scroll" type="checkbox"><span>Scroll long messages</span></label>
+          </div>
+        </section>
+
         <section class="plugin-config" data-config-panel="external" id="externalWidgetPanel">
           <div class="external-widget-fields" id="externalWidgetFields"></div>
         </section>
@@ -420,6 +432,6 @@
       </form>
     </dialog>
 
-              <script src="/app.js?v=assistant-20260710l"></script>
+              <script src="/app.js?v=assistant-20260723a"></script>
   </body>
 </html>

@@ -10,6 +10,7 @@ const storeSettingsPanel = document.querySelector("#storeSettingsPanel");
 const clockPanel = document.querySelector("#clockPanel");
 const agentPanel = document.querySelector("#agentPanel");
 const weatherPanel = document.querySelector("#weatherPanel");
+const textPanel = document.querySelector("#textPanel");
 const advancedPanel = document.querySelector("#advancedPanel");
 const externalWidgetPanel = document.querySelector("#externalWidgetPanel");
 const externalWidgetFields = document.querySelector("#externalWidgetFields");
@@ -192,6 +193,7 @@ const pluginLabels = {
   clock: "Clock",
   agent: "Agent Face",
   weather: "Weather",
+  text: "Custom Message",
   testPattern: "Test Pattern"
 };
 
@@ -710,6 +712,15 @@ function fillForms(config) {
     weatherMetricsSeconds: config.weather?.metricsSeconds || 45,
     weatherSceneSeconds: config.weather?.sceneSeconds || 20
   });
+  fillPanel(textPanel, {
+    text: config.text?.text ?? "HELLO",
+    color: config.text?.color || "#ffffff",
+    background: config.text?.background || "#000000",
+    fontSize: config.text?.fontSize || "medium",
+    align: config.text?.align || "center",
+    scroll: Boolean(config.text?.scroll),
+    scrollSpeed: config.text?.scrollSpeed || "normal"
+  });
   fillPanel(advancedPanel, {
     mockOutput: config.runtime?.mockOutput || "",
     testPattern: Boolean(config.runtime?.testPattern)
@@ -772,11 +783,23 @@ function collectConfig(modeOverride = null) {
       refreshMinutes: Number(fieldValue(weatherPanel, "weatherRefreshMinutes", "15") || 15),
       metricsSeconds: Number(fieldValue(weatherPanel, "weatherMetricsSeconds", "45") || 45),
       sceneSeconds: Number(fieldValue(weatherPanel, "weatherSceneSeconds", "20") || 20)
-    }
+    },
+    text: collectWidgetConfig("text")
   };
 }
 
 function collectWidgetConfig(plugin = selectedPlugin) {
+  if (plugin === "text") {
+    return {
+      text: fieldValue(textPanel, "text", ""),
+      color: fieldValue(textPanel, "color", "#ffffff") || "#ffffff",
+      background: fieldValue(textPanel, "background", "#000000") || "#000000",
+      fontSize: fieldValue(textPanel, "fontSize", "medium"),
+      align: fieldValue(textPanel, "align", "center"),
+      scroll: fieldChecked(textPanel, "scroll"),
+      scrollSpeed: fieldValue(textPanel, "scrollSpeed", "normal")
+    };
+  }
   if (plugin === "spotify") {
     return {
       clientId: fieldValue(spotifyPanel, "clientId"),

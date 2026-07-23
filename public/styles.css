@@ -721,6 +721,24 @@ dd {
   overflow: hidden;
 }
 
+.preview-text {
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, #131a2a 0%, #050607 75%);
+  color: #4be0c0;
+  font: 700 15px/1 "Courier New", ui-monospace, monospace;
+  letter-spacing: 3px;
+}
+
+.preview-text::after {
+  content: "AaB";
+}
+
+.text-settings-grid input[type="color"] {
+  min-height: 2.2rem;
+  padding: 2px;
+}
+
 .media-preview {
   display: flex;
   align-items: center;
