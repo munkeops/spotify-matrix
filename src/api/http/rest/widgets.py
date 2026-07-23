@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, StoreWidget, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest, WidgetInstallRequest, WidgetInstallResponse, WidgetStoreListResponse, WidgetUninstallResponse
+from src.domain.models.widget_schemas import LocalWidget, LocalWidgetListResponse, StoreWidget, WidgetApplyRequest, WidgetApplyResponse, WidgetConfigResponse, WidgetConfigUpdateRequest, WidgetInstallRequest, WidgetInstallResponse, WidgetPreviewRequest, WidgetPreviewResponse, WidgetStoreListResponse, WidgetUninstallResponse
 from src.domain.services.display_policy_runner_service import display_policy_runner_service
+from src.domain.services.preview_service import preview_service
 from src.domain.services.runtime_service import runtime_service
 from src.domain.services.widget_registry_service import widget_registry_service
 from src.domain.services.widget_store_service import widget_store_service
@@ -34,6 +35,12 @@ async def install_widget(body: WidgetInstallRequest) -> WidgetInstallResponse:
     if local_widget is None:
         raise ValueError(f"Installed widget {store_widget.id} is unavailable locally.")
     return WidgetInstallResponse(ok=True, widget=local_widget)
+
+
+@router.post("/api/widgets/preview", response_model=WidgetPreviewResponse)
+async def preview_widget(body: WidgetPreviewRequest) -> WidgetPreviewResponse:
+    data_url = preview_service.render_data_url(body.widgetId, body.config)
+    return WidgetPreviewResponse(ok=True, widgetId=body.widgetId, dataUrl=data_url)
 
 
 @router.get("/api/widgets/local", response_model=LocalWidgetListResponse)

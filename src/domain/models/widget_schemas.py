@@ -88,6 +88,17 @@ class WidgetConfigUpdateRequest(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
 
 
+class WidgetPreviewRequest(BaseModel):
+    widgetId: str
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class WidgetPreviewResponse(BaseModel):
+    ok: bool
+    widgetId: str
+    dataUrl: str
+
+
 class WidgetApplyRequest(BaseModel):
     config: dict[str, Any] | None = None
 

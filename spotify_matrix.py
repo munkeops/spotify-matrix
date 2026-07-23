@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from PIL import Image, ImageColor, ImageDraw, ImageOps
+from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageOps
 
 from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
 
@@ -1136,31 +1136,187 @@ def parse_color(value: str | None, fallback: tuple[int, int, int]) -> tuple[int,
     return color[:3]
 
 
+TTF_FONT_SIZES = {"small": 12, "medium": 18, "large": 28}
+
+FONT_SEARCH_DIRS = [
+    Path(__file__).resolve().parent / "fonts",
+    Path("/usr/share/fonts/truetype/noto"),
+    Path("/usr/share/fonts/opentype/noto"),
+    Path("/usr/share/fonts"),
+    Path("C:/Windows/Fonts"),
+]
+
+FONT_CANDIDATES = {
+    ("sans", False, False): ["NotoSans-Regular.ttf", "DejaVuSans.ttf", "arial.ttf"],
+    ("sans", True, False): ["NotoSans-Bold.ttf", "DejaVuSans-Bold.ttf", "arialbd.ttf"],
+    ("sans", False, True): ["NotoSans-Italic.ttf", "DejaVuSans-Oblique.ttf", "ariali.ttf"],
+    ("sans", True, True): ["NotoSans-BoldItalic.ttf", "DejaVuSans-BoldOblique.ttf", "arialbi.ttf"],
+    ("chinese", False, False): ["NotoSansCJK-Regular.ttc", "NotoSansCJKsc-Regular.otf", "NotoSansSC-Regular.otf", "msyh.ttc", "simsun.ttc"],
+    ("chinese", True, False): ["NotoSansCJK-Bold.ttc", "NotoSansCJKsc-Bold.otf", "NotoSansSC-Bold.otf", "msyhbd.ttc", "simsun.ttc"],
+    ("devanagari", False, False): ["NotoSansDevanagari-Regular.ttf", "Nirmala.ttf", "Nirmala.ttc", "mangal.ttf"],
+    ("devanagari", True, False): ["NotoSansDevanagari-Bold.ttf", "NirmalaB.ttf", "Nirmala.ttc", "mangalb.ttf"],
+}
+
+_font_file_cache: dict[tuple[str, ...], Path | None] = {}
+_font_cache: dict[tuple[str, bool, bool, int], Any] = {}
+
+
+def _find_font_file(candidates: list[str]) -> Path | None:
+    key = tuple(candidates)
+    if key in _font_file_cache:
+        return _font_file_cache[key]
+    found: Path | None = None
+    for name in candidates:
+        for directory in FONT_SEARCH_DIRS:
+            candidate = directory / name
+            if candidate.exists():
+                found = candidate
+                break
+        if found:
+            break
+    if found is None:
+        for directory in FONT_SEARCH_DIRS:
+            if not directory.exists():
+                continue
+            for name in candidates:
+                hits = list(directory.rglob(name))
+                if hits:
+                    found = hits[0]
+                    break
+            if found:
+                break
+    _font_file_cache[key] = found
+    return found
+
+
+def load_font(family: str, bold: bool, italic: bool, size: int) -> Any:
+    if family in ("chinese", "devanagari"):
+        italic = False
+    key = (family, bold, italic, size)
+    if key in _font_cache:
+        return _font_cache[key]
+    candidates = (
+        FONT_CANDIDATES.get((family, bold, italic))
+        or FONT_CANDIDATES.get((family, bold, False))
+        or FONT_CANDIDATES.get((family, False, False))
+    )
+    font = None
+    if candidates:
+        path = _find_font_file(candidates)
+        if path is not None:
+            try:
+                if path.suffix.lower() == ".ttc":
+                    font = ImageFont.truetype(str(path), size, index=0)
+                else:
+                    font = ImageFont.truetype(str(path), size)
+            except OSError:
+                font = None
+    _font_cache[key] = font
+    return font
+
+
+def _text_backend(draw: ImageDraw.ImageDraw, family: str, bold: bool, italic: bool, size_key: str):
+    """Return (measure, line_height, render_line) for the chosen font family."""
+    if family != "pixel":
+        font = load_font(family, bold, italic, TTF_FONT_SIZES.get(size_key, 18))
+        if font is not None:
+            ascent, descent = font.getmetrics()
+            line_height = ascent + descent + 2
+
+            def measure(value: str) -> int:
+                return int(draw.textlength(value, font=font))
+
+            def render_line(x: int, y: int, value: str, color: tuple[int, int, int]) -> None:
+                draw.text((x, y), value, fill=color, font=font)
+
+            return measure, line_height, render_line
+
+    scale = TEXT_FONT_SCALES.get(size_key, 2)
+    line_height = 5 * scale + scale
+
+    def measure(value: str) -> int:
+        return pixel_text_width(value, scale)
+
+    def render_line(x: int, y: int, value: str, color: tuple[int, int, int]) -> None:
+        draw_pixel_text(draw, x, y, value, color, scale)
+
+    return measure, line_height, render_line
+
+
+def _wrap_text(text: str, measure, max_width: int) -> list[str]:
+    lines: list[str] = []
+    for paragraph in text.split("\n"):
+        words = paragraph.split(" ")
+        current = ""
+        for word in words:
+            trial = word if not current else f"{current} {word}"
+            if measure(trial) <= max_width or not current:
+                current = trial
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+    wrapped: list[str] = []
+    for line in lines:
+        if measure(line) <= max_width or not line:
+            wrapped.append(line)
+            continue
+        piece = ""
+        for char in line:
+            if measure(piece + char) <= max_width or not piece:
+                piece += char
+            else:
+                wrapped.append(piece)
+                piece = char
+        wrapped.append(piece)
+    return wrapped or [""]
+
+
 def render_text(
     size: int,
     text: str,
     color: tuple[int, int, int],
     background: tuple[int, int, int],
-    scale: int,
-    align: str,
+    *,
+    family: str = "pixel",
+    bold: bool = False,
+    italic: bool = False,
+    size_key: str = "medium",
+    align: str = "center",
+    wrap: bool = False,
     scroll_offset: int | None = None,
 ) -> Image.Image:
     image = Image.new("RGB", (size, size), background)
     draw = ImageDraw.Draw(image)
     text = text or ""
-    glyph_height = 5 * scale
-    y = (size - glyph_height) // 2
-    width = pixel_text_width(text, scale)
-    if scroll_offset is not None:
-        x = size - scroll_offset
-    elif align == "left":
-        x = 1
-    elif align == "right":
-        x = size - width - 1
-    else:
-        x = (size - width) // 2
-    draw_pixel_text(draw, x, y, text, color, scale)
+    measure, line_height, render_line = _text_backend(draw, family, bold, italic, size_key)
+
+    if scroll_offset is not None and not wrap:
+        y = (size - line_height) // 2
+        render_line(size - scroll_offset, y, text, color)
+        return image
+
+    lines = _wrap_text(text, measure, size - 2) if wrap else text.split("\n")
+    total_height = line_height * len(lines)
+    y = max(0, (size - total_height) // 2)
+    for line in lines:
+        width = measure(line)
+        if align == "left":
+            x = 1
+        elif align == "right":
+            x = size - width - 1
+        else:
+            x = (size - width) // 2
+        render_line(x, y, line, color)
+        y += line_height
     return image
+
+
+def text_line_width(text: str, family: str, bold: bool, italic: bool, size_key: str) -> int:
+    probe = Image.new("RGB", (1, 1))
+    draw = ImageDraw.Draw(probe)
+    measure, _, _ = _text_backend(draw, family, bold, italic, size_key)
+    return measure(text)
 
 
 def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int]) -> None:
@@ -1471,23 +1627,28 @@ def run_weather(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, 
 
 
 def run_text(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
-    text = (args.text_value or "").strip()
+    text = args.text_value or ""
     color = parse_color(args.text_color, (255, 255, 255))
     background = parse_color(args.text_background, (0, 0, 0))
-    scale = TEXT_FONT_SCALES.get(args.text_font_size, 2)
-    width = pixel_text_width(text, scale)
-    scroll = bool(args.text_scroll) and width > size
-    speeds = {"slow": 0.5, "normal": 1.0, "fast": 2.0}
-    pixels_per_frame = max(1, round(speeds.get(args.text_scroll_speed, 1.0) * scale))
+    family = args.text_font_family or "pixel"
+    bold = bool(args.text_bold)
+    italic = bool(args.text_italic)
+    size_key = args.text_font_size
+    wrap = bool(args.text_wrap)
+    width = text_line_width(text.strip(), family, bold, italic, size_key)
+    scroll = bool(args.text_scroll) and not wrap and width > size
+    speeds = {"slow": 1.0, "normal": 2.0, "fast": 4.0}
+    pixels_per_frame = max(1, round(speeds.get(args.text_scroll_speed, 2.0)))
     travel = width + size
     offset = 0
+    common = dict(family=family, bold=bold, italic=italic, size_key=size_key, align=args.text_align, wrap=wrap)
     try:
         while True:
             if scroll:
-                display.show(render_text(size, text, color, background, scale, args.text_align, scroll_offset=offset))
+                display.show(render_text(size, text.strip(), color, background, scroll_offset=offset, **common))
                 offset = (offset + pixels_per_frame) % travel
             else:
-                display.show(render_text(size, text, color, background, scale, args.text_align))
+                display.show(render_text(size, text, color, background, **common))
             if args.once:
                 break
             time.sleep(1.0 / args.fps if scroll else 0.5)
@@ -1510,6 +1671,16 @@ def _fit_image(source: Image.Image, size: int, mode: str, background: tuple[int,
     return canvas
 
 
+def render_image_frame(size: int, asset_path: str, fit: str, background: tuple[int, int, int]) -> Image.Image:
+    if not asset_path or not Path(asset_path).exists():
+        placeholder = Image.new("RGB", (size, size), background)
+        draw = ImageDraw.Draw(placeholder)
+        message = "NO IMG"
+        draw_pixel_text(draw, max(1, (size - pixel_text_width(message, 1)) // 2), size // 2 - 3, message, (200, 200, 200), 1)
+        return placeholder
+    return _fit_image(Image.open(asset_path), size, fit, background)
+
+
 def render_image(args: argparse.Namespace, size: int) -> Image.Image:
     config = load_json_config(args.config_path)
     image_cfg = config.get("image", {}) if isinstance(config.get("image"), dict) else {}
@@ -1520,13 +1691,7 @@ def render_image(args: argparse.Namespace, size: int) -> Image.Image:
         asset_name = image_cfg.get("assetPath", "")
         if asset_name:
             asset = str(args.config_path.parent / "widgets" / "assets" / asset_name)
-    if not asset or not Path(asset).exists():
-        placeholder = Image.new("RGB", (size, size), background)
-        draw = ImageDraw.Draw(placeholder)
-        message = "NO IMG"
-        draw_pixel_text(draw, max(1, (size - pixel_text_width(message, 1)) // 2), size // 2 - 3, message, (200, 200, 200), 1)
-        return placeholder
-    return _fit_image(Image.open(asset), size, fit, background)
+    return render_image_frame(size, asset or "", fit, background)
 
 
 def run_image(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
@@ -1546,9 +1711,7 @@ def run_image(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, si
 DRAW_FONT_SCALES = {"small": 1, "medium": 2, "large": 3}
 
 
-def render_draw(args: argparse.Namespace, size: int) -> Image.Image:
-    config = load_json_config(args.config_path)
-    draw_cfg = config.get("draw", {}) if isinstance(config.get("draw"), dict) else {}
+def render_draw_frame(size: int, draw_cfg: dict[str, Any]) -> Image.Image:
     background = parse_color(draw_cfg.get("background", "#000000"), (0, 0, 0))
     image = Image.new("RGB", (size, size), background)
     draw = ImageDraw.Draw(image)
@@ -1572,9 +1735,23 @@ def render_draw(args: argparse.Namespace, size: int) -> Image.Image:
         elif kind == "pixel":
             draw.point((x, y), fill=color)
         elif kind == "text":
-            scale = DRAW_FONT_SCALES.get(shape.get("size", "small"), 1)
-            draw_pixel_text(draw, x, y, str(shape.get("text", "")), color, scale)
+            size_key = shape.get("size", "small")
+            value = str(shape.get("text", ""))
+            family = shape.get("fontFamily", "pixel")
+            font = None
+            if family != "pixel":
+                font = load_font(family, bool(shape.get("bold", False)), bool(shape.get("italic", False)), TTF_FONT_SIZES.get(size_key, 12))
+            if font is not None:
+                draw.text((x, y), value, fill=color, font=font)
+            else:
+                draw_pixel_text(draw, x, y, value, color, DRAW_FONT_SCALES.get(size_key, 1))
     return image
+
+
+def render_draw(args: argparse.Namespace, size: int) -> Image.Image:
+    config = load_json_config(args.config_path)
+    draw_cfg = config.get("draw", {}) if isinstance(config.get("draw"), dict) else {}
+    return render_draw_frame(size, draw_cfg)
 
 
 def run_draw(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
@@ -1849,6 +2026,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--text-scroll-speed", choices=("slow", "normal", "fast"), default="normal")
     parser.add_argument("--text-font-size", choices=("small", "medium", "large"), default="medium")
     parser.add_argument("--text-align", choices=("left", "center", "right"), default="center")
+    parser.add_argument("--text-font-family", choices=("pixel", "sans", "chinese", "devanagari"), default="pixel")
+    parser.add_argument("--text-bold", action="store_true", help="Render text with a bold font weight.")
+    parser.add_argument("--text-italic", action="store_true", help="Render text with an italic font style.")
+    parser.add_argument("--text-wrap", action="store_true", help="Wrap long text onto multiple lines.")
     parser.add_argument("--image-asset", default="", help="Absolute path to the image file for image mode.")
     parser.add_argument("--image-fit", choices=("contain", "cover", "stretch"), default="", help="How the image is scaled to the panel.")
     parser.add_argument("--image-background", default="", help="Background color behind a contained image.")

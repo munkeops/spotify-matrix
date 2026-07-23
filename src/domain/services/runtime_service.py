@@ -164,10 +164,18 @@ class RuntimeService:
                 config.text.fontSize,
                 "--text-align",
                 config.text.align,
+                "--text-font-family",
+                config.text.fontFamily,
             ]
         )
         if config.text.scroll:
             args.append("--text-scroll")
+        if config.text.bold:
+            args.append("--text-bold")
+        if config.text.italic:
+            args.append("--text-italic")
+        if config.text.wrap:
+            args.append("--text-wrap")
         args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background])
         if config.image.assetPath:
             asset_file = config_service.data_dir / "widgets" / "assets" / config.image.assetPath
