@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageColor, ImageDraw, ImageOps
 
 from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
 
@@ -1032,6 +1032,45 @@ DIGIT_FONT_3X5 = {
     "9": ("111", "101", "111", "001", "111"),
     "-": ("000", "000", "111", "000", "000"),
     ".": ("000", "000", "000", "000", "010"),
+    "A": ("010", "101", "111", "101", "101"),
+    "B": ("110", "101", "110", "101", "110"),
+    "C": ("011", "100", "100", "100", "011"),
+    "D": ("110", "101", "101", "101", "110"),
+    "E": ("111", "100", "110", "100", "111"),
+    "F": ("111", "100", "110", "100", "100"),
+    "G": ("011", "100", "101", "101", "011"),
+    "H": ("101", "101", "111", "101", "101"),
+    "I": ("111", "010", "010", "010", "111"),
+    "J": ("001", "001", "001", "101", "010"),
+    "K": ("101", "101", "110", "101", "101"),
+    "L": ("100", "100", "100", "100", "111"),
+    "M": ("101", "111", "111", "101", "101"),
+    "N": ("101", "111", "111", "111", "101"),
+    "O": ("010", "101", "101", "101", "010"),
+    "P": ("110", "101", "110", "100", "100"),
+    "Q": ("010", "101", "101", "110", "011"),
+    "R": ("110", "101", "110", "101", "101"),
+    "S": ("011", "100", "010", "001", "110"),
+    "T": ("111", "010", "010", "010", "010"),
+    "U": ("101", "101", "101", "101", "111"),
+    "V": ("101", "101", "101", "101", "010"),
+    "W": ("101", "101", "111", "111", "101"),
+    "X": ("101", "101", "010", "101", "101"),
+    "Y": ("101", "101", "010", "010", "010"),
+    "Z": ("111", "001", "010", "100", "111"),
+    ":": ("000", "010", "000", "010", "000"),
+    "!": ("010", "010", "010", "000", "010"),
+    "?": ("111", "001", "010", "000", "010"),
+    ",": ("000", "000", "000", "010", "100"),
+    "'": ("010", "010", "000", "000", "000"),
+    "/": ("001", "001", "010", "100", "100"),
+    "+": ("000", "010", "111", "010", "000"),
+    "(": ("001", "010", "010", "010", "001"),
+    ")": ("100", "010", "010", "010", "100"),
+    "&": ("010", "101", "010", "101", "011"),
+    "#": ("101", "111", "101", "111", "101"),
+    "%": ("101", "001", "010", "100", "101"),
+    "*": ("000", "101", "010", "101", "000"),
 }
 
 
@@ -1082,6 +1121,46 @@ def pixel_text_width(text: str, scale: int = 2) -> int:
         else:
             width += 6
     return max(0, width - scale)
+
+
+TEXT_FONT_SCALES = {"small": 1, "medium": 2, "large": 3}
+
+
+def parse_color(value: str | None, fallback: tuple[int, int, int]) -> tuple[int, int, int]:
+    if not value:
+        return fallback
+    try:
+        color = ImageColor.getrgb(value)
+    except ValueError:
+        return fallback
+    return color[:3]
+
+
+def render_text(
+    size: int,
+    text: str,
+    color: tuple[int, int, int],
+    background: tuple[int, int, int],
+    scale: int,
+    align: str,
+    scroll_offset: int | None = None,
+) -> Image.Image:
+    image = Image.new("RGB", (size, size), background)
+    draw = ImageDraw.Draw(image)
+    text = text or ""
+    glyph_height = 5 * scale
+    y = (size - glyph_height) // 2
+    width = pixel_text_width(text, scale)
+    if scroll_offset is not None:
+        x = size - scroll_offset
+    elif align == "left":
+        x = 1
+    elif align == "right":
+        x = size - width - 1
+    else:
+        x = (size - width) // 2
+    draw_pixel_text(draw, x, y, text, color, scale)
+    return image
 
 
 def draw_weather_metric(draw: ImageDraw.ImageDraw, x: int, y: int, title: str, value: str, color: tuple[int, int, int]) -> None:
@@ -1391,6 +1470,33 @@ def run_weather(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, 
         display.clear()
 
 
+def run_text(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    text = (args.text_value or "").strip()
+    color = parse_color(args.text_color, (255, 255, 255))
+    background = parse_color(args.text_background, (0, 0, 0))
+    scale = TEXT_FONT_SCALES.get(args.text_font_size, 2)
+    width = pixel_text_width(text, scale)
+    scroll = bool(args.text_scroll) and width > size
+    speeds = {"slow": 0.5, "normal": 1.0, "fast": 2.0}
+    pixels_per_frame = max(1, round(speeds.get(args.text_scroll_speed, 1.0) * scale))
+    travel = width + size
+    offset = 0
+    try:
+        while True:
+            if scroll:
+                display.show(render_text(size, text, color, background, scale, args.text_align, scroll_offset=offset))
+                offset = (offset + pixels_per_frame) % travel
+            else:
+                display.show(render_text(size, text, color, background, scale, args.text_align))
+            if args.once:
+                break
+            time.sleep(1.0 / args.fps if scroll else 0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
 def load_external_widget(widget_dir: Path, entrypoint: str) -> Any:
     if str(widget_dir) not in sys.path:
         sys.path.insert(0, str(widget_dir))
@@ -1573,6 +1679,8 @@ def run(args: argparse.Namespace) -> None:
         run_agent(args, display, size)
     elif mode == "weather":
         run_weather(args, display, size)
+    elif mode == "text":
+        run_text(args, display, size)
     elif mode == "widget":
         run_external_widget(args, display, size)
     else:
@@ -1595,7 +1703,7 @@ def render_preview_frames(directory: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
-    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "testPattern", "widget"), default="spotify")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "testPattern", "widget"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)
@@ -1636,6 +1744,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--weather-refresh-minutes", type=int, default=15)
     parser.add_argument("--weather-metrics-seconds", type=int, default=WEATHER_METRICS_SECONDS)
     parser.add_argument("--weather-scene-seconds", type=int, default=WEATHER_SCENE_SECONDS)
+    parser.add_argument("--text-value", default="", help="Message to display in text mode.")
+    parser.add_argument("--text-color", default="#ffffff", help="Text color in text mode.")
+    parser.add_argument("--text-background", default="#000000", help="Background color in text mode.")
+    parser.add_argument("--text-scroll", action="store_true", help="Scroll long messages horizontally in text mode.")
+    parser.add_argument("--text-scroll-speed", choices=("slow", "normal", "fast"), default="normal")
+    parser.add_argument("--text-font-size", choices=("small", "medium", "large"), default="medium")
+    parser.add_argument("--text-align", choices=("left", "center", "right"), default="center")
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")
