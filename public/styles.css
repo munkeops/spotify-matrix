@@ -766,6 +766,25 @@ dd {
   border-radius: 6px;
 }
 
+.widget-live-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.widget-live-preview img {
+  width: 128px;
+  height: 128px;
+  image-rendering: pixelated;
+  background: #000;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 .draw-shape-list {
   display: flex;
   flex-direction: column;

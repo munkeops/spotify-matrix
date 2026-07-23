@@ -18,6 +18,8 @@ const imagePreviewEmpty = document.querySelector("#imagePreviewEmpty");
 const drawPanel = document.querySelector("#drawPanel");
 const drawShapeList = document.querySelector("#drawShapeList");
 const addShapeButton = document.querySelector("#addShapeButton");
+const widgetLivePreview = document.querySelector("#widgetLivePreview");
+const widgetPreviewImg = document.querySelector("#widgetPreviewImg");
 const advancedPanel = document.querySelector("#advancedPanel");
 const externalWidgetPanel = document.querySelector("#externalWidgetPanel");
 const externalWidgetFields = document.querySelector("#externalWidgetFields");
@@ -427,6 +429,7 @@ function setSelectedPlugin(plugin) {
   if (panelName === "external") {
     renderExternalWidgetConfig(plugin);
   }
+  updateWidgetPreview();
 }
 
 function syncActiveMode(mode) {
@@ -700,6 +703,42 @@ function setImagePreview(url) {
   }
 }
 
+const PREVIEW_WIDGETS = new Set(["text", "image", "draw"]);
+let previewTimer = null;
+
+async function updateWidgetPreview() {
+  if (!widgetLivePreview || !widgetPreviewImg) {
+    return;
+  }
+  if (!PREVIEW_WIDGETS.has(selectedPlugin)) {
+    widgetLivePreview.hidden = true;
+    return;
+  }
+  widgetLivePreview.hidden = false;
+  const plugin = selectedPlugin;
+  try {
+    const response = await api("/api/widgets/preview", {
+      method: "POST",
+      body: JSON.stringify({ widgetId: widgetIdForMode(plugin), config: collectWidgetConfig(plugin) })
+    });
+    if (selectedPlugin === plugin) {
+      widgetPreviewImg.src = response.dataUrl;
+    }
+  } catch (error) {
+    setMessage(error.message);
+  }
+}
+
+function scheduleWidgetPreview() {
+  if (!PREVIEW_WIDGETS.has(selectedPlugin)) {
+    return;
+  }
+  if (previewTimer) {
+    clearTimeout(previewTimer);
+  }
+  previewTimer = setTimeout(updateWidgetPreview, 250);
+}
+
 let drawShapes = [];
 
 const SHAPE_TYPES = ["rect", "circle", "line", "text", "pixel"];
@@ -707,7 +746,7 @@ const SHAPE_FIELDS = {
   rect: ["x", "y", "w", "h"],
   circle: ["x", "y", "radius"],
   line: ["x", "y", "x2", "y2"],
-  text: ["x", "y", "text", "size"],
+  text: ["x", "y", "text", "fontFamily", "size"],
   pixel: ["x", "y"]
 };
 const SHAPE_FIELD_META = {
@@ -719,12 +758,13 @@ const SHAPE_FIELD_META = {
   x2: { label: "X2", type: "number" },
   y2: { label: "Y2", type: "number" },
   text: { label: "Text", type: "text" },
+  fontFamily: { label: "Font", type: "select", options: ["pixel", "sans", "chinese", "devanagari"] },
   size: { label: "Size", type: "select", options: ["small", "medium", "large"] }
 };
 const NUMERIC_SHAPE_FIELDS = new Set(["x", "y", "w", "h", "radius", "x2", "y2"]);
 
 function shapeDefaults(type = "rect") {
-  return { type, color: "#ffffff", x: 8, y: 8, w: 16, h: 12, radius: 8, x2: 24, y2: 24, text: "HI", size: "small", fill: true };
+  return { type, color: "#ffffff", x: 8, y: 8, w: 16, h: 12, radius: 8, x2: 24, y2: 24, text: "HI", size: "small", fill: true, fontFamily: "pixel", bold: false, italic: false };
 }
 
 function renderDrawShapes() {
@@ -745,15 +785,20 @@ function renderDrawShapes() {
       }
       return `<label class="shape-field">${meta.label}<input data-shape-field="${key}" type="${meta.type}" value="${escapeHtml(shape[key])}"></label>`;
     }).join("");
-    const fillControl = (shape.type === "rect" || shape.type === "circle")
-      ? `<label class="shape-field check"><input data-shape-field="fill" type="checkbox" ${shape.fill ? "checked" : ""}><span>Fill</span></label>`
-      : "";
+    let toggles = "";
+    if (shape.type === "rect" || shape.type === "circle") {
+      toggles = `<label class="shape-field check"><input data-shape-field="fill" type="checkbox" ${shape.fill ? "checked" : ""}><span>Fill</span></label>`;
+    } else if (shape.type === "text") {
+      toggles = `
+        <label class="shape-field check"><input data-shape-field="bold" type="checkbox" ${shape.bold ? "checked" : ""}><span>B</span></label>
+        <label class="shape-field check"><input data-shape-field="italic" type="checkbox" ${shape.italic ? "checked" : ""}><span>I</span></label>`;
+    }
     return `
       <div class="draw-shape-row" data-shape-index="${index}">
         <select data-shape-field="type" class="shape-type">${typeOptions}</select>
         ${inputs}
         <label class="shape-field color"><input data-shape-field="color" type="color" value="${escapeHtml(shape.color)}"></label>
-        ${fillControl}
+        ${toggles}
         <button type="button" class="icon-button danger" data-shape-remove="${index}" aria-label="Remove shape">x</button>
       </div>`;
   }).join("");
@@ -767,6 +812,10 @@ function collectDrawShapes() {
     }
     if (shape.type === "rect" || shape.type === "circle") {
       cleaned.fill = Boolean(shape.fill);
+    }
+    if (shape.type === "text") {
+      cleaned.bold = Boolean(shape.bold);
+      cleaned.italic = Boolean(shape.italic);
     }
     return cleaned;
   });
@@ -812,8 +861,12 @@ function fillForms(config) {
     text: config.text?.text ?? "HELLO",
     color: config.text?.color || "#ffffff",
     background: config.text?.background || "#000000",
+    fontFamily: config.text?.fontFamily || "pixel",
     fontSize: config.text?.fontSize || "medium",
     align: config.text?.align || "center",
+    bold: Boolean(config.text?.bold),
+    italic: Boolean(config.text?.italic),
+    wrap: Boolean(config.text?.wrap),
     scroll: Boolean(config.text?.scroll),
     scrollSpeed: config.text?.scrollSpeed || "normal"
   });
@@ -902,8 +955,12 @@ function collectWidgetConfig(plugin = selectedPlugin) {
       text: fieldValue(textPanel, "text", ""),
       color: fieldValue(textPanel, "color", "#ffffff") || "#ffffff",
       background: fieldValue(textPanel, "background", "#000000") || "#000000",
+      fontFamily: fieldValue(textPanel, "fontFamily", "pixel"),
       fontSize: fieldValue(textPanel, "fontSize", "medium"),
       align: fieldValue(textPanel, "align", "center"),
+      bold: fieldChecked(textPanel, "bold"),
+      italic: fieldChecked(textPanel, "italic"),
+      wrap: fieldChecked(textPanel, "wrap"),
       scroll: fieldChecked(textPanel, "scroll"),
       scrollSpeed: fieldValue(textPanel, "scrollSpeed", "normal")
     };
@@ -1270,6 +1327,7 @@ imageFileInput?.addEventListener("change", async () => {
     }
     setImagePreview(response.url);
     setMessage("Image uploaded. Apply to show it on the matrix.");
+    scheduleWidgetPreview();
   } catch (error) {
     setMessage(error.message);
   } finally {
@@ -1277,9 +1335,14 @@ imageFileInput?.addEventListener("change", async () => {
   }
 });
 
+textPanel?.addEventListener("input", scheduleWidgetPreview);
+imagePanel?.addEventListener("input", scheduleWidgetPreview);
+drawPanel?.addEventListener("input", scheduleWidgetPreview);
+
 addShapeButton?.addEventListener("click", () => {
   drawShapes.push(shapeDefaults("rect"));
   renderDrawShapes();
+  scheduleWidgetPreview();
 });
 
 function onShapeFieldChange(event) {
@@ -1297,13 +1360,11 @@ function onShapeFieldChange(event) {
     const current = drawShapes[index];
     drawShapes[index] = { ...shapeDefaults(control.value), color: current.color, x: current.x, y: current.y };
     renderDrawShapes();
+    scheduleWidgetPreview();
     return;
   }
-  if (key === "fill") {
-    drawShapes[index].fill = control.checked;
-  } else {
-    drawShapes[index][key] = control.value;
-  }
+  drawShapes[index][key] = control.type === "checkbox" ? control.checked : control.value;
+  scheduleWidgetPreview();
 }
 
 drawShapeList?.addEventListener("input", onShapeFieldChange);
@@ -1316,6 +1377,7 @@ drawShapeList?.addEventListener("click", (event) => {
   }
   drawShapes.splice(Number(removeButton.dataset.shapeRemove), 1);
   renderDrawShapes();
+  scheduleWidgetPreview();
 });
 
 populateTimezones();

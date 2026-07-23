@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Assistant Matrix</title>
-    <link rel="stylesheet" href="/styles.css?v=assistant-20260723b">
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260723c">
   </head>
   <body>
     <main class="app-frame">
@@ -411,13 +411,17 @@
 
         <section class="plugin-config" data-config-panel="text" id="textPanel">
           <div class="form-grid text-settings-grid">
-            <label class="wide">Message <input name="text" maxlength="120" autocomplete="off" placeholder="HELLO"></label>
+            <label class="wide">Message <textarea name="text" rows="2" maxlength="240" autocomplete="off" placeholder="HELLO"></textarea></label>
+            <label>Font <select name="fontFamily"><option value="pixel">Pixel</option><option value="sans">Sans (Latin)</option><option value="chinese">Chinese</option><option value="devanagari">Devanagari</option></select></label>
+            <label>Font size <select name="fontSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
             <label>Text color <input name="color" type="color"></label>
             <label>Background <input name="background" type="color"></label>
-            <label>Font size <select name="fontSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
             <label>Alignment <select name="align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
             <label>Scroll speed <select name="scrollSpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
-            <label class="check-row wide"><input name="scroll" type="checkbox"><span>Scroll long messages</span></label>
+            <label class="check-row"><input name="bold" type="checkbox"><span>Bold</span></label>
+            <label class="check-row"><input name="italic" type="checkbox"><span>Italic</span></label>
+            <label class="check-row"><input name="wrap" type="checkbox"><span>Wrap text</span></label>
+            <label class="check-row"><input name="scroll" type="checkbox"><span>Scroll long text</span></label>
           </div>
         </section>
 
@@ -448,6 +452,11 @@
           <div class="external-widget-fields" id="externalWidgetFields"></div>
         </section>
 
+        <div class="widget-live-preview" id="widgetLivePreview" hidden>
+          <span class="eyebrow">Matrix preview</span>
+          <img id="widgetPreviewImg" alt="Live matrix preview" width="128" height="128">
+        </div>
+
         <footer class="dialog-actions">
           <button type="button" id="savePluginButton" class="secondary">Save Config</button>
           <button type="button" id="applyPluginButton">Apply Plugin</button>
@@ -455,6 +464,6 @@
       </form>
     </dialog>
 
-              <script src="/app.js?v=assistant-20260723b"></script>
+              <script src="/app.js?v=assistant-20260723c"></script>
   </body>
 </html>
