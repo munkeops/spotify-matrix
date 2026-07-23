@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from src.domain.models.api_schemas import AgentConfig, ClockConfig, DrawConfig, ImageConfig, SpotifyConfig, TextConfig, WeatherConfig
+from src.domain.models.api_schemas import AgentConfig, ClockConfig, DrawConfig, ImageConfig, SlideshowConfig, SpotifyConfig, TextConfig, WeatherConfig
 from src.domain.models.widget_schemas import LocalWidget, StoreWidget, WidgetConfigField, WidgetConfigOption, WidgetManifest, WidgetPermission, WidgetPreview, WidgetTrigger
 from src.domain.services.config_service import config_service
 from src.domain.services.runtime_service import runtime_service
@@ -26,6 +26,7 @@ WIDGET_MODE_MAP = {
     "core.text": "text",
     "core.image": "image",
     "core.draw": "draw",
+    "core.slideshow": "slideshow",
     "core.testPattern": "testPattern",
 }
 
@@ -113,6 +114,8 @@ class WidgetRegistryService:
             return config.image.model_dump()
         if widget_id == "core.draw":
             return config.draw.model_dump()
+        if widget_id == "core.slideshow":
+            return config.slideshow.model_dump()
         if widget_id == "core.testPattern":
             return {"testPattern": config.runtime.testPattern}
         return self._read_installed_widget_config(widget_id)
@@ -136,6 +139,8 @@ class WidgetRegistryService:
             config.image = self._merge_model(config.image, values, ImageConfig)
         elif widget_id == "core.draw":
             config.draw = self._merge_model(config.draw, values, DrawConfig)
+        elif widget_id == "core.slideshow":
+            config.slideshow = self._merge_model(config.slideshow, values, SlideshowConfig)
         elif widget_id == "core.testPattern":
             config.runtime.testPattern = bool(values.get("testPattern", config.runtime.testPattern))
         else:
@@ -368,6 +373,28 @@ class WidgetRegistryService:
                 entrypoint="spotify_matrix:run_draw",
                 preview=WidgetPreview(description="Custom drawing built from rectangles, circles, lines, and text."),
                 config=[
+                    WidgetConfigField(key="background", label="Background color", type="string", default="#000000"),
+                ],
+                triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=15)],
+            ),
+            WidgetManifest(
+                id="core.slideshow",
+                name="Slideshow",
+                version="1.0.0",
+                summary="Cycle through a gallery of images and memes.",
+                category="media",
+                runtime="builtin",
+                entrypoint="spotify_matrix:run_slideshow",
+                preview=WidgetPreview(description="Rotating photo and meme slideshow from your gallery."),
+                config=[
+                    WidgetConfigField(key="intervalSeconds", label="Seconds per image", type="number", default=8, min=1, max=120, step=1),
+                    WidgetConfigField(
+                        key="fit",
+                        label="Fit",
+                        type="select",
+                        default="cover",
+                        options=[_option("Contain", "contain"), _option("Cover", "cover"), _option("Stretch", "stretch")],
+                    ),
                     WidgetConfigField(key="background", label="Background color", type="string", default="#000000"),
                 ],
                 triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=15)],

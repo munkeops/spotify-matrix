@@ -36,7 +36,7 @@ class RuntimeConfig(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    mode: Literal["spotify", "clock", "agent", "weather", "text", "image", "draw", "testPattern", "widget"] = "spotify"
+    mode: Literal["spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"] = "spotify"
     widgetId: str = ""
 
 
@@ -110,6 +110,15 @@ class DrawConfig(BaseModel):
     shapes: list[DrawShape] = Field(default_factory=list)
 
 
+class SlideshowConfig(BaseModel):
+    items: list[str] = Field(default_factory=list)
+    intervalSeconds: int = 8
+    fit: Literal["contain", "cover", "stretch"] = "cover"
+    background: str = "#000000"
+    rotate: Literal[0, 90, 180, 270] = 0
+    shuffle: bool = False
+
+
 class StoreConfig(BaseModel):
     indexUrl: str = "configs/widget_store_index.json"
 
@@ -125,6 +134,16 @@ class AssetUploadResponse(BaseModel):
     url: str
 
 
+class AssetItem(BaseModel):
+    name: str
+    url: str
+    animated: bool = False
+
+
+class AssetListResponse(BaseModel):
+    assets: list[AssetItem] = Field(default_factory=list)
+
+
 class AppConfig(BaseModel):
     spotify: SpotifyConfig = Field(default_factory=SpotifyConfig)
     matrix: MatrixConfig = Field(default_factory=MatrixConfig)
@@ -136,6 +155,7 @@ class AppConfig(BaseModel):
     text: TextConfig = Field(default_factory=TextConfig)
     image: ImageConfig = Field(default_factory=ImageConfig)
     draw: DrawConfig = Field(default_factory=DrawConfig)
+    slideshow: SlideshowConfig = Field(default_factory=SlideshowConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 
 

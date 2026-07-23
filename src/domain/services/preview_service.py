@@ -46,6 +46,16 @@ class PreviewService:
             )
         if widget_id == "core.draw":
             return runtime.render_draw_frame(SIZE, cfg)
+        if widget_id == "core.slideshow":
+            items = cfg.get("items", [])
+            asset_path = str(config_service.data_dir / "widgets" / "assets" / items[0]) if items else ""
+            return runtime.render_image_frame(
+                SIZE,
+                asset_path,
+                cfg.get("fit", "cover"),
+                runtime.parse_color(cfg.get("background", "#000000"), (0, 0, 0)),
+                int(cfg.get("rotate", 0) or 0),
+            )
         raise ValueError(f"Preview is not available for {widget_id}.")
 
 

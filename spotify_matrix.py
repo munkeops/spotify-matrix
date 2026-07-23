@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageOps
+from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageOps, ImageSequence
 
 from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
 
@@ -1844,7 +1844,7 @@ def render_image_frame(size: int, asset_path: str, fit: str, background: tuple[i
     return _fit_image(source, size, fit, background)
 
 
-def render_image(args: argparse.Namespace, size: int) -> Image.Image:
+def _resolve_image_settings(args: argparse.Namespace) -> tuple[str, str, tuple[int, int, int], int]:
     config = load_json_config(args.config_path)
     image_cfg = config.get("image", {}) if isinstance(config.get("image"), dict) else {}
     fit = args.image_fit or image_cfg.get("fit", "contain")
@@ -1855,17 +1855,91 @@ def render_image(args: argparse.Namespace, size: int) -> Image.Image:
         asset_name = image_cfg.get("assetPath", "")
         if asset_name:
             asset = str(args.config_path.parent / "widgets" / "assets" / asset_name)
-    return render_image_frame(size, asset or "", fit, background, rotate)
+    return asset or "", fit, background, rotate
+
+
+def render_image(args: argparse.Namespace, size: int) -> Image.Image:
+    asset, fit, background, rotate = _resolve_image_settings(args)
+    return render_image_frame(size, asset, fit, background, rotate)
+
+
+def is_animated_gif(path: str) -> bool:
+    try:
+        with Image.open(path) as image:
+            return getattr(image, "is_animated", False)
+    except (OSError, ValueError):
+        return False
+
+
+def load_gif_frames(path: str, size: int, fit: str, background: tuple[int, int, int], rotate: int) -> list[tuple[Image.Image, float]]:
+    frames: list[tuple[Image.Image, float]] = []
+    with Image.open(path) as source:
+        for frame in ImageSequence.Iterator(source):
+            rendered = frame.convert("RGB")
+            if rotate:
+                rendered = rendered.rotate(-int(rotate), expand=True)
+            fitted = _fit_image(rendered, size, fit, background)
+            duration_ms = frame.info.get("duration", 100) or 100
+            frames.append((fitted, max(0.02, duration_ms / 1000.0)))
+    return frames
 
 
 def run_image(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
-    frame = render_image(args, size)
+    asset, fit, background, rotate = _resolve_image_settings(args)
+    if asset and Path(asset).exists() and is_animated_gif(asset):
+        frames = load_gif_frames(asset, size, fit, background, rotate)
+        try:
+            index = 0
+            while frames:
+                frame, delay = frames[index % len(frames)]
+                display.show(frame)
+                if args.once:
+                    break
+                time.sleep(delay)
+                index += 1
+        except KeyboardInterrupt:
+            pass
+        finally:
+            display.clear()
+        return
+    frame = render_image_frame(size, asset, fit, background, rotate)
     try:
         while True:
             display.show(frame)
             if args.once:
                 break
             time.sleep(0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
+def run_slideshow(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    config = load_json_config(args.config_path)
+    cfg = config.get("slideshow", {}) if isinstance(config.get("slideshow"), dict) else {}
+    fit = cfg.get("fit", "cover")
+    background = parse_color(cfg.get("background", "#000000"), (0, 0, 0))
+    rotate = int(cfg.get("rotate", 0) or 0)
+    interval = max(1, int(cfg.get("intervalSeconds", 8) or 8))
+    assets_dir = args.config_path.parent / "widgets" / "assets"
+    paths = [str(assets_dir / name) for name in cfg.get("items", []) if name and (assets_dir / name).exists()]
+    try:
+        if not paths:
+            display.show(render_image_frame(size, "", fit, background, rotate))
+            while not args.once:
+                time.sleep(1.0)
+            return
+        index = 0
+        while True:
+            display.show(render_image_frame(size, paths[index % len(paths)], fit, background, rotate))
+            if args.once:
+                break
+            waited = 0.0
+            while waited < interval:
+                time.sleep(min(0.5, interval - waited))
+                waited += 0.5
+            index += 1
     except KeyboardInterrupt:
         pass
     finally:
@@ -2122,6 +2196,8 @@ def run(args: argparse.Namespace) -> None:
         run_image(args, display, size)
     elif mode == "draw":
         run_draw(args, display, size)
+    elif mode == "slideshow":
+        run_slideshow(args, display, size)
     elif mode == "widget":
         run_external_widget(args, display, size)
     else:
@@ -2144,7 +2220,7 @@ def render_preview_frames(directory: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
-    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "testPattern", "widget"), default="spotify")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)
