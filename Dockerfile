@@ -27,6 +27,7 @@ COPY configs ./configs
 COPY public ./public
 COPY scripts ./scripts
 COPY src ./src
+COPY assistant_matrix_sdk ./assistant_matrix_sdk
 COPY spotify_matrix.py requirements.txt ./
 
 RUN poetry config virtualenvs.in-project true \
