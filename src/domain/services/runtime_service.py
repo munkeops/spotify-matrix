@@ -168,6 +168,10 @@ class RuntimeService:
         )
         if config.text.scroll:
             args.append("--text-scroll")
+        args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background])
+        if config.image.assetPath:
+            asset_file = config_service.data_dir / "widgets" / "assets" / config.image.assetPath
+            args.extend(["--image-asset", str(asset_file)])
         if config.runtime.testPattern:
             args.append("--test-pattern")
         if config.display.mode == "widget" and config.display.widgetId:

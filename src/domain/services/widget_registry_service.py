@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from src.domain.models.api_schemas import AgentConfig, ClockConfig, SpotifyConfig, TextConfig, WeatherConfig
+from src.domain.models.api_schemas import AgentConfig, ClockConfig, DrawConfig, ImageConfig, SpotifyConfig, TextConfig, WeatherConfig
 from src.domain.models.widget_schemas import LocalWidget, StoreWidget, WidgetConfigField, WidgetConfigOption, WidgetManifest, WidgetPermission, WidgetPreview, WidgetTrigger
 from src.domain.services.config_service import config_service
 from src.domain.services.runtime_service import runtime_service
@@ -24,6 +24,8 @@ WIDGET_MODE_MAP = {
     "core.agent": "agent",
     "core.weather": "weather",
     "core.text": "text",
+    "core.image": "image",
+    "core.draw": "draw",
     "core.testPattern": "testPattern",
 }
 
@@ -107,6 +109,10 @@ class WidgetRegistryService:
             return config.weather.model_dump()
         if widget_id == "core.text":
             return config.text.model_dump()
+        if widget_id == "core.image":
+            return config.image.model_dump()
+        if widget_id == "core.draw":
+            return config.draw.model_dump()
         if widget_id == "core.testPattern":
             return {"testPattern": config.runtime.testPattern}
         return self._read_installed_widget_config(widget_id)
@@ -126,6 +132,10 @@ class WidgetRegistryService:
             config.weather = self._merge_model(config.weather, values, WeatherConfig)
         elif widget_id == "core.text":
             config.text = self._merge_model(config.text, values, TextConfig)
+        elif widget_id == "core.image":
+            config.image = self._merge_model(config.image, values, ImageConfig)
+        elif widget_id == "core.draw":
+            config.draw = self._merge_model(config.draw, values, DrawConfig)
         elif widget_id == "core.testPattern":
             config.runtime.testPattern = bool(values.get("testPattern", config.runtime.testPattern))
         else:
@@ -323,6 +333,42 @@ class WidgetRegistryService:
                         default="normal",
                         options=[_option("Slow", "slow"), _option("Normal", "normal"), _option("Fast", "fast")],
                     ),
+                ],
+                triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=15)],
+            ),
+            WidgetManifest(
+                id="core.image",
+                name="Image",
+                version="1.0.0",
+                summary="Upload an image and display it on the matrix.",
+                category="custom",
+                runtime="builtin",
+                entrypoint="spotify_matrix:run_image",
+                preview=WidgetPreview(description="Shows an uploaded image scaled to the 64x64 panel."),
+                config=[
+                    WidgetConfigField(key="assetPath", label="Image", type="string"),
+                    WidgetConfigField(
+                        key="fit",
+                        label="Fit",
+                        type="select",
+                        default="contain",
+                        options=[_option("Contain", "contain"), _option("Cover", "cover"), _option("Stretch", "stretch")],
+                    ),
+                    WidgetConfigField(key="background", label="Background color", type="string", default="#000000"),
+                ],
+                triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=15)],
+            ),
+            WidgetManifest(
+                id="core.draw",
+                name="Draw",
+                version="1.0.0",
+                summary="Compose shapes and text into a custom matrix drawing.",
+                category="custom",
+                runtime="builtin",
+                entrypoint="spotify_matrix:run_draw",
+                preview=WidgetPreview(description="Custom drawing built from rectangles, circles, lines, and text."),
+                config=[
+                    WidgetConfigField(key="background", label="Background color", type="string", default="#000000"),
                 ],
                 triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=15)],
             ),

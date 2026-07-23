@@ -1497,6 +1497,100 @@ def run_text(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
         display.clear()
 
 
+def _fit_image(source: Image.Image, size: int, mode: str, background: tuple[int, int, int]) -> Image.Image:
+    image = source.convert("RGB")
+    if mode == "stretch":
+        return image.resize((size, size))
+    if mode == "cover":
+        return ImageOps.fit(image, (size, size), method=Image.LANCZOS)
+    canvas = Image.new("RGB", (size, size), background)
+    scaled = image.copy()
+    scaled.thumbnail((size, size), Image.LANCZOS)
+    canvas.paste(scaled, ((size - scaled.width) // 2, (size - scaled.height) // 2))
+    return canvas
+
+
+def render_image(args: argparse.Namespace, size: int) -> Image.Image:
+    config = load_json_config(args.config_path)
+    image_cfg = config.get("image", {}) if isinstance(config.get("image"), dict) else {}
+    fit = args.image_fit or image_cfg.get("fit", "contain")
+    background = parse_color(args.image_background or image_cfg.get("background", "#000000"), (0, 0, 0))
+    asset = args.image_asset
+    if not asset:
+        asset_name = image_cfg.get("assetPath", "")
+        if asset_name:
+            asset = str(args.config_path.parent / "widgets" / "assets" / asset_name)
+    if not asset or not Path(asset).exists():
+        placeholder = Image.new("RGB", (size, size), background)
+        draw = ImageDraw.Draw(placeholder)
+        message = "NO IMG"
+        draw_pixel_text(draw, max(1, (size - pixel_text_width(message, 1)) // 2), size // 2 - 3, message, (200, 200, 200), 1)
+        return placeholder
+    return _fit_image(Image.open(asset), size, fit, background)
+
+
+def run_image(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    frame = render_image(args, size)
+    try:
+        while True:
+            display.show(frame)
+            if args.once:
+                break
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
+DRAW_FONT_SCALES = {"small": 1, "medium": 2, "large": 3}
+
+
+def render_draw(args: argparse.Namespace, size: int) -> Image.Image:
+    config = load_json_config(args.config_path)
+    draw_cfg = config.get("draw", {}) if isinstance(config.get("draw"), dict) else {}
+    background = parse_color(draw_cfg.get("background", "#000000"), (0, 0, 0))
+    image = Image.new("RGB", (size, size), background)
+    draw = ImageDraw.Draw(image)
+    for shape in draw_cfg.get("shapes", []):
+        if not isinstance(shape, dict):
+            continue
+        kind = shape.get("type", "rect")
+        color = parse_color(shape.get("color", "#ffffff"), (255, 255, 255))
+        x = int(shape.get("x", 0))
+        y = int(shape.get("y", 0))
+        filled = bool(shape.get("fill", True))
+        if kind == "rect":
+            w = int(shape.get("w", 8))
+            h = int(shape.get("h", 8))
+            draw.rectangle((x, y, x + w - 1, y + h - 1), fill=color if filled else None, outline=None if filled else color)
+        elif kind == "circle":
+            r = int(shape.get("radius", 4))
+            draw.ellipse((x - r, y - r, x + r, y + r), fill=color if filled else None, outline=None if filled else color)
+        elif kind == "line":
+            draw.line((x, y, int(shape.get("x2", x)), int(shape.get("y2", y))), fill=color, width=1)
+        elif kind == "pixel":
+            draw.point((x, y), fill=color)
+        elif kind == "text":
+            scale = DRAW_FONT_SCALES.get(shape.get("size", "small"), 1)
+            draw_pixel_text(draw, x, y, str(shape.get("text", "")), color, scale)
+    return image
+
+
+def run_draw(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    frame = render_draw(args, size)
+    try:
+        while True:
+            display.show(frame)
+            if args.once:
+                break
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
 def load_external_widget(widget_dir: Path, entrypoint: str) -> Any:
     if str(widget_dir) not in sys.path:
         sys.path.insert(0, str(widget_dir))
@@ -1681,6 +1775,10 @@ def run(args: argparse.Namespace) -> None:
         run_weather(args, display, size)
     elif mode == "text":
         run_text(args, display, size)
+    elif mode == "image":
+        run_image(args, display, size)
+    elif mode == "draw":
+        run_draw(args, display, size)
     elif mode == "widget":
         run_external_widget(args, display, size)
     else:
@@ -1703,7 +1801,7 @@ def render_preview_frames(directory: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
-    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "testPattern", "widget"), default="spotify")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "testPattern", "widget"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)
@@ -1751,6 +1849,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--text-scroll-speed", choices=("slow", "normal", "fast"), default="normal")
     parser.add_argument("--text-font-size", choices=("small", "medium", "large"), default="medium")
     parser.add_argument("--text-align", choices=("left", "center", "right"), default="center")
+    parser.add_argument("--image-asset", default="", help="Absolute path to the image file for image mode.")
+    parser.add_argument("--image-fit", choices=("contain", "cover", "stretch"), default="", help="How the image is scaled to the panel.")
+    parser.add_argument("--image-background", default="", help="Background color behind a contained image.")
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")

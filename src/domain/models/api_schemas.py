@@ -36,7 +36,7 @@ class RuntimeConfig(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    mode: Literal["spotify", "clock", "agent", "weather", "text", "testPattern", "widget"] = "spotify"
+    mode: Literal["spotify", "clock", "agent", "weather", "text", "image", "draw", "testPattern", "widget"] = "spotify"
     widgetId: str = ""
 
 
@@ -75,8 +75,45 @@ class TextConfig(BaseModel):
     align: Literal["left", "center", "right"] = "center"
 
 
+class ImageConfig(BaseModel):
+    assetPath: str = ""
+    fit: Literal["contain", "cover", "stretch"] = "contain"
+    background: str = "#000000"
+
+
+class DrawShape(BaseModel):
+    type: Literal["rect", "circle", "line", "text", "pixel"] = "rect"
+    color: str = "#ffffff"
+    x: int = 0
+    y: int = 0
+    w: int = 8
+    h: int = 8
+    radius: int = 4
+    x2: int = 16
+    y2: int = 16
+    text: str = ""
+    size: Literal["small", "medium", "large"] = "small"
+    fill: bool = True
+
+
+class DrawConfig(BaseModel):
+    background: str = "#000000"
+    shapes: list[DrawShape] = Field(default_factory=list)
+
+
 class StoreConfig(BaseModel):
     indexUrl: str = "configs/widget_store_index.json"
+
+
+class AssetUploadRequest(BaseModel):
+    name: str = ""
+    data: str
+
+
+class AssetUploadResponse(BaseModel):
+    ok: bool
+    assetPath: str
+    url: str
 
 
 class AppConfig(BaseModel):
@@ -88,6 +125,8 @@ class AppConfig(BaseModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     weather: WeatherConfig = Field(default_factory=WeatherConfig)
     text: TextConfig = Field(default_factory=TextConfig)
+    image: ImageConfig = Field(default_factory=ImageConfig)
+    draw: DrawConfig = Field(default_factory=DrawConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 
 
