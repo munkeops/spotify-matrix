@@ -1151,8 +1151,6 @@ FONT_CANDIDATES = {
     ("sans", True, False): ["NotoSans-Bold.ttf", "DejaVuSans-Bold.ttf", "arialbd.ttf"],
     ("sans", False, True): ["NotoSans-Italic.ttf", "DejaVuSans-Oblique.ttf", "ariali.ttf"],
     ("sans", True, True): ["NotoSans-BoldItalic.ttf", "DejaVuSans-BoldOblique.ttf", "arialbi.ttf"],
-    ("chinese", False, False): ["NotoSansCJK-Regular.ttc", "NotoSansCJKsc-Regular.otf", "NotoSansSC-Regular.otf", "msyh.ttc", "simsun.ttc"],
-    ("chinese", True, False): ["NotoSansCJK-Bold.ttc", "NotoSansCJKsc-Bold.otf", "NotoSansSC-Bold.otf", "msyhbd.ttc", "simsun.ttc"],
     ("devanagari", False, False): ["NotoSansDevanagari-Regular.ttf", "Nirmala.ttf", "Nirmala.ttc", "mangal.ttf"],
     ("devanagari", True, False): ["NotoSansDevanagari-Bold.ttf", "NirmalaB.ttf", "Nirmala.ttc", "mangalb.ttf"],
 }
@@ -1190,7 +1188,7 @@ def _find_font_file(candidates: list[str]) -> Path | None:
 
 
 def load_font(family: str, bold: bool, italic: bool, size: int) -> Any:
-    if family in ("chinese", "devanagari"):
+    if family == "devanagari":
         italic = False
     key = (family, bold, italic, size)
     if key in _font_cache:
@@ -2026,7 +2024,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--text-scroll-speed", choices=("slow", "normal", "fast"), default="normal")
     parser.add_argument("--text-font-size", choices=("small", "medium", "large"), default="medium")
     parser.add_argument("--text-align", choices=("left", "center", "right"), default="center")
-    parser.add_argument("--text-font-family", choices=("pixel", "sans", "chinese", "devanagari"), default="pixel")
+    parser.add_argument("--text-font-family", choices=("pixel", "sans", "devanagari"), default="pixel")
     parser.add_argument("--text-bold", action="store_true", help="Render text with a bold font weight.")
     parser.add_argument("--text-italic", action="store_true", help="Render text with an italic font style.")
     parser.add_argument("--text-wrap", action="store_true", help="Wrap long text onto multiple lines.")

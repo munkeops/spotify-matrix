@@ -15,7 +15,6 @@ RUN apt-get update \
         cmake \
         cython3 \
         fonts-noto-core \
-        fonts-noto-cjk \
         git \
         python3-dev \
         tzdata \

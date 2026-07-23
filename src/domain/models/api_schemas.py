@@ -73,7 +73,7 @@ class TextConfig(BaseModel):
     scrollSpeed: Literal["slow", "normal", "fast"] = "normal"
     fontSize: Literal["small", "medium", "large"] = "medium"
     align: Literal["left", "center", "right"] = "center"
-    fontFamily: Literal["pixel", "sans", "chinese", "devanagari"] = "pixel"
+    fontFamily: Literal["pixel", "sans", "devanagari"] = "pixel"
     bold: bool = False
     italic: bool = False
     wrap: bool = False
@@ -98,7 +98,7 @@ class DrawShape(BaseModel):
     text: str = ""
     size: Literal["small", "medium", "large"] = "small"
     fill: bool = True
-    fontFamily: Literal["pixel", "sans", "chinese", "devanagari"] = "pixel"
+    fontFamily: Literal["pixel", "sans", "devanagari"] = "pixel"
     bold: bool = False
     italic: bool = False
 

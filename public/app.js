@@ -758,7 +758,7 @@ const SHAPE_FIELD_META = {
   x2: { label: "X2", type: "number" },
   y2: { label: "Y2", type: "number" },
   text: { label: "Text", type: "text" },
-  fontFamily: { label: "Font", type: "select", options: ["pixel", "sans", "chinese", "devanagari"] },
+  fontFamily: { label: "Font", type: "select", options: ["pixel", "sans", "devanagari"] },
   size: { label: "Size", type: "select", options: ["small", "medium", "large"] }
 };
 const NUMERIC_SHAPE_FIELDS = new Set(["x", "y", "w", "h", "radius", "x2", "y2"]);
