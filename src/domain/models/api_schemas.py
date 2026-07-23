@@ -36,7 +36,7 @@ class RuntimeConfig(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    mode: Literal["spotify", "clock", "agent", "weather", "testPattern", "widget"] = "spotify"
+    mode: Literal["spotify", "clock", "agent", "weather", "text", "testPattern", "widget"] = "spotify"
     widgetId: str = ""
 
 
@@ -65,6 +65,16 @@ class WeatherConfig(BaseModel):
     sceneSeconds: int = 20
 
 
+class TextConfig(BaseModel):
+    text: str = "HELLO"
+    color: str = "#ffffff"
+    background: str = "#000000"
+    scroll: bool = False
+    scrollSpeed: Literal["slow", "normal", "fast"] = "normal"
+    fontSize: Literal["small", "medium", "large"] = "medium"
+    align: Literal["left", "center", "right"] = "center"
+
+
 class StoreConfig(BaseModel):
     indexUrl: str = "configs/widget_store_index.json"
 
@@ -77,6 +87,7 @@ class AppConfig(BaseModel):
     clock: ClockConfig = Field(default_factory=ClockConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     weather: WeatherConfig = Field(default_factory=WeatherConfig)
+    text: TextConfig = Field(default_factory=TextConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 
 

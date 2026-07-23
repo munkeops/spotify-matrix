@@ -150,6 +150,24 @@ class RuntimeService:
             args.extend(["--weather-latitude", str(config.weather.latitude)])
         if config.weather.longitude is not None:
             args.extend(["--weather-longitude", str(config.weather.longitude)])
+        args.extend(
+            [
+                "--text-value",
+                config.text.text,
+                "--text-color",
+                config.text.color,
+                "--text-background",
+                config.text.background,
+                "--text-scroll-speed",
+                config.text.scrollSpeed,
+                "--text-font-size",
+                config.text.fontSize,
+                "--text-align",
+                config.text.align,
+            ]
+        )
+        if config.text.scroll:
+            args.append("--text-scroll")
         if config.runtime.testPattern:
             args.append("--test-pattern")
         if config.display.mode == "widget" and config.display.widgetId:

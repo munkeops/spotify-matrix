@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from src.domain.models.api_schemas import AgentConfig, ClockConfig, SpotifyConfig, WeatherConfig
+from src.domain.models.api_schemas import AgentConfig, ClockConfig, SpotifyConfig, TextConfig, WeatherConfig
 from src.domain.models.widget_schemas import LocalWidget, StoreWidget, WidgetConfigField, WidgetConfigOption, WidgetManifest, WidgetPermission, WidgetPreview, WidgetTrigger
 from src.domain.services.config_service import config_service
 from src.domain.services.runtime_service import runtime_service
@@ -23,6 +23,7 @@ WIDGET_MODE_MAP = {
     "core.clock": "clock",
     "core.agent": "agent",
     "core.weather": "weather",
+    "core.text": "text",
     "core.testPattern": "testPattern",
 }
 
@@ -104,6 +105,8 @@ class WidgetRegistryService:
             return config.agent.model_dump()
         if widget_id == "core.weather":
             return config.weather.model_dump()
+        if widget_id == "core.text":
+            return config.text.model_dump()
         if widget_id == "core.testPattern":
             return {"testPattern": config.runtime.testPattern}
         return self._read_installed_widget_config(widget_id)
@@ -121,6 +124,8 @@ class WidgetRegistryService:
             config.agent = self._merge_model(config.agent, values, AgentConfig)
         elif widget_id == "core.weather":
             config.weather = self._merge_model(config.weather, values, WeatherConfig)
+        elif widget_id == "core.text":
+            config.text = self._merge_model(config.text, values, TextConfig)
         elif widget_id == "core.testPattern":
             config.runtime.testPattern = bool(values.get("testPattern", config.runtime.testPattern))
         else:
@@ -282,6 +287,44 @@ class WidgetRegistryService:
                     WidgetConfigField(key="longitude", label="Longitude override", type="number", required=False),
                 ],
                 triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=20)],
+            ),
+            WidgetManifest(
+                id="core.text",
+                name="Text",
+                version="1.0.0",
+                summary="Displays a custom static or scrolling text message.",
+                category="custom",
+                runtime="builtin",
+                entrypoint="spotify_matrix:run_text",
+                preview=WidgetPreview(description="Custom message on the 64x64 matrix with color and scroll options."),
+                config=[
+                    WidgetConfigField(key="text", label="Message", type="string", default="HELLO", required=True),
+                    WidgetConfigField(key="color", label="Text color", type="string", default="#ffffff", placeholder="#ffffff"),
+                    WidgetConfigField(key="background", label="Background color", type="string", default="#000000", placeholder="#000000"),
+                    WidgetConfigField(
+                        key="fontSize",
+                        label="Font size",
+                        type="select",
+                        default="medium",
+                        options=[_option("Small", "small"), _option("Medium", "medium"), _option("Large", "large")],
+                    ),
+                    WidgetConfigField(
+                        key="align",
+                        label="Alignment",
+                        type="select",
+                        default="center",
+                        options=[_option("Left", "left"), _option("Center", "center"), _option("Right", "right")],
+                    ),
+                    WidgetConfigField(key="scroll", label="Scroll long text", type="boolean", default=False),
+                    WidgetConfigField(
+                        key="scrollSpeed",
+                        label="Scroll speed",
+                        type="select",
+                        default="normal",
+                        options=[_option("Slow", "slow"), _option("Normal", "normal"), _option("Fast", "fast")],
+                    ),
+                ],
+                triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=15)],
             ),
             WidgetManifest(
                 id="core.testPattern",
