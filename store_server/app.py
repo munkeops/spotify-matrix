@@ -67,8 +67,24 @@ def _read_manifest_bytes(raw: bytes) -> tuple[dict, bytes]:
     return manifest, toml_bytes
 
 
+def _builtin_entries() -> list[dict]:
+    seed = Path(__file__).resolve().parent / "builtins.json"
+    if not seed.exists():
+        return []
+    try:
+        entries = json.loads(seed.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    for entry in entries:
+        entry.setdefault("runtime", "builtin")
+        entry.setdefault("author", "Assistant Matrix")
+        for key in ("manifestUrl", "archiveUrl", "previewGifUrl", "matrixPreviewUrl", "sha256"):
+            entry.setdefault(key, "")
+    return entries
+
+
 def rebuild_index() -> dict:
-    widgets = []
+    widgets = list(_builtin_entries())
     for toml_path in sorted(widgets_dir().glob("*/*/widget.toml")):
         manifest = tomllib.loads(toml_path.read_text(encoding="utf-8"))
         meta = manifest.get("widget", {})

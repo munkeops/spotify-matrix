@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
 import tomllib
 from typing import Any
+
+# "always" keeps built-ins available (classic behavior); "store" makes the app a
+# pure plugin host that starts empty and shows built-ins only once installed.
+BUILTIN_MODE = os.environ.get("ASSISTANT_MATRIX_BUILTIN_MODE", "always").lower()
 
 from pydantic import BaseModel
 
@@ -87,9 +92,25 @@ class WidgetRegistryService:
     def list_local_widgets(self) -> list[LocalWidget]:
         config = config_service.get_config()
         active_mode = "testPattern" if config.runtime.testPattern else config.display.mode
-        widgets = [self._local_widget(manifest, active_mode) for manifest in self._built_in_manifests()]
-        widgets.extend(self._installed_store_widgets())
+        installed_ids = self._installed_ids()
+        builtin_ids = {manifest.id for manifest in self._built_in_manifests()}
+        widgets = [
+            self._local_widget(manifest, active_mode)
+            for manifest in self._built_in_manifests()
+            if BUILTIN_MODE != "store" or manifest.id in installed_ids
+        ]
+        widgets.extend(widget for widget in self._installed_store_widgets() if widget.manifest.id not in builtin_ids)
         return widgets
+
+    def _installed_ids(self) -> set[str]:
+        path = config_service.data_dir / "widgets" / "installed.json"
+        try:
+            with path.open("r", encoding="utf-8") as file:
+                payload = json.load(file)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return set()
+        raw = payload.get("widgets", payload if isinstance(payload, list) else [])
+        return {item.get("id") for item in raw if isinstance(item, dict) and item.get("id")}
 
     def get_local_widget(self, widget_id: str) -> LocalWidget | None:
         for widget in self.list_local_widgets():

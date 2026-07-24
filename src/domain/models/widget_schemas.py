@@ -116,6 +116,7 @@ class StoreWidget(BaseModel):
     summary: str
     category: WidgetCategory = "custom"
     author: str = "Assistant Matrix"
+    runtime: str = "python"
     manifestUrl: str = ""
     archiveUrl: str = ""
     previewGifUrl: str = ""

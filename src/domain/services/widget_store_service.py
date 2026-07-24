@@ -44,7 +44,8 @@ class WidgetStoreService:
         installed = self.read_installed_widgets()
         by_id = {item.id: item for item in installed}
         by_id[widget.id] = widget
-        self._install_archive_if_available(widget)
+        if widget.runtime != "builtin":
+            self._install_archive_if_available(widget)
         self._write_installed_widgets(list(by_id.values()))
         widget.installed = True
         return widget
