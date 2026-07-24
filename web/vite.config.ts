@@ -1,10 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// The app is served under /app by FastAPI, so all built asset URLs are /app/*.
+// The app is served at the site root by FastAPI; built asset URLs are /assets/*.
 export default defineConfig({
   plugins: [react()],
-  base: "/app/",
+  base: "/",
   build: { outDir: "dist", emptyOutDir: true },
   server: {
     port: 5173,

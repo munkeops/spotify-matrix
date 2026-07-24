@@ -91,6 +91,22 @@ export const PREVIEWABLE = new Set(["core.text", "core.image", "core.draw", "cor
 export const getConfig = () => apiGet<Record<string, any>>("/api/config");
 export const saveConfig = (config: Record<string, unknown>) => apiPost<Record<string, any>>("/api/config", config);
 
+export const createPairing = () =>
+  apiPost<{ pairingToken: string; expiresInSeconds: number; command: string }>("/api/auth/session", {});
+
+export interface RotationItem { widgetId: string; durationSeconds: number; enabled: boolean }
+export interface TriggerRule { event: string; widgetId: string; enabled: boolean; priority: number; minDurationSeconds: number }
+export interface DisplayPolicy {
+  mode: "single" | "rotation";
+  activeWidgetId: string;
+  rotation: RotationItem[];
+  triggers: TriggerRule[];
+}
+export const getPolicy = () => apiGet<{ policy: DisplayPolicy }>("/api/display/policy");
+export const savePolicy = (policy: DisplayPolicy) => apiPost<{ policy: DisplayPolicy }>("/api/display/policy", { policy });
+export const applyPolicy = () => apiPost("/api/display/policy/apply", {});
+export const stopPolicy = () => apiPost("/api/display/policy/stop", {});
+
 export interface BtDevice {
   mac: string;
   name: string;

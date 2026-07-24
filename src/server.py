@@ -74,21 +74,31 @@ def create_app() -> FastAPI:
     app.include_router(assets.router)
     app.include_router(bluetooth.router)
 
-    # React + MUI app (built into web-dist) served at /app, with SPA fallback.
+    public_dir = str(base_config["paths"]["public_dir"])
     web_dist = Path("web-dist")
+
     if (web_dist / "index.html").exists():
+        # React + MUI app is the primary UI, served at the site root with SPA fallback.
         assets_dir = web_dist / "assets"
         if assets_dir.exists():
-            app.mount("/app/assets", StaticFiles(directory=str(assets_dir)), name="web-assets")
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="web-assets")
 
-        @app.get("/app")
-        async def _web_root() -> FileResponse:
+        studio_dir = Path(public_dir) / "studio"
+        if studio_dir.exists():
+            app.mount("/studio", StaticFiles(directory=str(studio_dir), html=True), name="studio")
+
+        @app.get("/")
+        async def _spa_root() -> FileResponse:
             return FileResponse(str(web_dist / "index.html"))
 
-        @app.get("/app/{full_path:path}")
-        async def _web_spa(full_path: str) -> FileResponse:
+        @app.get("/{full_path:path}")
+        async def _spa(full_path: str) -> FileResponse:
+            candidate = web_dist / full_path
+            if candidate.is_file():
+                return FileResponse(str(candidate))
             return FileResponse(str(web_dist / "index.html"))
+    else:
+        # Fallback to the classic UI when the React bundle has not been built.
+        app.mount("/", StaticFiles(directory=public_dir, html=True), name="public")
 
-    public_dir = str(base_config["paths"]["public_dir"])
-    app.mount("/", StaticFiles(directory=public_dir, html=True), name="public")
     return app

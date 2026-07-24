@@ -5,6 +5,7 @@ import {
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import { LocalWidget, listLocalWidgets, applyWidget } from "../api";
 import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
+import DisplayPolicyPanel from "../components/DisplayPolicyPanel";
 
 export default function Plugins() {
   const [widgets, setWidgets] = useState<LocalWidget[]>([]);
@@ -52,6 +53,8 @@ export default function Plugins() {
   return (
     <Stack spacing={2}>
       {error ? <Alert severity="error">{error}</Alert> : null}
+
+      <DisplayPolicyPanel />
 
       {widgets.map((widget) => (
         <Card key={widget.manifest.id} sx={{ borderColor: widget.active ? "primary.main" : "divider" }}>

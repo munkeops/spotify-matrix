@@ -5,7 +5,7 @@ import {
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import {
-  LocalWidget, getWidgetConfig, saveWidgetConfig, applyWidget, previewWidget, PREVIEWABLE,
+  LocalWidget, getWidgetConfig, saveWidgetConfig, applyWidget, previewWidget, PREVIEWABLE, createPairing,
 } from "../api";
 import Gallery from "./Gallery";
 
@@ -30,6 +30,7 @@ export default function WidgetConfigDrawer({
   const [preview, setPreview] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [pairingCmd, setPairingCmd] = useState<string>("");
   const timer = useRef<number | undefined>(undefined);
 
   const id = widget?.manifest.id ?? "";
@@ -117,7 +118,25 @@ export default function WidgetConfigDrawer({
       ) : null}
 
       <Stack spacing={2} sx={{ flex: 1, overflowY: "auto" }}>
-        {id === "core.image" ? (
+        {id === "core.spotify" ? (
+          <>
+            <TextField label="Client ID" size="small" value={String(values.clientId ?? "")} onChange={(e) => set("clientId", e.target.value)} />
+            <TextField label="Client Secret" type="password" size="small" placeholder="Leave masked to keep existing" value={String(values.clientSecret ?? "")} onChange={(e) => set("clientSecret", e.target.value)} />
+            <TextField label="Redirect URI" size="small" value={String(values.redirectUri ?? "")} onChange={(e) => set("redirectUri", e.target.value)} />
+            <Stack direction="row" spacing={1}>
+              <Button variant="outlined" onClick={async () => { await saveWidgetConfig(id, values); window.location.href = "/api/auth/login"; }}>Open Spotify Login</Button>
+              <Button variant="outlined" onClick={async () => {
+                try { await saveWidgetConfig(id, values); const s = await createPairing(); setPairingCmd(s.command.replace(/http:\/\/<pi-host>:\d+/, window.location.origin)); }
+                catch (e) { setError((e as Error).message); }
+              }}>Pairing Token</Button>
+            </Stack>
+            {pairingCmd ? (
+              <TextField label="Run on your laptop" size="small" multiline value={pairingCmd} InputProps={{ readOnly: true }} />
+            ) : (
+              <Typography variant="caption" color="text.secondary">Save an HTTPS /api/auth/callback redirect for tunnel login, or create a pairing token for local loopback setup.</Typography>
+            )}
+          </>
+        ) : id === "core.image" ? (
           <>
             <TextField select label="Fit" size="small" value={String(values.fit ?? "contain")} onChange={(e) => set("fit", e.target.value)}>
               {FIT.map((f) => <MenuItem key={f} value={f}>{f}</MenuItem>)}
