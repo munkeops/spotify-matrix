@@ -86,7 +86,10 @@ export const applyWidget = (id: string, config: Record<string, unknown> | null =
 export const previewWidget = (widgetId: string, config: Record<string, unknown>) =>
   apiPost<{ dataUrl: string }>("/api/widgets/preview", { widgetId, config });
 
-export const PREVIEWABLE = new Set(["core.text", "core.image", "core.draw", "core.slideshow"]);
+export const PREVIEWABLE = new Set([
+  "core.text", "core.image", "core.draw", "core.slideshow",
+  "core.clock", "core.agent", "core.weather", "core.spotify", "core.testPattern",
+]);
 
 export const getConfig = () => apiGet<Record<string, any>>("/api/config");
 export const saveConfig = (config: Record<string, unknown>) => apiPost<Record<string, any>>("/api/config", config);

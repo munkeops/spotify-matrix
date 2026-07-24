@@ -1,4 +1,7 @@
-import { AppBar, Box, BottomNavigation, BottomNavigationAction, Paper, Toolbar, Typography, Container } from "@mui/material";
+import {
+  AppBar, Box, BottomNavigation, BottomNavigationAction, Paper, Toolbar, Typography, Container,
+  Drawer, List, ListItemButton, ListItemIcon, ListItemText, useMediaQuery, useTheme,
+} from "@mui/material";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ExtensionRoundedIcon from "@mui/icons-material/ExtensionRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
@@ -16,30 +19,64 @@ const NAV = [
   { label: "Settings", value: "/settings", icon: <SettingsRoundedIcon /> },
 ];
 
+const DRAWER_WIDTH = 224;
+
+function Brand() {
+  return (
+    <Toolbar sx={{ gap: 1.5 }}>
+      <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "primary.main" }} />
+      <Typography variant="h6" color="text.primary">Assistant Matrix</Typography>
+    </Toolbar>
+  );
+}
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
+  const theme = useTheme();
+  const desktop = useMediaQuery(theme.breakpoints.up("md"));
   const current = NAV.some((n) => n.value === location.pathname) ? location.pathname : "/";
+
+  const content = (
+    <Container maxWidth={desktop ? "md" : "sm"} sx={{ flex: 1, py: 2, pb: desktop ? 4 : 12 }}>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/plugins" element={<Plugins />} />
+        <Route path="/store" element={<Store />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Container>
+  );
+
+  if (desktop) {
+    return (
+      <Box sx={{ display: "flex", minHeight: "100dvh", bgcolor: "background.default" }}>
+        <Drawer
+          variant="permanent"
+          sx={{ width: DRAWER_WIDTH, flexShrink: 0, "& .MuiDrawer-paper": { width: DRAWER_WIDTH, boxSizing: "border-box", bgcolor: "background.paper", borderRight: "1px solid", borderColor: "divider" } }}
+        >
+          <Brand />
+          <List sx={{ px: 1 }}>
+            {NAV.map((item) => (
+              <ListItemButton key={item.value} selected={current === item.value} onClick={() => navigate(item.value)} sx={{ borderRadius: 2, mb: 0.5 }}>
+                <ListItemIcon sx={{ minWidth: 40, color: current === item.value ? "primary.main" : "text.secondary" }}>{item.icon}</ListItemIcon>
+                <ListItemText primary={item.label} />
+              </ListItemButton>
+            ))}
+          </List>
+        </Drawer>
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>{content}</Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column", bgcolor: "background.default" }}>
       <AppBar position="sticky" elevation={0} sx={{ bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider" }}>
-        <Toolbar>
-          <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: "primary.main", mr: 1.5 }} />
-          <Typography variant="h6" color="text.primary">Assistant Matrix</Typography>
-        </Toolbar>
+        <Brand />
       </AppBar>
-
-      <Container maxWidth="sm" sx={{ flex: 1, py: 2, pb: 12 }}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/plugins" element={<Plugins />} />
-          <Route path="/store" element={<Store />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Container>
-
+      {content}
       <Paper elevation={3} sx={{ position: "fixed", bottom: 0, left: 0, right: 0, borderTop: "1px solid", borderColor: "divider" }}>
         <BottomNavigation value={current} onChange={(_, value) => navigate(value)} showLabels>
           {NAV.map((item) => (
