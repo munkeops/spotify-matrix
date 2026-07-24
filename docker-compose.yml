@@ -1,6 +1,7 @@
 services:
   spotify-matrix:
     build: .
+    image: spotify-matrix:local
     container_name: spotify-matrix
     privileged: true
     network_mode: host
@@ -11,10 +12,27 @@ services:
       SPOTIFY_MATRIX_DATA_DIR: /app/data
       SPOTIFY_MATRIX_CONFIG: /app/data/config.json
       SPOTIFY_TOKEN_CACHE: /app/data/spotify_token.json
+      # Install plugins from the on-Pi store container.
+      ASSISTANT_MATRIX_WIDGET_STORE_INDEX: http://localhost:8080/store-index.json
     volumes:
       - ./data:/app/data
       # Bluetooth: reach the host BlueZ daemon over the system D-Bus socket.
       - /var/run/dbus:/var/run/dbus
+
+  store:
+    image: spotify-matrix:local
+    container_name: spotify-matrix-store
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - spotify-matrix
+    environment:
+      STORE_DATA_DIR: /store-data
+      STORE_PUBLIC_URL: http://localhost:8080
+      STORE_PORT: "8080"
+    command: ["poetry", "run", "python", "-m", "store_server.app"]
+    volumes:
+      - ./store-data:/store-data
 
   cloudflared:
     image: cloudflare/cloudflared:latest

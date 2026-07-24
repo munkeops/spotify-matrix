@@ -67,6 +67,7 @@ COPY public ./public
 COPY scripts ./scripts
 COPY src ./src
 COPY assistant_matrix_sdk ./assistant_matrix_sdk
+COPY store_server ./store_server
 COPY spotify_matrix.py requirements.txt ./
 
 # Built React UI (served at /app by FastAPI).
