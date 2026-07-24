@@ -146,6 +146,10 @@ export interface StoreWidget {
   summary: string;
   category: string;
   author: string;
+  runtime: string;
+  installed: boolean;
+  previewGifUrl: string;
+  matrixPreviewUrl: string;
 }
 export const listStoreWidgets = () => apiGet<{ widgets: StoreWidget[] }>("/api/widgets/store");
 export const installWidget = (widgetId: string) => apiPost("/api/widgets/install", { widgetId });
