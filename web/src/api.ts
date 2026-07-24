@@ -87,3 +87,37 @@ export const previewWidget = (widgetId: string, config: Record<string, unknown>)
   apiPost<{ dataUrl: string }>("/api/widgets/preview", { widgetId, config });
 
 export const PREVIEWABLE = new Set(["core.text", "core.image", "core.draw", "core.slideshow"]);
+
+export const getConfig = () => apiGet<Record<string, any>>("/api/config");
+export const saveConfig = (config: Record<string, unknown>) => apiPost<Record<string, any>>("/api/config", config);
+
+export interface BtDevice {
+  mac: string;
+  name: string;
+  paired: boolean;
+  connected: boolean;
+  trusted: boolean;
+  icon: string;
+}
+export const btStatus = () => apiGet<{ available: boolean; powered: boolean; adapter: string }>("/api/bluetooth/status");
+export const btDevices = () => apiGet<{ available: boolean; devices: BtDevice[] }>("/api/bluetooth/devices");
+export const btScan = (seconds = 8) => apiPost<{ available: boolean; devices: BtDevice[] }>("/api/bluetooth/scan", { seconds });
+export const btConnect = (mac: string) => apiPost("/api/bluetooth/connect", { mac });
+export const btDisconnect = (mac: string) => apiPost("/api/bluetooth/disconnect", { mac });
+export const btRemove = (mac: string) => apiPost("/api/bluetooth/remove", { mac });
+
+export interface StoreWidget {
+  id: string;
+  name: string;
+  version: string;
+  summary: string;
+  category: string;
+  author: string;
+}
+export const listStoreWidgets = () => apiGet<{ widgets: StoreWidget[] }>("/api/widgets/store");
+export const installWidget = (widgetId: string) => apiPost("/api/widgets/install", { widgetId });
+export async function uninstallWidget(widgetId: string) {
+  const r = await fetch(`/api/widgets/local/${encodeURIComponent(widgetId)}`, { method: "DELETE" });
+  if (!r.ok) throw new Error("Uninstall failed");
+  return r.json();
+}

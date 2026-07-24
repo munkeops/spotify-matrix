@@ -1,17 +1,18 @@
 import { AppBar, Box, BottomNavigation, BottomNavigationAction, Paper, Toolbar, Typography, Container } from "@mui/material";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ExtensionRoundedIcon from "@mui/icons-material/ExtensionRounded";
-import BrushRoundedIcon from "@mui/icons-material/BrushRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Plugins from "./pages/Plugins";
-import Placeholder from "./pages/Placeholder";
+import Store from "./pages/Store";
+import Settings from "./pages/Settings";
 
 const NAV = [
   { label: "Home", value: "/", icon: <HomeRoundedIcon /> },
   { label: "Plugins", value: "/plugins", icon: <ExtensionRoundedIcon /> },
-  { label: "Studio", value: "/studio", icon: <BrushRoundedIcon /> },
+  { label: "Store", value: "/store", icon: <StorefrontRoundedIcon /> },
   { label: "Settings", value: "/settings", icon: <SettingsRoundedIcon /> },
 ];
 
@@ -33,8 +34,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/plugins" element={<Plugins />} />
-          <Route path="/studio" element={<Placeholder title="Meme Studio" note="Opens the canvas editor." link="/studio/" />} />
-          <Route path="/settings" element={<Placeholder title="Settings" note="Matrix, store, and Bluetooth coming here." />} />
+          <Route path="/store" element={<Store />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Container>
