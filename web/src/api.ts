@@ -106,6 +106,20 @@ export const btConnect = (mac: string) => apiPost("/api/bluetooth/connect", { ma
 export const btDisconnect = (mac: string) => apiPost("/api/bluetooth/disconnect", { mac });
 export const btRemove = (mac: string) => apiPost("/api/bluetooth/remove", { mac });
 
+export interface Asset {
+  name: string;
+  url: string;
+  animated: boolean;
+}
+export const listAssets = () => apiGet<{ assets: Asset[] }>("/api/assets");
+export const uploadAsset = (name: string, data: string) =>
+  apiPost<{ ok: boolean; assetPath: string; url: string }>("/api/assets/upload", { name, data });
+export async function deleteAsset(name: string) {
+  const r = await fetch(`/api/assets/${encodeURIComponent(name)}`, { method: "DELETE" });
+  if (!r.ok) throw new Error("Delete failed");
+  return r.json();
+}
+
 export interface StoreWidget {
   id: string;
   name: string;

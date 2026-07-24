@@ -7,6 +7,16 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import {
   LocalWidget, getWidgetConfig, saveWidgetConfig, applyWidget, previewWidget, PREVIEWABLE,
 } from "../api";
+import Gallery from "./Gallery";
+
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <Stack direction="row" alignItems="center" justifyContent="space-between">
+      <Typography variant="body2">{label}</Typography>
+      <input type="color" value={value || "#000000"} onChange={(e) => onChange(e.target.value)} style={{ width: 44, height: 30, border: "none", background: "none" }} />
+    </Stack>
+  );
+}
 
 export default function WidgetConfigDrawer({
   widget, open, onClose, onApplied,
@@ -45,6 +55,16 @@ export default function WidgetConfigDrawer({
   }, [values, open, previewable, id]);
 
   const set = (key: string, value: unknown) => setValues((prev) => ({ ...prev, [key]: value }));
+
+  const toggleItem = (name: string) => {
+    const items = Array.isArray(values.items) ? [...(values.items as string[])] : [];
+    const idx = items.indexOf(name);
+    if (idx >= 0) items.splice(idx, 1);
+    else items.push(name);
+    set("items", items);
+  };
+
+  const FIT = ["contain", "cover", "stretch"];
 
   const doSave = async () => {
     setBusy(true);
@@ -97,6 +117,28 @@ export default function WidgetConfigDrawer({
       ) : null}
 
       <Stack spacing={2} sx={{ flex: 1, overflowY: "auto" }}>
+        {id === "core.image" ? (
+          <>
+            <TextField select label="Fit" size="small" value={String(values.fit ?? "contain")} onChange={(e) => set("fit", e.target.value)}>
+              {FIT.map((f) => <MenuItem key={f} value={f}>{f}</MenuItem>)}
+            </TextField>
+            <TextField select label="Rotate" size="small" value={String(values.rotate ?? 0)} onChange={(e) => set("rotate", Number(e.target.value))}>
+              {[0, 90, 180, 270].map((r) => <MenuItem key={r} value={String(r)}>{r}°</MenuItem>)}
+            </TextField>
+            <ColorField label="Background" value={String(values.background ?? "#000000")} onChange={(v) => set("background", v)} />
+            <Gallery mode="single" selected={String(values.assetPath ?? "")} onPick={(name) => set("assetPath", name)} />
+          </>
+        ) : id === "core.slideshow" ? (
+          <>
+            <TextField label="Seconds per image" type="number" size="small" value={Number(values.intervalSeconds ?? 8)} onChange={(e) => set("intervalSeconds", Number(e.target.value))} />
+            <TextField select label="Fit" size="small" value={String(values.fit ?? "cover")} onChange={(e) => set("fit", e.target.value)}>
+              {FIT.map((f) => <MenuItem key={f} value={f}>{f}</MenuItem>)}
+            </TextField>
+            <ColorField label="Background" value={String(values.background ?? "#000000")} onChange={(v) => set("background", v)} />
+            <Gallery mode="multi" selected={(values.items as string[]) ?? []} onPick={toggleItem} />
+          </>
+        ) : (
+          <>
         {fields.length === 0 ? (
           <Typography variant="body2" color="text.secondary">This widget has no options.</Typography>
         ) : null}
@@ -134,6 +176,8 @@ export default function WidgetConfigDrawer({
             />
           );
         })}
+          </>
+        )}
       </Stack>
 
       <Divider sx={{ my: 2 }} />
