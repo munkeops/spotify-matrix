@@ -37,8 +37,8 @@ except ImportError:
 
 AUTH_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
-CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
-SCOPE = "user-read-currently-playing"
+PLAYER_STATE_URL = "https://api.spotify.com/v1/me/player"
+SCOPE = "user-read-playback-state user-read-currently-playing"
 DEFAULT_CONFIG_PATH = Path(os.environ.get("SPOTIFY_MATRIX_CONFIG", "data/config.json"))
 DEFAULT_TOKEN_CACHE = Path(os.environ.get("SPOTIFY_TOKEN_CACHE", "data/spotify_token.json"))
 WEATHER_METRICS_SECONDS = 45
@@ -316,7 +316,7 @@ class SpotifyClient:
         token = self._valid_access_token()
         response = http_request(
             "GET",
-            CURRENTLY_PLAYING_URL,
+            PLAYER_STATE_URL,
             params={"additional_types": "track,episode"},
             headers={"Authorization": f"Bearer {token}"},
             timeout=10,
@@ -327,12 +327,15 @@ class SpotifyClient:
         if response.status == 401:
             self._refresh_access_token()
             return self.get_currently_playing()
+        if response.status == 403:
+            print("Spotify playback state returned 403 - re-authorize Spotify to grant the playback-state scope.", flush=True)
+            return None
         if response.status == 429:
             retry_after = int(response.headers.get("Retry-After", "5"))
             time.sleep(max(retry_after, 1))
             return None
         if response.status != 200:
-            raise_http_error(response, "Spotify currently-playing request")
+            raise_http_error(response, "Spotify player-state request")
 
         return response.json()
 
@@ -1665,7 +1668,8 @@ def poll_spotify(
                     if image is not None:
                         state.image = image
 
-                status = f"art found, is_playing={art.is_playing}, playing={playing}"
+                device = playback.get("device", {}).get("name") if isinstance(playback, dict) else None
+                status = f"art found, is_playing={art.is_playing}, playing={playing}, progress={progress}, device={device}"
                 if playing and (last_is_playing is not True or art.key != last_art_key):
                     emit_display_event(
                         event_api_url,
