@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardContent, Typography, Stack, Chip, Switch, Box, CircularProgress, Alert, IconButton } from "@mui/material";
+import { Card, CardContent, Typography, Stack, Chip, Box, CircularProgress, Alert, IconButton, Button } from "@mui/material";
 import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import { apiGet, apiPost, StatusResponse, listLocalWidgets, getWidgetConfig, previewWidget, applyWidget, LocalWidget, PREVIEWABLE } from "../api";
+import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
 
 const CATEGORY_COLOR: Record<string, string> = {
   media: "#4be0c0", time: "#8ea2ff", assistant: "#ffb86b", information: "#7ee0a0",
@@ -16,6 +18,10 @@ export default function Dashboard() {
   const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [switching, setSwitching] = useState("");
+  const [configure, setConfigure] = useState<LocalWidget | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const openConfig = (w: LocalWidget) => { setConfigure(w); setDrawerOpen(true); };
 
   const loadPreviews = useCallback(async (list: LocalWidget[]) => {
     await Promise.all(list.filter((w) => PREVIEWABLE.has(w.manifest.id)).map(async (w) => {
@@ -93,13 +99,20 @@ export default function Dashboard() {
                 <Typography variant="h6" noWrap>{active ? active.manifest.name : "Nothing selected"}</Typography>
                 <Chip size="small" color={running ? "success" : "default"} label={running ? "Running" : "Stopped"} sx={{ mt: 0.5 }} />
               </Box>
-              <IconButton
-                onClick={() => togglePower(!running)}
-                disabled={busy}
-                sx={{ bgcolor: running ? accent : "action.selected", color: running ? "#04060a" : "text.secondary", width: 56, height: 56, "&:hover": { bgcolor: running ? accent : "action.selected", filter: "brightness(1.1)" } }}
-              >
-                <PowerSettingsNewRoundedIcon />
-              </IconButton>
+              <Stack direction="row" spacing={1} alignItems="center">
+                {active && active.configurable ? (
+                  <IconButton onClick={() => openConfig(active)} sx={{ width: 48, height: 48, border: "1px solid", borderColor: "divider" }} aria-label="Configure">
+                    <TuneRoundedIcon />
+                  </IconButton>
+                ) : null}
+                <IconButton
+                  onClick={() => togglePower(!running)}
+                  disabled={busy}
+                  sx={{ bgcolor: running ? accent : "action.selected", color: running ? "#04060a" : "text.secondary", width: 56, height: 56, "&:hover": { bgcolor: running ? accent : "action.selected", filter: "brightness(1.1)" } }}
+                >
+                  <PowerSettingsNewRoundedIcon />
+                </IconButton>
+              </Stack>
             </Stack>
           </Stack>
         </CardContent>
@@ -114,13 +127,23 @@ export default function Dashboard() {
               {widgets.map((w) => {
                 const c = color(w);
                 return (
-                  <Box key={w.manifest.id} onClick={() => runWidget(w)} sx={{ flex: "0 0 auto", width: 84, cursor: "pointer", opacity: switching === w.manifest.id ? 0.5 : 1 }}>
-                    <Box sx={{ width: 84, height: 84, borderRadius: 2, overflow: "hidden", bgcolor: "#050607", border: "2px solid", borderColor: w.active ? "primary.main" : "transparent", display: "grid", placeItems: "center" }}>
+                  <Box key={w.manifest.id} sx={{ flex: "0 0 auto", width: 84, opacity: switching === w.manifest.id ? 0.5 : 1 }}>
+                    <Box sx={{ position: "relative", width: 84, height: 84, borderRadius: 2, overflow: "hidden", bgcolor: "#050607", border: "2px solid", borderColor: w.active ? "primary.main" : "transparent", display: "grid", placeItems: "center", cursor: "pointer" }} onClick={() => runWidget(w)}>
                       {previews[w.manifest.id] ? (
                         <img src={previews[w.manifest.id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", imageRendering: "pixelated" }} />
                       ) : (
                         <Typography sx={{ fontSize: 26, fontWeight: 800, color: c }}>{w.manifest.name.charAt(0)}</Typography>
                       )}
+                      {w.configurable ? (
+                        <IconButton
+                          size="small"
+                          onClick={(e) => { e.stopPropagation(); openConfig(w); }}
+                          sx={{ position: "absolute", top: 2, right: 2, width: 22, height: 22, bgcolor: "rgba(0,0,0,0.6)", "&:hover": { bgcolor: "rgba(0,0,0,0.8)" } }}
+                          aria-label="Configure"
+                        >
+                          <TuneRoundedIcon sx={{ fontSize: 14, color: "#fff" }} />
+                        </IconButton>
+                      ) : null}
                     </Box>
                     <Typography variant="caption" noWrap sx={{ display: "block", textAlign: "center", mt: 0.5 }}>{w.manifest.name}</Typography>
                   </Box>
@@ -148,6 +171,8 @@ export default function Dashboard() {
           </Stack>
         </CardContent>
       </Card>
+
+      <WidgetConfigDrawer widget={configure} open={drawerOpen} onClose={() => setDrawerOpen(false)} onApplied={refresh} />
     </Stack>
   );
 }
