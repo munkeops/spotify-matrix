@@ -1636,6 +1636,7 @@ def poll_spotify(
     last_status: str | None = None
     last_is_playing: bool | None = None
     last_art_key: str | None = None
+    last_progress: int | None = None
 
     while not stop_event.is_set():
         try:
@@ -1643,6 +1644,15 @@ def poll_spotify(
             art = playback_art_from_response(playback)
 
             if art:
+                # Some devices/accounts report is_playing=false while music is
+                # actually playing. Treat the track as playing if its position
+                # advanced since the last poll (a reliable "it's moving" signal).
+                progress = playback.get("progress_ms") if isinstance(playback, dict) else None
+                playing = art.is_playing
+                if not playing and progress is not None and last_progress is not None and progress - last_progress > 200:
+                    playing = True
+                last_progress = progress
+
                 with state_lock:
                     needs_download = art.key != state.art_key or art.image_url != state.image_url
 
@@ -1651,26 +1661,27 @@ def poll_spotify(
                 with state_lock:
                     state.art_key = art.key
                     state.image_url = art.image_url
-                    state.is_playing = art.is_playing
+                    state.is_playing = playing
                     if image is not None:
                         state.image = image
 
-                status = f"art found, is_playing={art.is_playing}"
-                if art.is_playing and (last_is_playing is not True or art.key != last_art_key):
+                status = f"art found, is_playing={art.is_playing}, playing={playing}"
+                if playing and (last_is_playing is not True or art.key != last_art_key):
                     emit_display_event(
                         event_api_url,
                         "spotify.playback_started",
                         {"source": "spotify", "artKey": art.key, "imageUrl": art.image_url, "isPlaying": True},
                     )
-                elif not art.is_playing and last_is_playing is True:
+                elif not playing and last_is_playing is True:
                     emit_display_event(
                         event_api_url,
                         "spotify.playback_paused",
                         {"source": "spotify", "artKey": art.key, "imageUrl": art.image_url, "isPlaying": False},
                     )
-                last_is_playing = art.is_playing
+                last_is_playing = playing
                 last_art_key = art.key
             else:
+                last_progress = None
                 with state_lock:
                     state.art_key = None
                     state.image_url = None
