@@ -123,6 +123,11 @@ export default function WidgetConfigDrawer({
             <TextField label="Client ID" size="small" value={String(values.clientId ?? "")} onChange={(e) => set("clientId", e.target.value)} />
             <TextField label="Client Secret" type="password" size="small" placeholder="Leave masked to keep existing" value={String(values.clientSecret ?? "")} onChange={(e) => set("clientSecret", e.target.value)} />
             <TextField label="Redirect URI" size="small" value={String(values.redirectUri ?? "")} onChange={(e) => set("redirectUri", e.target.value)} />
+            <TextField select label="Record spin" size="small" value={String(values.spin ?? "auto")} onChange={(e) => set("spin", e.target.value)} helperText="Set to Always if the art won't spin (Spotify reports paused).">
+              <MenuItem value="auto">Auto — spin while playing</MenuItem>
+              <MenuItem value="always">Always spin</MenuItem>
+              <MenuItem value="off">Never spin</MenuItem>
+            </TextField>
             <Stack direction="row" spacing={1}>
               <Button variant="outlined" onClick={async () => { await saveWidgetConfig(id, values); window.location.href = "/api/auth/login"; }}>Open Spotify Login</Button>
               <Button variant="outlined" onClick={async () => {

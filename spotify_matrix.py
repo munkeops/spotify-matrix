@@ -2132,6 +2132,7 @@ def run_spotify(
     if size is None:
         size = min(args.rows, args.cols)
     idle = render_idle(size)
+    spin_mode = str(get_nested(config, "spotify", "spin") or "auto")
     playback_state = SharedPlaybackState()
     playback_lock = threading.Lock()
     stop_event = threading.Event()
@@ -2156,7 +2157,8 @@ def run_spotify(
             delta = now - last_frame
             last_frame = now
 
-            if is_playing and current_art_image is not None:
+            should_spin = spin_mode == "always" or (spin_mode != "off" and is_playing)
+            if should_spin and current_art_image is not None:
                 angle = (angle - 360.0 * (args.rpm / 60.0) * delta) % 360.0
 
             image = render_record(current_art_image, angle, size) if current_art_image else idle

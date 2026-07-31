@@ -11,6 +11,7 @@ class SpotifyConfig(BaseModel):
     clientId: str = ""
     clientSecret: str = ""
     redirectUri: str = "http://127.0.0.1:8888/callback"
+    spin: Literal["auto", "always", "off"] = "auto"
 
 
 class MatrixConfig(BaseModel):
