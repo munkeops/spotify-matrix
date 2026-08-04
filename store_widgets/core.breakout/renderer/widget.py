@@ -9,7 +9,7 @@ from PIL import Image
 
 from assistant_matrix_sdk.config import ConfigField
 from assistant_matrix_sdk.game import GameWidget
-from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame, shade
 
 BRICK_COLS = 10
 BRICK_ROWS = 5
@@ -24,9 +24,26 @@ PADDLE_Y = 58
 PADDLE_HEIGHT = 2
 BALL_SIZE = 2
 
+# Ten layouts, cycled with a rebuilt wall each time round. "#" is a brick,
+# "=" takes two hits, "." is a gap. Each row is BRICK_COLS wide.
+LEVELS = (
+    ("##########", "##########", "##########", "##########", "##########"),
+    ("#.#.#.#.#.", ".#.#.#.#.#", "#.#.#.#.#.", ".#.#.#.#.#", "#.#.#.#.#."),
+    ("....##....", "...####...", "..######..", ".########.", "##########"),
+    ("##########", "#........#", "#.######.#", "#........#", "##########"),
+    ("=========="  , "##########", "..######..", "##########", "=========="),
+    ("#........#", ".#......#.", "..#....#..", "...#..#...", "....##...."),
+    ("##..##..##", "##..##..##", "..######..", "##..##..##", "##..##..##"),
+    ("=#=#=#=#=#", "#=#=#=#=#=", "=#=#=#=#=#", "#=#=#=#=#=", "=#=#=#=#=#"),
+    (".########.", "#.#....#.#", "#..####..#", "#.#....#.#", ".########."),
+    ("==========", "==========", "##########", "==========", "=========="),
+)
+
 ROW_COLORS = [(238, 74, 84), (244, 148, 44), (240, 206, 46), (72, 214, 96), (74, 158, 240)]
 ROW_POINTS = [50, 40, 30, 20, 10]
 PADDLE_COLOR = (210, 220, 240)
+# A brick that still needs another hit is drawn washed out.
+TOUGH_TINT = 0.55
 BALL_COLOR = (255, 255, 255)
 TEXT_COLOR = (170, 182, 206)
 FRAME_COLOR = (40, 46, 62)
@@ -53,8 +70,17 @@ class BreakoutGame(GameWidget):
         self.level = 1
         self._build_level()
 
+    def layout(self) -> tuple[str, ...]:
+        """The pattern for this level, cycling once they run out."""
+        return LEVELS[(self.level - 1) % len(LEVELS)]
+
     def _build_level(self) -> None:
-        self.bricks = [[True] * BRICK_COLS for _ in range(BRICK_ROWS)]
+        rows = self.layout()
+        # 0 is empty, 1 needs one hit, 2 needs two.
+        self.bricks = [
+            [2 if cell == chr(61) else 1 if cell == chr(35) else 0 for cell in rows[row]]
+            for row in range(BRICK_ROWS)
+        ]
         self.paddle_x = (PANEL - self.paddle_width) / 2
         self._serve()
 
@@ -139,7 +165,12 @@ class BreakoutGame(GameWidget):
                     continue
                 left, top, right, bottom = self._brick_rect(row, column)
                 if left <= self.ball_x + BALL_SIZE - 1 and self.ball_x <= right and top <= self.ball_y + BALL_SIZE - 1 and self.ball_y <= bottom:
-                    self.bricks[row][column] = False
+                    self.bricks[row][column] -= 1
+                    if self.bricks[row][column] > 0:
+                        # A tough brick cracks first and pays on the second hit.
+                        self.audio.play("wall")
+                        self.ball_vy = -self.ball_vy
+                        return
                     self.audio.play("brick")
                     self.score += ROW_POINTS[row]
                     # Bounce off whichever face the ball was closest to.
@@ -150,10 +181,16 @@ class BreakoutGame(GameWidget):
                     if not any(any(brick_row) for brick_row in self.bricks):
                         self.level += 1
                         self._build_level()
+                        self.audio.play("start")
                     return
 
     def hud(self) -> dict[str, Any]:
-        return {"Score": self.score, "Best": max(self.store.best, self.score), "Lives": max(0, self.lives), "Level": self.level}
+        return {
+            "Score": self.score,
+            "Best": max(self.store.best, self.score),
+            "Lives": max(0, self.lives),
+            "Level": f"{self.level}/{len(LEVELS)}",
+        }
 
     def render(self, size: int = PANEL) -> Image.Image:
         image, draw = new_frame()
@@ -164,9 +201,11 @@ class BreakoutGame(GameWidget):
 
         for row in range(BRICK_ROWS):
             for column in range(BRICK_COLS):
-                if self.bricks[row][column]:
+                strength = self.bricks[row][column]
+                if strength:
                     left, top, right, bottom = self._brick_rect(row, column)
-                    draw.rectangle((left, top, right - 1, bottom), fill=ROW_COLORS[row])
+                    color = ROW_COLORS[row] if strength == 1 else shade(ROW_COLORS[row], TOUGH_TINT)
+                    draw.rectangle((left, top, right - 1, bottom), fill=color)
 
         draw.rectangle(
             (int(self.paddle_x), PADDLE_Y, int(self.paddle_x) + self.paddle_width - 1, PADDLE_Y + PADDLE_HEIGHT - 1),
@@ -189,8 +228,8 @@ class BreakoutGame(GameWidget):
 def demo_snapshot() -> BreakoutGame:
     game = BreakoutGame(seed=2)
     for column in range(BRICK_COLS):
-        game.bricks[0][column] = column % 3 != 0
-        game.bricks[1][column] = column % 4 != 1
+        game.bricks[0][column] = 0 if column % 3 == 0 else 1
+        game.bricks[1][column] = 0 if column % 4 == 1 else 1
     game.score = 320
     game.ball_x = 30
     game.ball_y = 40

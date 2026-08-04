@@ -7,6 +7,7 @@ produces, so both drive the games through one binding.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator
@@ -50,6 +51,14 @@ BUTTON_MAP = {
 #: Fraction of an analog axis before it counts as a push.
 DEFAULT_DEADZONE = 0.5
 
+# The I2C module's MCU produces auto-repeat and long-press itself. A gamepad
+# only reports raw press and release, so the same events are synthesised here
+# from held state and time. Without this a held stick moves once and a long
+# press never happens, which means no quick wheel from a controller.
+REPEAT_DELAY = 0.28
+REPEAT_INTERVAL = 0.09
+LONG_PRESS_SECONDS = 0.55
+
 
 @dataclass(frozen=True)
 class GamepadInfo:
@@ -70,11 +79,24 @@ class GamepadMapper:
     Kept free of evdev itself so the mapping can be tested anywhere.
     """
 
-    def __init__(self, deadzone: float = DEFAULT_DEADZONE) -> None:
+    def __init__(
+        self,
+        deadzone: float = DEFAULT_DEADZONE,
+        *,
+        repeat_delay: float = REPEAT_DELAY,
+        repeat_interval: float = REPEAT_INTERVAL,
+        long_press: float = LONG_PRESS_SECONDS,
+    ) -> None:
         self.deadzone = max(0.1, min(0.9, float(deadzone)))
+        self.repeat_delay = max(0.0, float(repeat_delay))
+        self.repeat_interval = max(0.02, float(repeat_interval))
+        self.long_press = max(0.1, float(long_press))
         self._axis_range: dict[int, tuple[float, float]] = {}
         self._direction = Direction.NEUTRAL
         self._axes: dict[int, float] = {ABS_X: 0.0, ABS_Y: 0.0, ABS_HAT0X: 0.0, ABS_HAT0Y: 0.0}
+        self._next_repeat = 0.0
+        self._held: dict[Button, float] = {}
+        self._long_fired: set[Button] = set()
 
     def configure_axis(self, code: int, minimum: float, maximum: float) -> None:
         """Tell the mapper an axis range, so sticks normalise correctly."""
@@ -89,25 +111,50 @@ class GamepadMapper:
         span = (high - low) / 2
         return max(-1.0, min(1.0, (float(value) - middle) / span)) if span else 0.0
 
-    def feed(self, event_type: int, code: int, value: int) -> list[JoystickEvent]:
+    def feed(self, event_type: int, code: int, value: int, now: float | None = None) -> list[JoystickEvent]:
+        now = time.monotonic() if now is None else now
         if event_type == EV_KEY:
-            return self._button(code, value)
+            return self._button(code, value, now)
         if event_type == EV_ABS:
-            return self._axis(code, value)
+            return self._axis(code, value, now)
         return []
 
-    def _button(self, code: int, value: int) -> list[JoystickEvent]:
+    def tick(self, now: float | None = None) -> list[JoystickEvent]:
+        """Events that come from holding rather than from moving.
+
+        Called every poll, so a held direction repeats and a held button
+        becomes a long press, matching what the I2C module reports.
+        """
+        now = time.monotonic() if now is None else now
+        events: list[JoystickEvent] = []
+
+        if self._direction != Direction.NEUTRAL and now >= self._next_repeat:
+            self._next_repeat = now + self.repeat_interval
+            x, y = self._vector()
+            events.append(JoystickEvent(kind="direction", direction=self._direction, repeat=True, x=x, y=y))
+
+        for button, since in list(self._held.items()):
+            if button not in self._long_fired and now - since >= self.long_press:
+                self._long_fired.add(button)
+                events.append(JoystickEvent(kind="button", button=button, event=ButtonEvent.LONG_PRESS_START))
+        return events
+
+    def _button(self, code: int, value: int, now: float) -> list[JoystickEvent]:
         button = BUTTON_MAP.get(code)
         if button is None:
             return []
         # 1 is press, 2 is auto-repeat from the kernel, 0 is release.
         if value == 0:
+            self._held.pop(button, None)
+            self._long_fired.discard(button)
             return [JoystickEvent(kind="button", button=button, event=ButtonEvent.PRESS_UP)]
         if value == 1:
+            self._held[button] = now
+            self._long_fired.discard(button)
             return [JoystickEvent(kind="button", button=button, event=ButtonEvent.PRESS_DOWN)]
         return []
 
-    def _axis(self, code: int, value: int) -> list[JoystickEvent]:
+    def _axis(self, code: int, value: int, now: float = 0.0) -> list[JoystickEvent]:
         if code not in self._axes:
             return []
         # Hats are already -1/0/1; sticks need their reported range applied.
@@ -116,6 +163,8 @@ class GamepadMapper:
         if direction == self._direction:
             return []
         self._direction = direction
+        # A fresh push waits the initial delay before it starts repeating.
+        self._next_repeat = now + self.repeat_delay
         if direction == Direction.NEUTRAL:
             return []
         x, y = self._vector()
@@ -234,17 +283,18 @@ class GamepadReader:
                 self.mapper.configure_axis(code, getattr(info, "min", -1), getattr(info, "max", 1))
 
     def poll(self) -> Iterator[JoystickEvent]:
-        """Drain whatever the pad has sent since the last call."""
+        """Drain the pad, then add whatever holding it has produced."""
         try:
             while True:
                 event = self._device.read_one()
                 if event is None:
-                    return
+                    break
                 for mapped in self.mapper.feed(event.type, event.code, event.value):
                     yield mapped
         except OSError:
             # The pad went away mid-read; the service will notice and reconnect.
             raise
+        yield from self.mapper.tick()
 
     def close(self) -> None:
         try:
@@ -266,10 +316,11 @@ class FakeGamepad:
     def send(self, event_type: int, code: int, value: int) -> None:
         self.queued.append((event_type, code, value))
 
-    def poll(self) -> Iterator[JoystickEvent]:
+    def poll(self, now: float | None = None) -> Iterator[JoystickEvent]:
         pending, self.queued = self.queued, []
         for event_type, code, value in pending:
-            yield from self.mapper.feed(event_type, code, value)
+            yield from self.mapper.feed(event_type, code, value, now)
+        yield from self.mapper.tick(now)
 
     def close(self) -> None:
         self.closed = True
@@ -296,4 +347,7 @@ __all__ = [
     "ABS_HAT0X",
     "ABS_HAT0Y",
     "DEFAULT_DEADZONE",
+    "REPEAT_DELAY",
+    "REPEAT_INTERVAL",
+    "LONG_PRESS_SECONDS",
 ]

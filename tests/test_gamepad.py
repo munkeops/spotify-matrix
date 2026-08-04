@@ -281,3 +281,104 @@ def test_the_cross_check_survives_bluetooth_being_unavailable(monkeypatch):
     )
 
     assert service._advice([]), "a broken bluetooth stack must not break this panel"
+
+
+# --- holding, which the I2C module gets from its MCU ---------------------
+
+
+def test_a_held_direction_repeats():
+    """Without this a held stick moves once, so Breakout was unplayable."""
+    pad = mapper()
+    assert [e.direction for e in pad.feed(EV_ABS, ABS_HAT0X, -1, now=0.0)] == [Direction.LEFT]
+
+    assert pad.tick(0.1) == [], "nothing until the initial delay passes"
+
+    first = pad.tick(0.35)
+    assert [e.direction for e in first] == [Direction.LEFT]
+    assert first[0].repeat is True
+
+    assert pad.tick(0.36) == [], "repeats are spaced, not every poll"
+    assert [e.direction for e in pad.tick(0.5)] == [Direction.LEFT]
+
+
+def test_releasing_stops_the_repeat():
+    pad = mapper()
+    pad.feed(EV_ABS, ABS_HAT0X, -1, now=0.0)
+    pad.tick(0.4)
+    pad.feed(EV_ABS, ABS_HAT0X, 0, now=0.5)
+
+    assert pad.tick(1.0) == []
+
+
+def test_changing_direction_restarts_the_delay():
+    pad = mapper()
+    pad.feed(EV_ABS, ABS_HAT0X, -1, now=0.0)
+    pad.tick(0.4)
+    pad.feed(EV_ABS, ABS_HAT0X, 1, now=0.5)
+
+    assert pad.tick(0.55) == [], "a fresh push waits again before repeating"
+    assert [e.direction for e in pad.tick(0.85)] == [Direction.RIGHT]
+
+
+def test_a_held_button_becomes_a_long_press():
+    """The quick wheel opens on a long press, which a pad never reported."""
+    pad = mapper()
+    assert [e.event for e in pad.feed(EV_KEY, BTN_START, 1, now=0.0)] == [ButtonEvent.PRESS_DOWN]
+
+    assert pad.tick(0.2) == []
+    assert [e.event for e in pad.tick(0.6)] == [ButtonEvent.LONG_PRESS_START]
+    assert pad.tick(1.5) == [], "a long press fires once, not forever"
+
+
+def test_a_quick_tap_is_not_a_long_press():
+    pad = mapper()
+    pad.feed(EV_KEY, BTN_START, 1, now=0.0)
+    pad.feed(EV_KEY, BTN_START, 0, now=0.1)
+
+    assert pad.tick(2.0) == []
+
+
+def test_the_same_button_can_be_long_pressed_twice():
+    pad = mapper()
+    pad.feed(EV_KEY, BTN_START, 1, now=0.0)
+    assert pad.tick(0.6)
+    pad.feed(EV_KEY, BTN_START, 0, now=0.7)
+
+    pad.feed(EV_KEY, BTN_START, 1, now=1.0)
+    assert [e.event for e in pad.tick(1.6)] == [ButtonEvent.LONG_PRESS_START]
+
+
+def test_a_long_press_opens_the_wheel_from_a_pad(tmp_path, monkeypatch):
+    from matrix_input.shell import read_shell_state
+
+    config_module, game_module, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.breakout"
+    config_module.config_service.save_config(config)
+
+    pad = FakeGamepad([(EV_KEY, BTN_START, 1)])
+    for event in pad.poll(now=0.0):
+        gamepad_module.gamepad_service._dispatch(event)
+    for event in pad.poll(now=1.0):
+        gamepad_module.gamepad_service._dispatch(event)
+
+    state = read_shell_state(game_module.game_service.state_dir / "shell.json")
+    assert state["wheel"]["open"] is True, "the wheel must open from a controller too"
+
+
+def test_holding_left_keeps_moving_the_paddle(tmp_path, monkeypatch):
+    _, game_module, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
+    config_module = importlib.import_module("src.domain.services.config_service")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.breakout"
+    config_module.config_service.save_config(config)
+
+    pad = FakeGamepad([(EV_ABS, ABS_HAT0X, -1)])
+    for moment in (0.0, 0.35, 0.45, 0.55):
+        for event in pad.poll(now=moment):
+            gamepad_module.gamepad_service._dispatch(event)
+
+    actions, _ = mg.read_commands(game_module.game_service.input_path("breakout"), 0)
+    assert actions.count("left") >= 3, f"a held stick should keep moving, got {actions}"

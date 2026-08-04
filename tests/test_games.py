@@ -1131,3 +1131,60 @@ def test_runtime_args_carry_the_score_file(tmp_path, monkeypatch):
 
     args = runtime_module.runtime_service._args()
     assert args[args.index("--game-scores") + 1] == str(game_module.game_service.scores_path("flappy"))
+
+
+def test_breakout_levels_differ():
+    breakout = mg.plugin_module("breakout")
+    assert len(breakout.LEVELS) >= 10
+
+    walls = []
+    for level in range(1, len(breakout.LEVELS) + 1):
+        game = mg.create_game("breakout", {}, seed=1)
+        game.level = level
+        game._build_level()
+        walls.append(tuple(tuple(row) for row in game.bricks))
+    assert len(set(walls)) == len(walls), "every level should be a different wall"
+
+
+def test_breakout_levels_cycle_rather_than_running_out():
+    breakout = mg.plugin_module("breakout")
+    game = mg.create_game("breakout", {}, seed=1)
+    game.level = 1
+    first = game.layout()
+    game.level = len(breakout.LEVELS) + 1
+    assert game.layout() == first
+
+
+def test_a_tough_brick_takes_two_hits():
+    game = mg.create_game("breakout", {}, seed=1)
+    game.level = 5
+    game._build_level()
+    row, column = next((r, c) for r in range(5) for c in range(10) if game.bricks[r][c] == 2)
+
+    left, top, _, _ = game._brick_rect(row, column)
+    game.ball_x, game.ball_y = float(left), float(top)
+    game.handle("fire")
+    score_before = game.score
+
+    game._hit_bricks()
+    assert game.bricks[row][column] == 1, "the first hit only cracks it"
+    assert game.score == score_before, "and pays nothing"
+
+    game.ball_x, game.ball_y = float(left), float(top)
+    game._hit_bricks()
+    assert game.bricks[row][column] == 0
+    assert game.score > score_before
+
+
+def test_clearing_a_wall_advances_and_rebuilds():
+    game = mg.create_game("breakout", {}, seed=1)
+    game.bricks = [[0] * 10 for _ in range(5)]
+    game.bricks[0][0] = 1
+    left, top, _, _ = game._brick_rect(0, 0)
+    game.ball_x, game.ball_y = float(left), float(top)
+    game.handle("fire")
+
+    game._hit_bricks()
+
+    assert game.level == 2
+    assert any(any(row) for row in game.bricks), "the next wall is built"
