@@ -152,19 +152,14 @@ def list_output_devices(include_plumbing: bool = False) -> list[dict[str, Any]]:
             }
         )
 
-    # The bare `bluealsa` alias means "whichever speaker"; once a real one is
-    # listed it is a confusing duplicate of it.
-    named = {
-        device["name"]
+    # `aplay -L` always offers a bare `bluealsa`, but it resolves to
+    # 00:00:00:00:00:00 rather than to any speaker, so opening it can only
+    # ever fail with "PCM not found". Only the daemon's own list is real.
+    devices = [
+        device
         for device in devices
-        if device["kind"] == BLUETOOTH and _bluetooth_address(device["name"])
-    }
-    if named:
-        devices = [
-            device
-            for device in devices
-            if device["kind"] != BLUETOOTH or _bluetooth_address(device["name"])
-        ]
+        if device["kind"] != BLUETOOTH or _bluetooth_address(device["name"])
+    ]
 
     devices.sort(key=lambda device: (ORDER.get(device["kind"], 9), device["label"]))
     return devices

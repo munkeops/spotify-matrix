@@ -303,6 +303,13 @@ in the place the bus looks:
 The container's ALSA plugin then talks to that daemon over the same socket, and
 the speaker appears in Settings under Game sound, by name.
 
-Do not select the bare `bluealsa` PCM by hand if you see it: it means device
-`00:00:00:00:00:00` and fails with "PCM not found". The panel lists speakers by
-address instead, and resolves an old saved setting to whichever is connected.
+The panel lists speakers by address, never the bare `bluealsa` PCM: that one
+means device `00:00:00:00:00:00` and fails with "PCM not found".
+
+If the bridge is running but the speaker still is not offered, reconnect it.
+BlueZ gives the audio connection to whatever was listening when the speaker
+connected, so a speaker already connected before the bridge started is not
+routed through it. Disconnect and reconnect from the Bluetooth panel and it
+will register. Check from the Pi with:
+
+    bluealsa-aplay -L

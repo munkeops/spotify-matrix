@@ -440,12 +440,15 @@ def test_the_bare_bluealsa_alias_is_dropped_once_a_speaker_is_named(monkeypatch)
     assert bluetooth[0]["name"].startswith("bluealsa:DEV=")
 
 
-def test_the_bare_alias_survives_when_it_is_all_there_is(monkeypatch):
+def test_the_bare_alias_is_never_offered(monkeypatch):
+    """It looks like a "whichever speaker" choice and is not one: it means
+    00:00:00:00:00:00, and selecting it failed with "PCM not found"."""
     module = _fake_aplay(monkeypatch, "bluealsa\n    Bluetooth Audio Hub\ndefault\n    Default\n")
 
-    labels = [d["label"] for d in module.list_output_devices() if d["kind"] == "bluetooth"]
+    listed = module.list_output_devices()
 
-    assert labels == ["Bluetooth speaker"]
+    assert not [d for d in listed if d["kind"] == "bluetooth"]
+    assert [d["label"] for d in listed] == ["System default"]
 
 
 def test_bare_sysdefault_is_plumbing_too(monkeypatch):
@@ -670,3 +673,39 @@ def test_the_speaker_reaches_aplay_by_address(monkeypatch):
     device = command[command.index("-D") + 1]
     assert "DEV=E8:07:BF:12:34:56" in device
     assert device.startswith('plug:{SLAVE="'), "still converted for A2DP"
+
+
+def test_a_bridge_with_no_registered_speaker_says_so(monkeypatch):
+    """Running is not the same as routed: BlueZ hands the audio transport to
+    whatever was listening when the speaker connected, so one connected
+    before the bridge started never reaches it."""
+    from matrix_audio import bluealsa
+
+    monkeypatch.setattr(bluealsa, "running", lambda: True)
+    monkeypatch.setattr(bluealsa, "pcms", lambda: [])
+    monkeypatch.setattr(bluealsa, "installed", lambda: True)
+
+    from src.domain.services import audio_service as module
+
+    monkeypatch.setattr(module, "aplay_available", lambda: True)
+    monkeypatch.setattr(
+        module.audio_service, "_bluetooth_audio", lambda: [{"name": "SoundCore 2", "mac": "E8:07:BF:12:34:56"}]
+    )
+    monkeypatch.setattr(module, "list_output_devices", lambda: [
+        {"name": "default", "kind": "default", "label": "System default", "description": "", "plumbing": False},
+    ])
+
+    advice = module.audio_service._advice(module.audio_service.devices())
+
+    assert "SoundCore 2" in advice
+    assert "reconnect" in advice.lower(), "it should say what to do, not just what is wrong"
+
+
+def test_the_bridge_reports_how_many_speakers_reached_it(monkeypatch):
+    bluealsa = _fake_daemon(monkeypatch)
+
+    assert bluealsa.status()["speakers"] == 2, "the speaker and the headset"
+
+    _fake_daemon(monkeypatch, listing="")
+    assert bluealsa.status()["speakers"] == 0
+    assert bluealsa.status()["running"] is True

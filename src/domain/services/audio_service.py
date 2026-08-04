@@ -113,10 +113,7 @@ class AudioService:
                 )
             if not bluealsa.running():
                 return f"{names} is connected, but the bluealsa bridge is not running. {bluealsa.status()['error'] or bluealsa.DBUS_ADVICE}"
-            return (
-                f"{names} is connected and the bridge is up, but ALSA is not offering it "
-                "as an output yet. Reconnect the speaker and refresh."
-            )
+            return f"{names} is connected, but not through the bridge. {bluealsa.NO_PCM_ADVICE}"
         if not self.settings().enabled:
             return "Turn on game sound to hear effects. Use Test to check the output first."
         wireless = sum(1 for device in devices if device["kind"] == BLUETOOTH)

@@ -119,13 +119,27 @@ DBUS_ADVICE = (
 )
 
 
+#: The daemon is up but no speaker has handed it an audio transport.
+NO_PCM_ADVICE = (
+    "The bluealsa bridge is running but no speaker has registered a playback "
+    "PCM with it. BlueZ gives the audio connection to whatever was listening "
+    "when the speaker connected, so a speaker that was already connected "
+    "before the bridge started is not routed through it. Disconnect and "
+    "reconnect the speaker - the Bluetooth panel can do both - and it will "
+    "appear as an output."
+)
+
+
 def status() -> dict[str, object]:
     """Enough for the panel to say what is wrong, not just that it is."""
+    alive = running()
     return {
         "installed": installed(),
-        "running": running(),
+        "running": alive,
         "error": _last_error,
         "binary": binary(),
+        # How many speakers have actually handed it a playback transport.
+        "speakers": len(pcms()) if alive else 0,
     }
 
 

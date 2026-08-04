@@ -551,6 +551,8 @@ class AudioBridge(BaseModel):
     running: bool = False
     error: str = ""
     binary: str = ""
+    #: Speakers that have registered a playback PCM, not merely paired.
+    speakers: int = 0
 
 
 class AudioStateResponse(BaseModel):
