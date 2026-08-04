@@ -166,12 +166,15 @@ export interface BtDevice {
   connected: boolean;
   trusted: boolean;
   icon: string;
+  named: boolean;
+  role: "controller" | "audio" | "input" | "phone" | "computer" | "display" | "other";
 }
 export const btStatus = () =>
-  apiGet<{ available: boolean; powered: boolean; adapter: string; blocked: boolean; powerState: string; advice: string }>("/api/bluetooth/status");
+  apiGet<{ available: boolean; powered: boolean; adapter: string; blocked: boolean; powerState: string; ertmDisabled: boolean | null; advice: string }>("/api/bluetooth/status");
 export const btDevices = () => apiGet<{ available: boolean; devices: BtDevice[] }>("/api/bluetooth/devices");
 export const btScan = (seconds = 8) => apiPost<{ available: boolean; devices: BtDevice[] }>("/api/bluetooth/scan", { seconds });
-export const btConnect = (mac: string) => apiPost("/api/bluetooth/connect", { mac });
+export const btConnect = (mac: string) =>
+  apiPost<{ ok: boolean; message: string; advice: string }>("/api/bluetooth/connect", { mac });
 export const btDisconnect = (mac: string) => apiPost("/api/bluetooth/disconnect", { mac });
 export const btRemove = (mac: string) => apiPost("/api/bluetooth/remove", { mac });
 

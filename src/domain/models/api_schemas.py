@@ -182,6 +182,10 @@ class BluetoothDevice(BaseModel):
     connected: bool = False
     trusted: bool = False
     icon: str = ""
+    #: False when the device has only reported its address so far.
+    named: bool = False
+    #: controller, audio, input, phone, computer, display or other.
+    role: str = "other"
 
 
 class BluetoothStatusResponse(BaseModel):
@@ -190,6 +194,8 @@ class BluetoothStatusResponse(BaseModel):
     adapter: str = ""
     blocked: bool = False
     powerState: str = ""
+    #: None when the kernel setting is not visible from here.
+    ertmDisabled: bool | None = None
     advice: str = ""
 
 
@@ -214,6 +220,7 @@ class BluetoothActionResponse(BaseModel):
     ok: bool
     message: str = ""
     device: BluetoothDevice | None = None
+    advice: str = ""
 
 
 class AppConfig(BaseModel):

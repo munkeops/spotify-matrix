@@ -104,6 +104,44 @@ ls -l /dev/input/event*
 cat /proc/bus/input/devices | grep -A 4 Name
 ```
 
+## Xbox controllers need ERTM disabled
+
+An Xbox Wireless Controller will not stay connected on Linux with Bluetooth
+ERTM enabled. It typically pairs and drops straight away, or refuses to connect
+at all. This is a kernel setting, not something the app can change:
+
+```bash
+# Permanent
+echo 'options bluetooth disable_ertm=1' | sudo tee /etc/modprobe.d/bluetooth.conf
+sudo reboot
+
+# Or try it right now, without rebooting
+echo 1 | sudo tee /sys/module/bluetooth/parameters/disable_ertm
+```
+
+Then forget any half-finished pairing and start again:
+
+```bash
+bluetoothctl remove AA:BB:CC:DD:EE:FF
+bluetoothctl --timeout 15 scan on
+bluetoothctl pair AA:BB:CC:DD:EE:FF
+bluetoothctl trust AA:BB:CC:DD:EE:FF
+bluetoothctl connect AA:BB:CC:DD:EE:FF
+```
+
+Hold the small **pair** button on the top edge until the Xbox light flashes
+*quickly* — a slow blink means it is looking for a console, not a computer.
+
+## A scan is mostly nameless addresses
+
+That is normal. A scan hears every nearby radio, and a device reports its name a
+moment after it first appears, so the list fills in as it goes. The panel
+filters by **Controllers** and **Audio**, sorts anything connected or paired to
+the top, and hides nameless strangers behind **Show unnamed**.
+
+If your controller only shows as a MAC, scan again once it has settled, or
+switch to **All** and look for the address.
+
 ## Controls
 
 The binding adapts to whatever the running game declares, exactly like the

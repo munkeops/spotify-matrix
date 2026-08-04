@@ -17,6 +17,65 @@ from loguru import logger
 _DEVICE_LINE = re.compile(r"^Device\s+([0-9A-Fa-f:]{17})\s+(.*)$")
 _MAC = re.compile(r"^[0-9A-Fa-f:]{17}$")
 
+# BlueZ's Icon tells you what a device is, which is what lets the UI separate a
+# controller from a speaker from the pile of nameless things a scan turns up.
+_ROLE_BY_ICON = {
+    "audio-card": "audio",
+    "audio-headset": "audio",
+    "audio-headphones": "audio",
+    "audio-speaker": "audio",
+    "input-gaming": "controller",
+    "input-gamepad": "controller",
+    "input-joystick": "controller",
+    "input-keyboard": "input",
+    "input-mouse": "input",
+    "input-tablet": "input",
+    "phone": "phone",
+    "computer": "computer",
+    "video-display": "display",
+}
+
+#: Names that give a device away when BlueZ has not worked out an icon yet.
+_ROLE_BY_NAME = (
+    ("controller", ("xbox", "dualshock", "dualsense", "wireless controller", "8bitdo", "gamepad", "joy-con", "stadia")),
+    ("audio", ("speaker", "soundbar", "headphone", "headset", "buds", "airpods", "jbl", "bose", "sony wh", "echo")),
+)
+
+
+def ertm_disabled() -> bool | None:
+    """Whether Bluetooth ERTM is off. None when the setting is not visible.
+
+    Xbox Wireless Controllers will not stay connected on Linux with ERTM on,
+    which is the single most common reason an Xbox pad refuses to pair.
+    """
+    from pathlib import Path as _Path
+
+    node = _Path("/sys/module/bluetooth/parameters/disable_ertm")
+    try:
+        return node.read_text(encoding="utf-8").strip().upper() in ("Y", "1")
+    except OSError:
+        return None
+
+
+ERTM_HELP = (
+    "Xbox controllers need Bluetooth ERTM disabled on Linux or they will not stay connected. "
+    "Run: echo 'options bluetooth disable_ertm=1' | sudo tee /etc/modprobe.d/bluetooth.conf "
+    "then reboot. To try it now without rebooting: "
+    "echo 1 | sudo tee /sys/module/bluetooth/parameters/disable_ertm"
+)
+
+
+def classify(icon: str, name: str) -> str:
+    """Best guess at what a device is, for grouping the scan results."""
+    role = _ROLE_BY_ICON.get((icon or "").strip().lower())
+    if role:
+        return role
+    lowered = (name or "").lower()
+    for candidate, needles in _ROLE_BY_NAME:
+        if any(needle in lowered for needle in needles):
+            return candidate
+    return "other"
+
 
 class BluetoothService:
     def _binary(self) -> str | None:
@@ -106,6 +165,7 @@ class BluetoothService:
             "adapter": name_match.group(1).strip() if name_match else "",
             "blocked": blocked,
             "powerState": power_state,
+            "ertmDisabled": ertm_disabled(),
             "advice": self._advice(no_adapter, blocked, powered, power_state),
         }
 
@@ -137,13 +197,19 @@ class BluetoothService:
         ok, output = self._run(["info", mac])
         name_match = re.search(r"Name:\s*(.+)", output)
         icon_match = re.search(r"Icon:\s*(.+)", output)
+        name = name_match.group(1).strip() if name_match else ""
+        icon = icon_match.group(1).strip() if icon_match else ""
         return {
             "mac": mac,
-            "name": name_match.group(1).strip() if name_match else mac,
+            # A device that has not answered a name request yet only has its
+            # address, which is most of what a scan turns up.
+            "name": name or mac,
+            "named": bool(name),
             "paired": "Paired: yes" in output,
             "connected": "Connected: yes" in output,
             "trusted": "Trusted: yes" in output,
-            "icon": icon_match.group(1).strip() if icon_match else "",
+            "icon": icon,
+            "role": classify(icon, name),
         }
 
     def _parse_device_list(self, output: str) -> list[str]:
@@ -159,7 +225,19 @@ class BluetoothService:
             return []
         ok, output = self._run(["devices"])
         macs = self._parse_device_list(output)
-        return [self._device_info(mac) for mac in macs]
+        devices = [self._device_info(mac) for mac in macs]
+        # Connected first, then paired, then anything that told us its name.
+        # Nameless strangers sink to the bottom where the UI can hide them.
+        return sorted(
+            devices,
+            key=lambda device: (
+                not device["connected"],
+                not device["paired"],
+                not device["named"],
+                device["role"] == "other",
+                device["name"].lower(),
+            ),
+        )
 
     def scan(self, seconds: int = 8) -> list[dict[str, Any]]:
         if not self.available():
@@ -184,7 +262,36 @@ class BluetoothService:
         ok, output = self._run(["connect", address], timeout=30)
         messages.append(f"connect: {output}")
         final = self._device_info(address)
-        return {"ok": final["connected"], "message": " | ".join(m for m in messages if m), "device": final}
+        return {
+            "ok": final["connected"],
+            "message": " | ".join(m for m in messages if m),
+            "device": final,
+            "advice": "" if final["connected"] else self._connect_advice(final, " ".join(messages)),
+        }
+
+    def _connect_advice(self, device: dict[str, Any], output: str) -> str:
+        """Why a connect failed, in terms of what to do about it."""
+        lowered = (output or "").lower()
+        name = (device.get("name") or "").lower()
+        is_xbox = "xbox" in name or device.get("role") == "controller"
+
+        if is_xbox and ertm_disabled() is False:
+            return ERTM_HELP
+        if "authentication" in lowered or "failed" in lowered and device.get("paired"):
+            return (
+                "Pairing exists but the connection failed. Remove the device and pair again: "
+                f"bluetoothctl remove {device.get('mac', '')}"
+            )
+        if "not available" in lowered or "does not exist" in lowered:
+            return "The device stopped advertising. Put it back into pairing mode and scan again."
+        if "in progress" in lowered:
+            return "A connection is already in progress. Give it a few seconds and check again."
+        if is_xbox:
+            return ERTM_HELP
+        return (
+            "Put the device back into pairing mode and try again. If it keeps failing, remove it first "
+            f"with: bluetoothctl remove {device.get('mac', '')}"
+        )
 
     def disconnect(self, mac: str) -> dict[str, Any]:
         address = self._safe_mac(mac)

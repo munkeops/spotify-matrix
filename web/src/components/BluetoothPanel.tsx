@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardContent, Stack, Typography, Button, Chip, Box, Alert } from "@mui/material";
+import { Card, CardContent, Stack, Typography, Button, Chip, Box, Alert, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import BluetoothRoundedIcon from "@mui/icons-material/BluetoothRounded";
 import { BtDevice, btStatus, btDevices, btScan, btConnect, btDisconnect, btRemove } from "../api";
 
@@ -13,6 +13,10 @@ export default function BluetoothPanel() {
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [connectAdvice, setConnectAdvice] = useState("");
+  // A scan turns up every nearby radio, so start on what you came for.
+  const [filter, setFilter] = useState<"controller" | "audio" | "all">("all");
+  const [showUnnamed, setShowUnnamed] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -43,10 +47,15 @@ export default function BluetoothPanel() {
     }
   };
 
-  const act = async (fn: () => Promise<unknown>, mac: string) => {
+  const act = async (fn: () => Promise<any>, mac: string) => {
     setBusy(mac);
+    setConnectAdvice("");
     try {
-      await fn();
+      const result = await fn();
+      // A failed connect explains itself rather than just going quiet.
+      if (result && typeof result === "object" && "ok" in result && !result.ok) {
+        setConnectAdvice(String((result as any).advice || (result as any).message || ""));
+      }
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -55,7 +64,15 @@ export default function BluetoothPanel() {
     }
   };
 
-  const sorted = [...devices].sort((a, b) => Number(b.connected) - Number(a.connected) || Number(b.paired) - Number(a.paired));
+  const counts = {
+    controller: devices.filter((d) => d.role === "controller").length,
+    audio: devices.filter((d) => d.role === "audio").length,
+    all: devices.length,
+  };
+  const sorted = devices
+    .filter((d) => filter === "all" || d.role === filter)
+    // Anything already set up stays visible whatever the filters say.
+    .filter((d) => showUnnamed || d.named || d.paired || d.connected);
 
   return (
     <Card>
@@ -72,6 +89,12 @@ export default function BluetoothPanel() {
 
         {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
 
+        {connectAdvice ? (
+          <Alert severity="warning" sx={{ mb: 1 }} onClose={() => setConnectAdvice("")}>
+            {connectAdvice}
+          </Alert>
+        ) : null}
+
         {advice ? (
           <Alert severity={!available || blocked ? "warning" : powered ? "info" : "warning"} sx={{ mb: 1 }}>
             {advice}
@@ -83,10 +106,32 @@ export default function BluetoothPanel() {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Adapter {adapter || "ready"} · power {powered ? "on" : "off"}
             </Typography>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1, flexWrap: "wrap" }} useFlexGap>
+              <ToggleButtonGroup size="small" exclusive value={filter} onChange={(_, next) => next && setFilter(next)}>
+                <ToggleButton value="controller" sx={{ textTransform: "none", py: 0.25 }}>
+                  Controllers ({counts.controller})
+                </ToggleButton>
+                <ToggleButton value="audio" sx={{ textTransform: "none", py: 0.25 }}>
+                  Audio ({counts.audio})
+                </ToggleButton>
+                <ToggleButton value="all" sx={{ textTransform: "none", py: 0.25 }}>
+                  All ({counts.all})
+                </ToggleButton>
+              </ToggleButtonGroup>
+              <Chip
+                size="small"
+                variant={showUnnamed ? "filled" : "outlined"}
+                label={showUnnamed ? "Hide unnamed" : "Show unnamed"}
+                onClick={() => setShowUnnamed((value) => !value)}
+              />
+            </Stack>
+
             <Stack spacing={1}>
               {sorted.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
-                  No devices yet. Put the device in pairing mode first, then tap Scan.
+                  {devices.length === 0
+                    ? "No devices yet. Put the device in pairing mode first, then tap Scan."
+                    : "Nothing on this filter. Devices report their name a moment after they appear, so scan again or show unnamed."}
                 </Typography>
               ) : null}
               {sorted.map((device) => (
@@ -94,7 +139,8 @@ export default function BluetoothPanel() {
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>{device.name || device.mac}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {device.mac}{device.connected ? " · Connected" : device.paired ? " · Paired" : ""}
+                      {device.role !== "other" ? `${device.role} · ` : ""}{device.mac}
+                      {device.connected ? " · Connected" : device.paired ? " · Paired" : ""}
                     </Typography>
                   </Box>
                   <Stack direction="row" spacing={0.5}>
