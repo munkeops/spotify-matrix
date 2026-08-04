@@ -2,24 +2,37 @@ from __future__ import annotations
 
 import importlib
 import json
+import shutil
 import sys
 from pathlib import Path
 
 import pytest
 
 import matrix_games as mg
-from matrix_games import base
-from matrix_games.breakout import BRICK_COLS, BRICK_ROWS, BreakoutGame
-from matrix_games.connect_four import COLUMNS as C4_COLUMNS, ROWS as C4_ROWS, ConnectFourGame
-from matrix_games.flappy import FlappyGame
-from matrix_games.invaders import InvadersGame
-from matrix_games.pacman import COLS as MAZE_COLS, MAZE, ROWS as MAZE_ROWS, PacmanGame, walkable
-from matrix_games.pong import PongGame
-from matrix_games.render import PANEL, frame_to_pixels
-from matrix_games.snake import COLS as SNAKE_COLS, ROWS as SNAKE_ROWS, SnakeGame
+from assistant_matrix_sdk import game as base
+from assistant_matrix_sdk.pixels import PANEL, frame_to_pixels
 from src.utils.frame_codec import decode_frame
 
-ALL_GAMES = sorted(mg.GAMES)
+# Games live in store_widgets/ as plugins, so the tests load them the same way
+# the host does rather than importing modules that no longer exist.
+breakout = mg.plugin_module("breakout")
+BRICK_COLS, BRICK_ROWS, BreakoutGame = breakout.BRICK_COLS, breakout.BRICK_ROWS, breakout.BreakoutGame
+
+connect_four = mg.plugin_module("connect4")
+C4_COLUMNS, C4_ROWS, ConnectFourGame = connect_four.COLUMNS, connect_four.ROWS, connect_four.ConnectFourGame
+
+FlappyGame = mg.game_class("flappy")
+InvadersGame = mg.game_class("invaders")
+PongGame = mg.game_class("pong")
+
+pacman = mg.plugin_module("pacman")
+MAZE, MAZE_COLS, MAZE_ROWS = pacman.MAZE, pacman.COLS, pacman.ROWS
+PacmanGame, walkable = pacman.PacmanGame, pacman.walkable
+
+snake = mg.plugin_module("snake")
+SNAKE_COLS, SNAKE_ROWS, SnakeGame = snake.COLS, snake.ROWS, snake.SnakeGame
+
+ALL_GAMES = sorted(mg.discover())
 
 
 SERVICE_MODULES = [
@@ -46,7 +59,7 @@ def reload_game_stack(monkeypatch, data_dir: Path):
 @pytest.mark.parametrize("game_id", ALL_GAMES)
 def test_every_game_survives_a_long_random_session(game_id):
     game = mg.create_game(game_id, {}, seed=5)
-    actions = list(mg.GAMES[game_id].factory.actions) or ["pause"]
+    actions = [a for a in mg.discover()[game_id].actions if a not in mg.COMMON_GAME_ACTIONS] or ["pause"]
     for tick in range(600):
         game.command(actions[tick % len(actions)])
         game.step(0.05)
@@ -105,10 +118,11 @@ def test_unknown_game_is_rejected():
 
 
 def test_every_spec_declares_its_common_actions():
-    for spec in mg.GAMES.values():
+    for spec in mg.discover().values():
         assert spec.widget_id == f"core.{spec.game_id}"
-        assert set(mg.COMMON_ACTIONS).issubset(set(spec.actions))
-        assert spec.layout in (mg.DPAD, mg.HORIZONTAL, mg.VERTICAL, mg.TAP, mg.TETRIS_PAD)
+        assert set(mg.COMMON_GAME_ACTIONS).issubset(set(spec.actions))
+        assert spec.layout in mg.GAME_LAYOUTS
+        assert spec.package_dir.joinpath("widget.toml").exists()
 
 
 # --- Pac-Man ------------------------------------------------------------
@@ -545,7 +559,8 @@ def test_active_game_follows_the_display_mode(tmp_path, monkeypatch):
     assert game_module.game_service.active_game_id() == ""
 
     config = config_module.config_service.get_config()
-    config.display.mode = "pacman"
+    config.display.mode = "widget"
+    config.display.widgetId = "core.pacman"
     config_module.config_service.save_config(config)
     assert game_module.game_service.active_game_id() == "pacman"
 
@@ -576,9 +591,12 @@ def test_each_game_is_a_configurable_widget(tmp_path, monkeypatch, game_id):
     widget = registry_module.widget_registry_service.get_local_widget(f"core.{game_id}")
     assert widget is not None
     assert widget.manifest.category == "games"
+    assert widget.manifest.kind == "game"
 
     registry_module.widget_registry_service.apply_widget(f"core.{game_id}")
-    assert config_module.config_service.get_config().display.mode == game_id
+    saved = config_module.config_service.get_config()
+    assert saved.display.mode == "widget"
+    assert saved.display.widgetId == f"core.{game_id}"
 
 
 def test_runtime_passes_the_active_game_queue(tmp_path, monkeypatch):
@@ -586,11 +604,13 @@ def test_runtime_passes_the_active_game_queue(tmp_path, monkeypatch):
     runtime_module = importlib.import_module("src.domain.services.runtime_service")
 
     config = config_module.config_service.get_config()
-    config.display.mode = "invaders"
+    config.display.mode = "widget"
+    config.display.widgetId = "core.invaders"
     config_module.config_service.save_config(config)
 
     args = runtime_module.runtime_service._args()
-    assert args[args.index("--display-mode") + 1] == "invaders"
+    assert args[args.index("--display-mode") + 1] == "widget"
+    assert args[args.index("--widget-id") + 1] == "core.invaders"
     assert args[args.index("--game-input") + 1] == str(game_module.game_service.input_path("invaders"))
     assert args[args.index("--game-state") + 1] == str(game_module.game_service.state_path("invaders"))
 
@@ -603,7 +623,7 @@ def test_runtime_renders_one_frame_per_game(tmp_path, game_id):
     state_path = tmp_path / f"{game_id}-state.json"
     args = runtime.build_parser().parse_args(
         [
-            "--display-mode", game_id,
+            "--display-mode", "widget",
             "--mock-output", str(frame_path),
             "--game-state", str(state_path),
             "--config-path", str(tmp_path / "config.json"),
@@ -631,3 +651,137 @@ def test_restart_button_waits_out_the_grace_period():
     game.command("hardDrop")
     assert game.game_over is False
     assert game.status() == base.PLAYING
+
+
+# --- adding a game plugin ------------------------------------------------
+
+
+DROP_IN_GAME = '''
+from typing import Any
+
+from PIL import Image
+
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, fit_panel, new_frame
+
+
+class DropInGame(GameWidget):
+    game_id = "dropin"
+    id = "third.dropin"
+    name = "Drop In"
+    summary = "A game added without touching the app."
+    layout = "horizontal"
+    actions = ("left", "right")
+    config_fields = [ConfigField.number("size", label="Size", default=4, minimum=1, maximum=9, step=1)]
+
+    def reset(self) -> None:
+        self.x = 10
+        self.moves = 0
+
+    def handle(self, action: str) -> None:
+        self.x += 1 if action == "right" else -1
+        self.moves += 1
+
+    def advance(self, elapsed: float) -> None:
+        pass
+
+    def hud(self) -> dict[str, Any]:
+        return {"Moves": self.moves}
+
+    def render(self, size: int = PANEL) -> Image.Image:
+        image, draw = new_frame()
+        draw.rectangle((self.x, 30, self.x + 3, 33), fill=(90, 220, 255))
+        return fit_panel(image, size)
+'''
+
+
+def install_drop_in_game(packages_dir: Path) -> Path:
+    """Author a game package the way a third party would."""
+    import importlib.util
+
+    package = packages_dir / "third.dropin"
+    (package / "renderer").mkdir(parents=True)
+    (package / "renderer" / "__init__.py").write_text("", encoding="utf-8")
+    (package / "renderer" / "widget.py").write_text(DROP_IN_GAME, encoding="utf-8")
+
+    spec = importlib.util.spec_from_file_location("drop_in_probe", package / "renderer" / "widget.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["drop_in_probe"] = module
+    spec.loader.exec_module(module)
+    manifest = module.DropInGame.manifest(entrypoint="renderer.widget:DropInGame")
+    widget = manifest["widget"]
+    lines = ["[widget]"]
+    for key, value in widget.items():
+        if isinstance(value, list):
+            lines.append(f"{key} = [" + ", ".join(f'"{item}"' for item in value) + "]")
+        else:
+            lines.append(f'{key} = "{value}"')
+    (package / "widget.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return package
+
+
+def test_a_dropped_in_package_becomes_a_playable_game(tmp_path, monkeypatch):
+    config_module, game_module, registry_module = reload_game_stack(monkeypatch, tmp_path / "data")
+    packages = tmp_path / "data" / "widgets" / "packages"
+    packages.mkdir(parents=True)
+    install_drop_in_game(packages)
+
+    # Discovered without any change to the app.
+    specs = game_module.game_service.specs()
+    assert "dropin" in specs
+    spec = specs["dropin"]
+    assert spec.bundled is False
+    assert spec.layout == "horizontal"
+    assert "left" in spec.actions and "restart" in spec.actions
+
+    # Runnable.
+    game = spec.create({})
+    game.command("right")
+    assert game.hud() == {"Moves": 1}
+    assert game.render(PANEL).size == (PANEL, PANEL)
+
+    # Listed and configurable like any other plugin.
+    registry_module.runtime_service.apply = lambda: {"stub": True}
+    widget = registry_module.widget_registry_service.get_local_widget("third.dropin")
+    assert widget is not None
+    assert widget.manifest.kind == "game"
+    assert widget.builtIn is False
+
+    # Applying it points the panel at the package.
+    registry_module.widget_registry_service.apply_widget("third.dropin")
+    saved = config_module.config_service.get_config()
+    assert saved.display.mode == "widget"
+    assert saved.display.widgetId == "third.dropin"
+    assert game_module.game_service.active_game_id() == "dropin"
+
+    # And it accepts controller input on its own queue.
+    game_module.game_service.queue_command("dropin", "left")
+    actions, _ = mg.read_commands(game_module.game_service.input_path("dropin"), 0)
+    assert actions == ["left"]
+
+
+def test_an_installed_package_shadows_a_bundled_game(tmp_path, monkeypatch):
+    _, game_module, _ = reload_game_stack(monkeypatch, tmp_path / "data")
+    packages = tmp_path / "data" / "widgets" / "packages"
+    packages.mkdir(parents=True)
+
+    bundled = game_module.game_service.specs()["snake"]
+    assert bundled.bundled is True
+
+    shutil.copytree(bundled.package_dir, packages / "core.snake")
+    replaced = game_module.game_service.specs()["snake"]
+    assert replaced.bundled is False, "an installed build must win over the shipped one"
+
+
+def test_a_broken_package_does_not_break_discovery(tmp_path, monkeypatch):
+    _, game_module, _ = reload_game_stack(monkeypatch, tmp_path / "data")
+    packages = tmp_path / "data" / "widgets" / "packages"
+    (packages / "broken.game").mkdir(parents=True)
+    (packages / "broken.game" / "widget.toml").write_text("this is not valid toml {{{", encoding="utf-8")
+    (packages / "no.manifest").mkdir(parents=True)
+
+    specs = game_module.game_service.specs()
+
+    assert "snake" in specs, "a bad package must not hide the good ones"
+    assert "game" not in specs and "manifest" not in specs

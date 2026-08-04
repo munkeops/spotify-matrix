@@ -4,12 +4,21 @@
   "title": "Assistant Matrix Widget Manifest",
   "description": "Author-facing widget.toml/widget.json contract for Assistant Matrix widgets.",
   "type": "object",
-  "required": ["widget"],
+  "required": [
+    "widget"
+  ],
   "additionalProperties": false,
   "properties": {
     "widget": {
       "type": "object",
-      "required": ["id", "name", "version", "summary", "runtime", "entrypoint"],
+      "required": [
+        "id",
+        "name",
+        "version",
+        "summary",
+        "runtime",
+        "entrypoint"
+      ],
       "additionalProperties": false,
       "properties": {
         "id": {
@@ -34,12 +43,23 @@
         },
         "category": {
           "type": "string",
-          "enum": ["media", "time", "assistant", "information", "diagnostics", "games", "custom"],
+          "enum": [
+            "media",
+            "time",
+            "assistant",
+            "information",
+            "diagnostics",
+            "games",
+            "custom"
+          ],
           "default": "custom"
         },
         "runtime": {
           "type": "string",
-          "enum": ["python", "builtin"]
+          "enum": [
+            "python",
+            "builtin"
+          ]
         },
         "entrypoint": {
           "type": "string",
@@ -53,6 +73,33 @@
         "license": {
           "type": "string",
           "default": "MIT"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "widget",
+            "game"
+          ],
+          "default": "widget",
+          "description": "game marks a package the host drives with a controller"
+        },
+        "layout": {
+          "type": "string",
+          "enum": [
+            "dpad",
+            "horizontal",
+            "vertical",
+            "tap",
+            "tetris"
+          ],
+          "description": "Control pad a game asks the controller to render"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Controller actions a game accepts"
         }
       }
     },
@@ -77,7 +124,10 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["name", "reason"],
+        "required": [
+          "name",
+          "reason"
+        ],
         "additionalProperties": false,
         "properties": {
           "name": {
@@ -103,7 +153,9 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["event"],
+        "required": [
+          "event"
+        ],
         "additionalProperties": false,
         "properties": {
           "event": {
@@ -131,7 +183,11 @@
   "$defs": {
     "configField": {
       "type": "object",
-      "required": ["key", "label", "type"],
+      "required": [
+        "key",
+        "label",
+        "type"
+      ],
       "additionalProperties": false,
       "properties": {
         "key": {
@@ -144,7 +200,15 @@
         },
         "type": {
           "type": "string",
-          "enum": ["string", "number", "boolean", "select", "secret", "location", "color"]
+          "enum": [
+            "string",
+            "number",
+            "boolean",
+            "select",
+            "secret",
+            "location",
+            "color"
+          ]
         },
         "required": {
           "type": "boolean",
@@ -168,14 +232,21 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["label", "value"],
+            "required": [
+              "label",
+              "value"
+            ],
             "additionalProperties": false,
             "properties": {
               "label": {
                 "type": "string"
               },
               "value": {
-                "type": ["string", "number", "boolean"]
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
               }
             }
           },
@@ -194,10 +265,14 @@
                 "const": "select"
               }
             },
-            "required": ["type"]
+            "required": [
+              "type"
+            ]
           },
           "then": {
-            "required": ["options"],
+            "required": [
+              "options"
+            ],
             "properties": {
               "options": {
                 "minItems": 1

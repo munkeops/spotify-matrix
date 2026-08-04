@@ -6,8 +6,9 @@ from typing import Any
 
 from PIL import Image, ImageDraw
 
-from matrix_games.base import Game
-from matrix_games.render import PANEL, draw_pixel_text, fit_panel, new_frame, pixel_text_width
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_pixel_text, fit_panel, new_frame, pixel_text_width
 
 TETRIS_COLS = 10
 TETRIS_ROWS = 20
@@ -53,9 +54,17 @@ def tetris_cells(piece_type: str, rotation: int) -> tuple[tuple[int, int], ...]:
     return result
 
 
-class TetrisGame(Game):
+class TetrisGame(GameWidget):
     game_id = "tetris"
     name = "Tetris"
+    id = "core.tetris"
+    summary = "Stack falling tetrominoes and clear lines."
+    layout = "tetris"
+    config_fields = [
+        ConfigField.number("startLevel", label="Starting level", default=1, minimum=1, maximum=15, step=1, help_text="Higher levels start with faster gravity."),
+        ConfigField.boolean("ghost", label="Show landing preview", default=True),
+        ConfigField.number("autoRestartSeconds", label="Auto restart seconds", default=0, minimum=0, maximum=120, step=1, help_text="Seconds to wait after game over before dealing a new board. 0 waits for the restart button."),
+    ]
     actions = ("left", "right", "softDrop", "hardDrop", "rotateCw", "rotateCcw", "hold")
 
     def __init__(

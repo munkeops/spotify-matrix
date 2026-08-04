@@ -5,7 +5,7 @@ import {
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import {
-  LocalWidget, getWidgetConfig, saveWidgetConfig, applyWidget, previewWidget, PREVIEWABLE, createPairing,
+  LocalWidget, getWidgetConfig, saveWidgetConfig, applyWidget, previewWidget, canPreview, createPairing,
 } from "../api";
 import Gallery from "./Gallery";
 
@@ -35,7 +35,7 @@ export default function WidgetConfigDrawer({
 
   const id = widget?.manifest.id ?? "";
   const fields = widget?.manifest.config ?? [];
-  const previewable = PREVIEWABLE.has(id);
+  const previewable = canPreview(widget);
 
   useEffect(() => {
     if (!widget || !open) return;

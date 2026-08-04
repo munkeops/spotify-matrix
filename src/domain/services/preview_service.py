@@ -10,7 +10,7 @@ from typing import Any
 import spotify_matrix as runtime
 from src.domain.services.config_service import config_service
 from src.utils.frame_codec import decode_frame
-from matrix_games import GAMES, demo_game
+from matrix_games.registry import demo_instance
 from src.domain.services.game_service import game_service
 
 SIZE = 64
@@ -54,8 +54,9 @@ class PreviewService:
             return runtime.render_clock(SIZE, datetime.now(), cfg.get("face", "analog"), bool(cfg.get("use24Hour", False)), bool(cfg.get("showSeconds", False)))
         if widget_id == "core.agent":
             return runtime.render_agent_face(SIZE, 0, cfg.get("faceStyle", "classic"), cfg.get("animationSpeed", "normal"))
-        if widget_id.startswith("core.") and widget_id[5:] in GAMES:
-            return self._game_frame(widget_id[5:])
+        game_spec = next((spec for spec in game_service.specs().values() if spec.widget_id == widget_id), None)
+        if game_spec is not None:
+            return self._game_frame(game_spec)
         if widget_id == "core.testPattern":
             return runtime.render_test_pattern(SIZE, 0)
         if widget_id == "core.spotify":
@@ -79,12 +80,12 @@ class PreviewService:
             )
         raise ValueError(f"Preview is not available for {widget_id}.")
 
-    def _game_frame(self, game_id: str):
+    def _game_frame(self, spec):
         # Mirror the real panel while a game is running, otherwise pose a demo board.
-        state = game_service.read_state(game_id)
+        state = game_service.read_state(spec.game_id)
         if game_service.is_live(state) and state is not None and state.pixels:
             return decode_frame(state.palette, state.pixels, SIZE)
-        return demo_game(game_id).render(SIZE)
+        return demo_instance(spec).render(SIZE)
 
 
 preview_service = PreviewService()

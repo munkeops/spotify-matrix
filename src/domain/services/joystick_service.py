@@ -14,7 +14,6 @@ from typing import Any
 
 from loguru import logger
 
-from matrix_games import GAMES
 from mini_joystick import (
     Button,
     FakeTransport,
@@ -163,7 +162,7 @@ class JoystickService:
             self._dispatch_shell(event)
 
     def _dispatch_game(self, game_id: str, event) -> None:
-        spec = GAMES.get(game_id)
+        spec = game_service.spec(game_id)
         if spec is None:
             return
         action = game_action(event, set(spec.actions))

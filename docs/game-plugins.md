@@ -1,0 +1,156 @@
+# Game Plugins
+
+Games are not built into Assistant Matrix. Each one is a widget package that the
+host discovers on disk, so adding a game is dropping in a folder — no change to
+the app, no restart.
+
+## Where games live
+
+| Directory | Contents |
+|---|---|
+| `store_widgets/` | The games that ship with Assistant Matrix |
+| `<data>/widgets/packages/` | Anything installed from the Store |
+
+Both roots are scanned. An installed package **shadows** a bundled one with the
+same id, so you can replace a shipped game with your own build of it.
+
+Manifests are read without importing anything, so listing the arcade never runs
+plugin code. A package's entrypoint is imported only when its game is created,
+and a package that fails to parse is skipped rather than taking the app down.
+
+## Anatomy of a game package
+
+```text
+core.snake/
+  widget.toml          # the contract
+  README.md
+  renderer/
+    __init__.py
+    widget.py          # a GameWidget subclass
+  previews/
+    matrix-64.png      # tile shown in the app
+```
+
+`widget.toml` is an ordinary widget manifest with three extra keys:
+
+```toml
+[widget]
+id = "core.snake"
+name = "Snake"
+version = "1.0.0"
+summary = "Eat, grow, and do not bite yourself."
+category = "games"
+runtime = "python"
+entrypoint = "renderer.widget:SnakeGame"
+kind = "game"                                   # drives the controller path
+layout = "dpad"                                 # which pad to render
+actions = ["up", "down", "left", "right", "pause", "resume", "togglePause", "restart"]
+```
+
+`layout` is one of `dpad`, `horizontal`, `vertical`, `tap` or `tetris`. The app
+and the joystick both read it to decide what controls to offer, and a game only
+ever receives actions it declared.
+
+## Writing one
+
+Subclass `GameWidget` and implement four methods. The host owns timing and IO,
+so a game is pure enough to unit test on its own:
+
+```python
+from typing import Any
+
+from PIL import Image
+
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, fit_panel, new_frame
+
+
+class DodgeGame(GameWidget):
+    game_id = "dodge"
+    id = "core.dodge"
+    name = "Dodge"
+    summary = "Slide out of the way of falling blocks."
+    layout = "horizontal"
+    actions = ("left", "right")
+    config_fields = [
+        ConfigField.number("fallSpeed", label="Fall speed", default=26, minimum=10, maximum=60, step=2),
+    ]
+
+    def reset(self) -> None:
+        """Start a new game. Called on construction and on restart."""
+        self.player_x = 30
+        self.score = 0
+
+    def handle(self, action: str) -> None:
+        """One controller action. Never called while paused or finished."""
+        self.player_x += 3 if action == "right" else -3
+
+    def advance(self, elapsed: float) -> None:
+        """Move the game on by `elapsed` seconds. Never called while paused."""
+
+    def hud(self) -> dict[str, Any]:
+        """Label/value pairs shown beside the board in the app."""
+        return {"Dodged": self.score}
+
+    def render(self, size: int = PANEL) -> Image.Image:
+        image, draw = new_frame()
+        draw.rectangle((self.player_x, 54, self.player_x + 4, 57), fill=(96, 220, 255))
+        if self.game_over:
+            draw_banner(draw, ("GAME", "OVER"), (226, 234, 248))
+        return fit_panel(image, size)
+```
+
+What the base class handles for you:
+
+- `pause`, `resume`, `togglePause` and `restart`, so you never implement them.
+- Setting `self.game_over = True` or `self.won = True` ends the round; a fire or
+  drop button then starts a new one, but only after a short grace period so the
+  final score stays readable.
+- `self.random` is a seeded `random.Random`, which is what makes a game
+  reproducible in tests.
+- `self.config` holds the saved settings for your `config_fields`.
+
+Optional: a module-level `demo_snapshot()` returning a posed game gives the app
+a good-looking preview tile instead of an empty board.
+
+The drawing helpers in `assistant_matrix_sdk.pixels` are the same ones the
+shipped games use — `new_frame`, `fit_panel`, `draw_pixel_text`,
+`draw_centered_text`, `draw_banner`, `shade` and `parse_color`.
+
+## Building and installing
+
+Generate the manifest from the class so the two can never drift:
+
+```python
+from renderer.widget import DodgeGame
+
+manifest = DodgeGame.manifest(entrypoint="renderer.widget:DodgeGame")
+```
+
+Then package and publish it with the widget CLI:
+
+```bash
+poetry run assistant-matrix-widget validate widget.toml
+poetry run assistant-matrix-widget package . --output-dir dist
+poetry run assistant-matrix-widget publish . --store-dir store-dist --base-url https://store.example.com
+```
+
+Install it from the Store, or drop the folder straight into
+`<data>/widgets/packages/`. Either way it appears in **Play** with the right
+pad, gets a config drawer from its `config_fields`, and is drivable from the
+mini-joystick — all from the manifest.
+
+## How the host runs a game
+
+1. Applying a game sets `display.mode = "widget"` and `display.widgetId` to the
+   package id, exactly like any other widget.
+2. The runtime sees `kind = "game"` in the manifest and drives the game loop
+   instead of asking for a single frame.
+3. Controller input arrives through a sequenced queue at
+   `<data>/widgets/state/<game-id>-input.json`, so presses are never dropped or
+   replayed twice.
+4. Each frame is published to `<game-id>-state.json` as a colour palette plus
+   one row string per line, which is what the app mirrors on its canvas.
+
+None of that is game-specific, which is why a new package needs no host changes.

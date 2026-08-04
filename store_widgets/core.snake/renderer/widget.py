@@ -6,8 +6,9 @@ from typing import Any
 
 from PIL import Image
 
-from matrix_games.base import Game
-from matrix_games.render import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame, shade
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame, shade
 
 CELL = 3
 COLS = 21
@@ -23,9 +24,16 @@ TEXT_COLOR = (200, 212, 232)
 DIRECTIONS = {"up": (0, -1), "down": (0, 1), "left": (-1, 0), "right": (1, 0)}
 
 
-class SnakeGame(Game):
+class SnakeGame(GameWidget):
     game_id = "snake"
     name = "Snake"
+    id = "core.snake"
+    summary = "Eat, grow, and do not bite yourself."
+    layout = "dpad"
+    config_fields = [
+        ConfigField.number("speed", label="Starting speed", default=6, minimum=2, maximum=14, step=1, help_text="Cells per second. Speeds up as you eat."),
+        ConfigField.boolean("walls", label="Walls are deadly", default=True, help_text="Turn off to wrap around the edges instead."),
+    ]
     actions = ("up", "down", "left", "right")
 
     def reset(self) -> None:

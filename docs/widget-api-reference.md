@@ -443,6 +443,10 @@ GET /api/games
 `layout` tells a controller which pad to render: `dpad`, `horizontal`,
 `vertical`, `tap`, or `tetris`. `actions` is the full set the game accepts.
 
+Games are plugins, so this list is whatever is installed. Drop a package into
+`<data>/widgets/packages/` and it appears here. See
+[game plugins](game-plugins.md).
+
 Put a game on the panel with the normal widget route:
 
 ```text

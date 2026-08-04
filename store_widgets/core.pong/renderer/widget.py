@@ -7,8 +7,9 @@ from typing import Any
 
 from PIL import Image
 
-from matrix_games.base import Game
-from matrix_games.render import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame, pixel_text_width
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame, pixel_text_width
 
 PADDLE_WIDTH = 2
 PADDLE_HEIGHT = 12
@@ -24,9 +25,18 @@ NET_COLOR = (48, 54, 74)
 TEXT_COLOR = (196, 208, 230)
 
 
-class PongGame(Game):
+class PongGame(GameWidget):
     game_id = "pong"
     name = "Pong"
+    id = "core.pong"
+    summary = "Rally against the computer or a second phone."
+    layout = "vertical"
+    config_fields = [
+        ConfigField.select("opponent", [("Computer", "ai"), ("Second player", "human")], label="Opponent", help_text="Second player uses the P2 buttons, so two phones can share one panel."),
+        ConfigField.number("target", label="Play to", default=7, minimum=1, maximum=21, step=1),
+        ConfigField.number("aiSpeed", label="Computer speed", default=34, minimum=10, maximum=60, step=2),
+        ConfigField.number("ballSpeed", label="Ball speed", default=32, minimum=18, maximum=60, step=2),
+    ]
     actions = ("up", "down", "p2Up", "p2Down")
 
     def reset(self) -> None:

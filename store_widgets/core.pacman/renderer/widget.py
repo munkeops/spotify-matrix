@@ -11,8 +11,9 @@ from typing import Any
 
 from PIL import Image
 
-from matrix_games.base import Game
-from matrix_games.render import PANEL, draw_banner, draw_centered_text, draw_pixel_text, fit_panel, new_frame
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_centered_text, draw_pixel_text, fit_panel, new_frame
 
 MAZE = (
     "############################",
@@ -114,9 +115,17 @@ def walkable(x: int, y: int, *, doors: bool = False) -> bool:
     return True
 
 
-class PacmanGame(Game):
+class PacmanGame(GameWidget):
     game_id = "pacman"
     name = "Pac-Man"
+    id = "core.pacman"
+    summary = "Clear the maze while four ghosts hunt you down."
+    layout = "dpad"
+    config_fields = [
+        ConfigField.number("speed", label="Pac-Man speed", default=5.5, minimum=3, maximum=9, step=0.5, help_text="Tiles per second. Ghosts scale with this."),
+        ConfigField.number("lives", label="Lives", default=3, minimum=1, maximum=5, step=1),
+        ConfigField.number("frightSeconds", label="Power pellet seconds", default=7, minimum=2, maximum=15, step=1),
+    ]
     actions = ("up", "down", "left", "right")
 
     def reset(self) -> None:

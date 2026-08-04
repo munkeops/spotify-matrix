@@ -18,6 +18,7 @@ Widget platform docs:
 - [Widget API reference](docs/widget-api-reference.md)
 - [Widget manifest schema](docs/schemas/widget-manifest.schema.json)
 - [Widget store index schema](docs/schemas/widget-store-index.schema.json)
+- [Game plugins](docs/game-plugins.md)
 - [Mini-joystick module](docs/mini-joystick.md)
 
 ## Layout
@@ -215,7 +216,7 @@ curl http://<pi-host>:3000/api/games/pacman/state
 Run a game locally without matrix hardware:
 
 ```bash
-python spotify_matrix.py --display-mode pacman --mock-output data/frame.png   --game-input data/widgets/state/pacman-input.json   --game-state data/widgets/state/pacman-state.json
+python spotify_matrix.py --display-mode widget --widget-id core.pacman   --widget-dir store_widgets/core.pacman --mock-output data/frame.png   --game-input data/widgets/state/pacman-input.json   --game-state data/widgets/state/pacman-state.json
 ```
 
 Each game is also a plugin, so difficulty and rules are editable from its config

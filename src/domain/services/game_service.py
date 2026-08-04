@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from matrix_games import GAMES, GameSpec
+from matrix_games import GameSpec, discover
 from src.domain.models.api_schemas import GameFrame
 from src.domain.services.config_service import config_service
 
@@ -27,8 +27,9 @@ STALE_SECONDS = 4.0
 
 
 def _safe_game_id(game_id: str) -> str:
-    if game_id not in GAMES:
-        raise ValueError(f"Unknown game {game_id}.")
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+    if not game_id or any(character not in allowed for character in game_id):
+        raise ValueError(f"Invalid game id {game_id}.")
     return game_id
 
 
@@ -43,16 +44,35 @@ class GameService:
     def state_path(self, game_id: str) -> Path:
         return self.state_dir / f"{_safe_game_id(game_id)}-state.json"
 
-    def specs(self) -> list[GameSpec]:
-        return list(GAMES.values())
+    def packages_dir(self) -> Path:
+        return config_service.data_dir / "widgets" / "packages"
+
+    def specs(self) -> dict[str, GameSpec]:
+        """Every game plugin available right now, bundled or installed."""
+        return discover(self.packages_dir())
+
+    def spec(self, game_id: str) -> GameSpec | None:
+        return self.specs().get(game_id)
+
+    def require_spec(self, game_id: str) -> GameSpec:
+        spec = self.spec(_safe_game_id(game_id))
+        if spec is None:
+            raise ValueError(f"Unknown game {game_id}.")
+        return spec
 
     def active_game_id(self) -> str:
         config = config_service.get_config()
-        if config.runtime.testPattern:
+        if config.runtime.testPattern or config.display.mode != "widget":
             return ""
-        return config.display.mode if config.display.mode in GAMES else ""
+        widget_id = config.display.widgetId
+        for game_id, spec in self.specs().items():
+            if spec.widget_id == widget_id:
+                return game_id
+        return ""
 
     def queue_command(self, game_id: str, action: str) -> int:
+        # Reject unknown games here rather than leaving a queue file nothing reads.
+        self.require_spec(game_id)
         path = self.input_path(game_id)
         payload = self._read_json(path)
         commands = payload.get("commands", []) if isinstance(payload, dict) else []

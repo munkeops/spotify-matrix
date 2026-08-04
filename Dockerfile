@@ -69,6 +69,8 @@ COPY src ./src
 COPY assistant_matrix_sdk ./assistant_matrix_sdk
 COPY matrix_games ./matrix_games
 COPY mini_joystick ./mini_joystick
+# Bundled game plugins, discovered at runtime alongside anything installed.
+COPY store_widgets ./store_widgets
 COPY store_server ./store_server
 COPY spotify_matrix.py requirements.txt ./
 

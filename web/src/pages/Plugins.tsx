@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardActionArea, Typography, Box, CircularProgress, Alert, Chip, IconButton, Stack } from "@mui/material";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
-import { GAME_IDS, LocalWidget, listLocalWidgets, applyWidget, getWidgetConfig, previewWidget, PREVIEWABLE } from "../api";
+import { canPreview, gameIdOf, isGame, LocalWidget, listLocalWidgets, applyWidget, getWidgetConfig, previewWidget } from "../api";
 import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
 import DisplayPolicyPanel from "../components/DisplayPolicyPanel";
 
@@ -33,7 +33,7 @@ export default function Plugins() {
   const loadPreviews = useCallback(async (list: LocalWidget[]) => {
     await Promise.all(
       list
-        .filter((w) => PREVIEWABLE.has(w.manifest.id))
+        .filter((w) => canPreview(w))
         .map(async (w) => {
           try {
             const cfg = await getWidgetConfig(w.manifest.id);
@@ -66,8 +66,7 @@ export default function Plugins() {
     try {
       await applyWidget(widget.manifest.id, null);
       await refresh();
-      const gameId = widget.manifest.id.replace("core.", "");
-      if ((GAME_IDS as readonly string[]).includes(gameId)) navigate(`/play/${gameId}`);
+      if (isGame(widget)) navigate(`/play/${gameIdOf(widget)}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {

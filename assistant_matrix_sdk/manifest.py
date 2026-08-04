@@ -9,6 +9,13 @@ from assistant_matrix_sdk.config import ConfigField
 
 
 WidgetCategory = Literal["media", "time", "assistant", "information", "diagnostics", "games", "custom"]
+WidgetKind = Literal["widget", "game"]
+
+#: Control layouts a game can ask a controller to render.
+GAME_LAYOUTS = ("dpad", "horizontal", "vertical", "tap", "tetris")
+
+#: Controls every game understands regardless of what else it declares.
+COMMON_GAME_ACTIONS = ("pause", "resume", "togglePause", "restart")
 
 
 @dataclass(frozen=True)
@@ -66,22 +73,34 @@ def build_widget_manifest(
     permissions: list[WidgetPermission] | None = None,
     config: list[ConfigField] | None = None,
     triggers: list[WidgetTrigger] | None = None,
+    kind: WidgetKind = "widget",
+    layout: str = "",
+    actions: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Build the canonical widget.toml-compatible manifest shape."""
+    """Build the canonical widget.toml-compatible manifest shape.
 
+    ``kind="game"`` marks a package the host should drive with a controller;
+    ``layout`` and ``actions`` tell that controller what pad to draw.
+    """
+
+    widget: dict[str, Any] = {
+        "id": widget_id,
+        "name": name,
+        "version": version,
+        "summary": summary,
+        "author": author,
+        "category": category,
+        "runtime": runtime,
+        "entrypoint": entrypoint,
+        "matrix_size": matrix_size,
+        "license": license,
+        "kind": kind,
+    }
+    if kind == "game":
+        widget["layout"] = layout or "dpad"
+        widget["actions"] = list(actions or [])
     return {
-        "widget": {
-            "id": widget_id,
-            "name": name,
-            "version": version,
-            "summary": summary,
-            "author": author,
-            "category": category,
-            "runtime": runtime,
-            "entrypoint": entrypoint,
-            "matrix_size": matrix_size,
-            "license": license,
-        },
+        "widget": widget,
         "preview": (preview or WidgetPreview()).to_manifest(),
         "permissions": [permission.to_manifest() for permission in permissions or []],
         "config": [field.to_manifest() for field in config or []],

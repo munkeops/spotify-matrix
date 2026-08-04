@@ -7,8 +7,9 @@ from typing import Any
 
 from PIL import Image
 
-from matrix_games.base import Game
-from matrix_games.render import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame
 
 BRICK_COLS = 10
 BRICK_ROWS = 5
@@ -31,9 +32,17 @@ TEXT_COLOR = (170, 182, 206)
 FRAME_COLOR = (40, 46, 62)
 
 
-class BreakoutGame(Game):
+class BreakoutGame(GameWidget):
     game_id = "breakout"
     name = "Breakout"
+    id = "core.breakout"
+    summary = "Bounce the ball and clear every brick."
+    layout = "horizontal"
+    config_fields = [
+        ConfigField.number("paddleWidth", label="Paddle width", default=12, minimum=6, maximum=20, step=1),
+        ConfigField.number("ballSpeed", label="Ball speed", default=34, minimum=18, maximum=60, step=2),
+        ConfigField.number("lives", label="Lives", default=3, minimum=1, maximum=5, step=1),
+    ]
     actions = ("left", "right", "fire")
 
     def reset(self) -> None:

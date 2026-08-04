@@ -1,184 +1,153 @@
 """Playable games for the Assistant Matrix panel.
 
-Every game subclasses :class:`matrix_games.base.Game` and publishes an encoded
-frame, so the API and the web app treat them all identically. Adding a game is
-a module here plus one entry in ``GAMES``.
+Games are not built into the app. Each one is a widget package with a
+``widget.toml`` declaring ``kind = "game"`` and a Python entrypoint exposing a
+:class:`assistant_matrix_sdk.game.GameWidget` subclass. The ones that ship with
+Assistant Matrix live in ``store_widgets/``; anything you install lands in
+``<data>/widgets/packages/`` and is picked up the same way.
+
+Adding a game is dropping in a folder. See ``docs/game-plugins.md``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Callable
+from pathlib import Path
+from typing import Any
 
-from matrix_games.base import GAME_OVER, PAUSED, PLAYING, WON, Game
-from matrix_games.breakout import BreakoutGame
-from matrix_games.connect_four import ConnectFourGame
-from matrix_games.flappy import FlappyGame
-from matrix_games.invaders import InvadersGame
+from assistant_matrix_sdk.game import GAME_OVER, PAUSED, PLAYING, WON, GameWidget
+from assistant_matrix_sdk.manifest import COMMON_GAME_ACTIONS, GAME_LAYOUTS
+from assistant_matrix_sdk.pixels import PANEL, encode_frame, frame_to_pixels
 from matrix_games.io import read_commands, write_state
-from matrix_games.pacman import PacmanGame
-from matrix_games.pong import PongGame
-from matrix_games.render import PANEL, encode_frame, frame_to_pixels
-from matrix_games.snake import SnakeGame
-from matrix_games.tetris import TetrisGame, render_tetris_frame, tetris_demo_snapshot
+from matrix_games.registry import BUNDLED_DIR, GAME_KIND, GameSpec, demo_instance, discover, load_game_class, load_module
 
-# Universal actions every game understands, on top of its own action list.
-COMMON_ACTIONS = ("pause", "resume", "togglePause", "restart")
+# Layout names, re-exported so callers do not reach into the SDK for them.
+DPAD, HORIZONTAL, VERTICAL, TAP, TETRIS_PAD = GAME_LAYOUTS
 
-# Control layouts the web pad and the joystick binding both understand.
-DPAD = "dpad"
-HORIZONTAL = "horizontal"
-VERTICAL = "vertical"
-TAP = "tap"
-TETRIS_PAD = "tetris"
+Game = GameWidget
 
 
-@dataclass(frozen=True)
-class GameSpec:
-    game_id: str
-    name: str
-    summary: str
-    factory: Callable[..., Game]
-    layout: str
-    # Config key in data/config.json and the widget id that runs it.
-    config_key: str = ""
-    demo: Callable[[], Any] | None = None
-    extra_actions: tuple[str, ...] = field(default_factory=tuple)
-
-    @property
-    def widget_id(self) -> str:
-        return f"core.{self.game_id}"
-
-    @property
-    def mode(self) -> str:
-        return self.game_id
-
-    @property
-    def actions(self) -> tuple[str, ...]:
-        return tuple(self.factory.actions) + self.extra_actions + COMMON_ACTIONS  # type: ignore[attr-defined]
+def games(installed_dir: Path | None = None) -> dict[str, GameSpec]:
+    """Every available game, bundled plus installed."""
+    return discover(installed_dir)
 
 
-GAMES: dict[str, GameSpec] = {
-    spec.game_id: spec
-    for spec in (
-        GameSpec(
-            game_id="tetris",
-            name="Tetris",
-            summary="Stack falling tetrominoes and clear lines.",
-            factory=TetrisGame,
-            layout=TETRIS_PAD,
-            config_key="tetris",
-            demo=tetris_demo_snapshot,
-        ),
-        GameSpec(
-            game_id="pacman",
-            name="Pac-Man",
-            summary="Clear the maze while four ghosts hunt you down.",
-            factory=PacmanGame,
-            layout=DPAD,
-            config_key="pacman",
-        ),
-        GameSpec(
-            game_id="snake",
-            name="Snake",
-            summary="Eat, grow, and do not bite yourself.",
-            factory=SnakeGame,
-            layout=DPAD,
-            config_key="snake",
-        ),
-        GameSpec(
-            game_id="breakout",
-            name="Breakout",
-            summary="Bounce the ball and clear every brick.",
-            factory=BreakoutGame,
-            layout=HORIZONTAL,
-            config_key="breakout",
-        ),
-        GameSpec(
-            game_id="invaders",
-            name="Space Invaders",
-            summary="Hold off descending waves of aliens.",
-            factory=InvadersGame,
-            layout=HORIZONTAL,
-            config_key="invaders",
-        ),
-        GameSpec(
-            game_id="flappy",
-            name="Flappy",
-            summary="One button, endless pipes.",
-            factory=FlappyGame,
-            layout=TAP,
-            config_key="flappy",
-        ),
-        GameSpec(
-            game_id="pong",
-            name="Pong",
-            summary="Rally against the computer or a second phone.",
-            factory=PongGame,
-            layout=VERTICAL,
-            config_key="pong",
-        ),
-        GameSpec(
-            game_id="connect4",
-            name="Connect Four",
-            summary="Line up four discs before your rival does.",
-            factory=ConnectFourGame,
-            layout=HORIZONTAL,
-            config_key="connect4",
-        ),
-    )
-}
-
-GAME_MODES = tuple(GAMES)
+def get_spec(game_id: str, installed_dir: Path | None = None) -> GameSpec | None:
+    return discover(installed_dir).get(game_id)
 
 
-def get_spec(game_id: str) -> GameSpec | None:
-    return GAMES.get(game_id)
-
-
-def spec_for_mode(mode: str) -> GameSpec | None:
-    return GAMES.get(mode)
-
-
-def create_game(game_id: str, config: dict[str, Any] | None = None, seed: int | None = None) -> Game:
-    spec = GAMES.get(game_id)
+def create_game(game_id: str, config: dict[str, Any] | None = None, seed: int | None = None, installed_dir: Path | None = None) -> GameWidget:
+    spec = get_spec(game_id, installed_dir)
     if spec is None:
         raise ValueError(f"Unknown game {game_id}.")
-    return spec.factory(config or {}, seed)
+    return spec.create(config, seed)
 
 
-def demo_game(game_id: str) -> Game:
-    """A game posed mid-play, used for preview tiles."""
-    spec = GAMES.get(game_id)
+def plugin_module(game_id: str, installed_dir: Path | None = None):
+    """The imported module behind a game, for its constants and helpers."""
+    spec = get_spec(game_id, installed_dir)
     if spec is None:
         raise ValueError(f"Unknown game {game_id}.")
-    module = __import__(f"matrix_games.{'connect_four' if game_id == 'connect4' else game_id}", fromlist=["demo_snapshot"])
-    demo = getattr(module, "demo_snapshot", None)
-    if demo is None:
-        return spec.factory({}, 1)
-    posed = demo()
-    return posed if isinstance(posed, Game) else spec.factory({}, 1)
+    return load_module(spec)
+
+
+def game_class(game_id: str, installed_dir: Path | None = None) -> type[GameWidget]:
+    spec = get_spec(game_id, installed_dir)
+    if spec is None:
+        raise ValueError(f"Unknown game {game_id}.")
+    return spec.load()
+
+
+def demo_game(game_id: str, installed_dir: Path | None = None) -> GameWidget:
+    spec = get_spec(game_id, installed_dir)
+    if spec is None:
+        raise ValueError(f"Unknown game {game_id}.")
+    return demo_instance(spec)
+
+
+class _GameMapping(dict):
+    """``GAMES`` reads as a dict but re-scans the plugin directories on use.
+
+    Keeping it live means installing a game makes it appear without a restart.
+    """
+
+    def _refresh(self) -> dict[str, GameSpec]:
+        current = discover()
+        super().clear()
+        super().update(current)
+        return current
+
+    def __getitem__(self, key):  # type: ignore[override]
+        self._refresh()
+        return super().__getitem__(key)
+
+    def __contains__(self, key) -> bool:  # type: ignore[override]
+        self._refresh()
+        return super().__contains__(key)
+
+    def __iter__(self):  # type: ignore[override]
+        self._refresh()
+        return super().__iter__()
+
+    def __len__(self) -> int:  # type: ignore[override]
+        self._refresh()
+        return super().__len__()
+
+    def get(self, key, default=None):  # type: ignore[override]
+        self._refresh()
+        return super().get(key, default)
+
+    def keys(self):  # type: ignore[override]
+        self._refresh()
+        return super().keys()
+
+    def values(self):  # type: ignore[override]
+        self._refresh()
+        return super().values()
+
+    def items(self):  # type: ignore[override]
+        self._refresh()
+        return super().items()
+
+
+#: Bundled games, refreshed on access.
+GAMES: dict[str, GameSpec] = _GameMapping()
+
+
+def game_modes() -> tuple[str, ...]:
+    return tuple(discover())
 
 
 __all__ = [
     "GAMES",
-    "GAME_MODES",
     "GameSpec",
+    "GameWidget",
     "Game",
-    "COMMON_ACTIONS",
+    "BUNDLED_DIR",
+    "GAME_KIND",
+    "COMMON_GAME_ACTIONS",
+    "GAME_LAYOUTS",
+    "DPAD",
+    "HORIZONTAL",
+    "VERTICAL",
+    "TAP",
+    "TETRIS_PAD",
     "PLAYING",
     "PAUSED",
     "GAME_OVER",
     "WON",
     "PANEL",
+    "games",
+    "game_modes",
+    "get_spec",
     "create_game",
     "demo_game",
-    "get_spec",
-    "spec_for_mode",
+    "discover",
+    "load_game_class",
+    "load_module",
+    "plugin_module",
+    "game_class",
     "read_commands",
     "write_state",
     "encode_frame",
     "frame_to_pixels",
-    "render_tetris_frame",
-    "tetris_demo_snapshot",
 ]

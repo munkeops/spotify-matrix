@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
-import { GAME_IDS, apiGet, apiPost, StatusResponse, listLocalWidgets, getWidgetConfig, previewWidget, applyWidget, LocalWidget, PREVIEWABLE } from "../api";
+import { canPreview, gameIdOf, isGame, apiGet, apiPost, StatusResponse, listLocalWidgets, getWidgetConfig, previewWidget, applyWidget, LocalWidget } from "../api";
 import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
 
 const CATEGORY_COLOR: Record<string, string> = {
@@ -27,7 +27,7 @@ export default function Dashboard() {
   const openConfig = (w: LocalWidget) => { setConfigure(w); setDrawerOpen(true); };
 
   const loadPreviews = useCallback(async (list: LocalWidget[]) => {
-    await Promise.all(list.filter((w) => PREVIEWABLE.has(w.manifest.id)).map(async (w) => {
+    await Promise.all(list.filter((w) => canPreview(w)).map(async (w) => {
       try {
         const cfg = await getWidgetConfig(w.manifest.id);
         const p = await previewWidget(w.manifest.id, cfg.config);
@@ -103,8 +103,8 @@ export default function Dashboard() {
                 <Chip size="small" color={running ? "success" : "default"} label={running ? "Running" : "Stopped"} sx={{ mt: 0.5 }} />
               </Box>
               <Stack direction="row" spacing={1} alignItems="center">
-                {active && GAME_IDS.includes(active.manifest.id.replace("core.", "") as any) ? (
-                  <IconButton onClick={() => navigate(`/play/${active.manifest.id.replace("core.", "")}`)} sx={{ width: 48, height: 48, border: "1px solid", borderColor: "divider" }} aria-label="Open gamepad">
+                {active && isGame(active) ? (
+                  <IconButton onClick={() => navigate(`/play/${gameIdOf(active)}`)} sx={{ width: 48, height: 48, border: "1px solid", borderColor: "divider" }} aria-label="Open gamepad">
                     <SportsEsportsRoundedIcon />
                   </IconButton>
                 ) : null}

@@ -6,8 +6,9 @@ from typing import Any
 
 from PIL import Image
 
-from matrix_games.base import Game
-from matrix_games.render import PANEL, draw_banner, draw_centered_text, fit_panel, new_frame
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_centered_text, fit_panel, new_frame
 
 COLUMNS = 7
 ROWS = 6
@@ -28,9 +29,15 @@ PLAYER_COLORS = {1: RED, 2: YELLOW}
 PLAYER_NAMES = {1: "RED", 2: "YELLOW"}
 
 
-class ConnectFourGame(Game):
+class ConnectFourGame(GameWidget):
     game_id = "connect4"
     name = "Connect Four"
+    id = "core.connect4"
+    summary = "Line up four discs before your rival does."
+    layout = "horizontal"
+    config_fields = [
+        ConfigField.select("opponent", [("Second player", "human"), ("Computer", "ai")], label="Opponent"),
+    ]
     actions = ("left", "right", "drop")
 
     def reset(self) -> None:

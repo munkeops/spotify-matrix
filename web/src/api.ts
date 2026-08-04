@@ -64,8 +64,18 @@ export interface WidgetManifest {
   author: string;
   category: string;
   runtime: string;
+  /** "game" widgets are driven by a controller and get a gamepad. */
+  kind?: "widget" | "game";
+  layout?: string;
+  actions?: string[];
   config: WidgetConfigField[];
 }
+
+type HasManifest = { manifest: WidgetManifest } | null | undefined;
+
+/** Games are plugins, so identify them by manifest rather than a fixed list. */
+export const isGame = (widget: HasManifest) => widget?.manifest.kind === "game";
+export const gameIdOf = (widget: HasManifest) => (widget?.manifest.id ?? "").replace(/^core\./, "");
 
 export interface LocalWidget {
   manifest: WidgetManifest;
@@ -86,15 +96,14 @@ export const applyWidget = (id: string, config: Record<string, unknown> | null =
 export const previewWidget = (widgetId: string, config: Record<string, unknown>) =>
   apiPost<{ dataUrl: string }>("/api/widgets/preview", { widgetId, config });
 
-export const GAME_IDS = [
-  "tetris", "pacman", "snake", "breakout", "invaders", "flappy", "pong", "connect4",
-] as const;
-
-export const PREVIEWABLE = new Set([
+const CORE_PREVIEWABLE = new Set([
   "core.text", "core.image", "core.draw", "core.slideshow",
   "core.clock", "core.agent", "core.weather", "core.spotify", "core.testPattern",
-  ...GAME_IDS.map((id) => `core.${id}`),
 ]);
+
+/** Core widgets render a preview, and so does every game plugin. */
+export const canPreview = (widget: HasManifest) =>
+  Boolean(widget) && (CORE_PREVIEWABLE.has(widget!.manifest.id) || isGame(widget));
 
 export type TetrisAction =
   | "left" | "right" | "softDrop" | "hardDrop"

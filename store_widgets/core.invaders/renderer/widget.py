@@ -6,8 +6,9 @@ from typing import Any
 
 from PIL import Image
 
-from matrix_games.base import Game
-from matrix_games.render import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame
 
 COLUMNS = 8
 ROWS = 5
@@ -44,9 +45,15 @@ TEXT_COLOR = (196, 208, 230)
 FLOOR_COLOR = (40, 46, 62)
 
 
-class InvadersGame(Game):
+class InvadersGame(GameWidget):
     game_id = "invaders"
     name = "Space Invaders"
+    id = "core.invaders"
+    summary = "Hold off descending waves of aliens."
+    layout = "horizontal"
+    config_fields = [
+        ConfigField.number("lives", label="Lives", default=3, minimum=1, maximum=5, step=1),
+    ]
     actions = ("left", "right", "fire")
 
     def reset(self) -> None:

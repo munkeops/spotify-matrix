@@ -37,11 +37,7 @@ class RuntimeConfig(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    mode: Literal[
-        "spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow",
-        "tetris", "pacman", "snake", "breakout", "invaders", "flappy", "pong", "connect4",
-        "testPattern", "widget",
-    ] = "spotify"
+    mode: Literal["spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"] = "spotify"
     widgetId: str = ""
 
 
@@ -122,50 +118,6 @@ class SlideshowConfig(BaseModel):
     background: str = "#000000"
     rotate: Literal[0, 90, 180, 270] = 0
     shuffle: bool = False
-
-
-class TetrisConfig(BaseModel):
-    startLevel: int = 1
-    ghost: bool = True
-    autoRestartSeconds: int = 0
-
-
-class PacmanConfig(BaseModel):
-    speed: float = 5.5
-    lives: int = 3
-    frightSeconds: float = 7
-
-
-class SnakeConfig(BaseModel):
-    speed: float = 6
-    walls: bool = True
-
-
-class BreakoutConfig(BaseModel):
-    paddleWidth: int = 12
-    ballSpeed: float = 34
-    lives: int = 3
-
-
-class InvadersConfig(BaseModel):
-    lives: int = 3
-
-
-class FlappyConfig(BaseModel):
-    gap: int = 20
-    speed: float = 22
-    gravity: float = 110
-
-
-class PongConfig(BaseModel):
-    opponent: Literal["ai", "human"] = "ai"
-    target: int = 7
-    aiSpeed: float = 34
-    ballSpeed: float = 32
-
-
-class ConnectFourConfig(BaseModel):
-    opponent: Literal["ai", "human"] = "human"
 
 
 class JoystickConfig(BaseModel):
@@ -258,14 +210,6 @@ class AppConfig(BaseModel):
     image: ImageConfig = Field(default_factory=ImageConfig)
     draw: DrawConfig = Field(default_factory=DrawConfig)
     slideshow: SlideshowConfig = Field(default_factory=SlideshowConfig)
-    tetris: TetrisConfig = Field(default_factory=TetrisConfig)
-    pacman: PacmanConfig = Field(default_factory=PacmanConfig)
-    snake: SnakeConfig = Field(default_factory=SnakeConfig)
-    breakout: BreakoutConfig = Field(default_factory=BreakoutConfig)
-    invaders: InvadersConfig = Field(default_factory=InvadersConfig)
-    flappy: FlappyConfig = Field(default_factory=FlappyConfig)
-    pong: PongConfig = Field(default_factory=PongConfig)
-    connect4: ConnectFourConfig = Field(default_factory=ConnectFourConfig)
     joystick: JoystickConfig = Field(default_factory=JoystickConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 

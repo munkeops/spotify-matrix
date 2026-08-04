@@ -30,7 +30,7 @@ async def list_games() -> GameListResponse:
             actions=list(spec.actions),
             active=spec.game_id == active,
         )
-        for spec in game_service.specs()
+        for spec in sorted(game_service.specs().values(), key=lambda spec: spec.name)
     ]
     return GameListResponse(games=games, activeGameId=active, running=runtime_service.state().running)
 

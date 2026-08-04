@@ -28,23 +28,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageOps, ImageSequence
 
 from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
-from matrix_games import GAME_MODES, GAMES, create_game
+from matrix_games import create_game, discover, get_spec
 from matrix_games.io import read_commands as read_game_commands, write_state as write_game_state
-from matrix_games.render import DIGIT_FONT_3X5, draw_pixel_text, parse_color, pixel_text_width
-from matrix_games.tetris import (
-    TETRIS_CELL,
-    TETRIS_COLORS,
-    TETRIS_COLS,
-    TETRIS_KICKS,
-    TETRIS_LINE_SCORES,
-    TETRIS_LOCK_DELAY,
-    TETRIS_LOCK_RESET_LIMIT,
-    TETRIS_ROWS,
-    TETRIS_SHAPES,
-    TetrisGame,
-    render_tetris_frame,
-    tetris_demo_snapshot,
-)
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import DIGIT_FONT_3X5, draw_pixel_text, parse_color, pixel_text_width
 
 # Older callers used the Tetris specific names before the shared games layer.
 read_tetris_commands = read_game_commands
@@ -1957,23 +1944,10 @@ def run_draw(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
         display.clear()
 
 
-def game_config(args: argparse.Namespace, game_id: str) -> dict[str, Any]:
-    """Per-game settings from data/config.json, with CLI overrides for Tetris."""
-    config = load_json_config(args.config_path)
-    spec = GAMES.get(game_id)
-    section = config.get(spec.config_key, {}) if spec and spec.config_key else {}
-    values = dict(section) if isinstance(section, dict) else {}
-    if game_id == "tetris":
-        if "--tetris-start-level" in sys.argv[1:] or "startLevel" not in values:
-            values["startLevel"] = args.tetris_start_level
-        if args.tetris_no_ghost:
-            values["ghost"] = False
-    return values
-
-
-def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int, game_id: str) -> None:
+def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int, game: GameWidget | str) -> None:
     """Drive one game: drain queued input, step, draw, publish state."""
-    game = create_game(game_id, game_config(args, game_id))
+    if isinstance(game, str):
+        game = create_game(game, read_external_widget_config(args.widget_config))
     input_path = args.game_input
     state_path = args.game_state
     auto_restart = max(0, int(getattr(args, "tetris_auto_restart_seconds", 0) or 0))
@@ -2020,6 +1994,25 @@ def run_tetris(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, s
     run_game(args, display, size, "tetris")
 
 
+def load_game_package(widget_dir: Path, manifest: dict[str, Any], config: dict[str, Any]) -> GameWidget:
+    """Build the game a package declares, without importing the whole arcade."""
+    from matrix_games.registry import GameSpec, load_game_class
+
+    widget_info = manifest.get("widget", {})
+    widget_id = str(widget_info.get("id", "") or widget_dir.name)
+    spec = GameSpec(
+        game_id=widget_id.split(".", 1)[-1],
+        widget_id=widget_id,
+        name=str(widget_info.get("name", widget_id)),
+        summary=str(widget_info.get("summary", "")),
+        layout=str(widget_info.get("layout", "dpad") or "dpad"),
+        actions=tuple(widget_info.get("actions", []) or ()),
+        package_dir=widget_dir,
+        entrypoint=str(widget_info.get("entrypoint", "")),
+    )
+    return load_game_class(spec)(config)
+
+
 def load_external_widget(widget_dir: Path, entrypoint: str) -> Any:
     if str(widget_dir) not in sys.path:
         sys.path.insert(0, str(widget_dir))
@@ -2059,9 +2052,15 @@ def run_external_widget(args: argparse.Namespace, display: MatrixDisplay | MockD
     if not entrypoint:
         raise RuntimeError("Widget manifest is missing widget.entrypoint.")
 
+    config = read_external_widget_config(args.widget_config)
+    if str(widget_info.get("kind", "widget")) == "game":
+        # A game plugin needs stepping and controller input, not a static frame.
+        run_game(args, display, size, load_game_package(widget_dir, manifest, config))
+        return
+
     renderer = load_external_widget(widget_dir, entrypoint)
     state: dict[str, Any] = {}
-    context = WidgetContext(config=read_external_widget_config(args.widget_config), state=state, assets_dir=widget_dir / "assets")
+    context = WidgetContext(config=config, state=state, assets_dir=widget_dir / "assets")
 
     if isinstance(renderer, Widget):
         renderer.setup(context)
@@ -2212,8 +2211,6 @@ def run(args: argparse.Namespace) -> None:
         run_draw(args, display, size)
     elif mode == "slideshow":
         run_slideshow(args, display, size)
-    elif mode in GAME_MODES:
-        run_game(args, display, size, mode)
     elif mode == "widget":
         run_external_widget(args, display, size)
     else:
@@ -2236,7 +2233,7 @@ def render_preview_frames(directory: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
-    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", *GAME_MODES, "testPattern", "widget"), default="spotify")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)

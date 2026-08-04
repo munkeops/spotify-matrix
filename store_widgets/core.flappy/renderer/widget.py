@@ -6,8 +6,9 @@ from typing import Any
 
 from PIL import Image
 
-from matrix_games.base import Game
-from matrix_games.render import PANEL, draw_banner, draw_centered_text, fit_panel, new_frame
+from assistant_matrix_sdk.config import ConfigField
+from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_centered_text, fit_panel, new_frame
 
 BIRD_X = 14
 BIRD_SIZE = 5
@@ -24,9 +25,17 @@ GROUND_COLOR = (86, 62, 40)
 TEXT_COLOR = (226, 234, 248)
 
 
-class FlappyGame(Game):
+class FlappyGame(GameWidget):
     game_id = "flappy"
     name = "Flappy"
+    id = "core.flappy"
+    summary = "One button, endless pipes."
+    layout = "tap"
+    config_fields = [
+        ConfigField.number("gap", label="Pipe gap", default=20, minimum=14, maximum=30, step=1, help_text="Smaller is harder."),
+        ConfigField.number("speed", label="Scroll speed", default=22, minimum=10, maximum=40, step=2),
+        ConfigField.number("gravity", label="Gravity", default=110, minimum=40, maximum=200, step=10),
+    ]
     actions = ("flap",)
 
     def reset(self) -> None:

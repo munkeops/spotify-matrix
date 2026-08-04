@@ -13,8 +13,8 @@ BUILTIN_MODE = os.environ.get("ASSISTANT_MATRIX_BUILTIN_MODE", "always").lower()
 
 from pydantic import BaseModel
 
-from matrix_games import GAMES
-from src.domain.models.api_schemas import AgentConfig, BreakoutConfig, ClockConfig, ConnectFourConfig, DrawConfig, FlappyConfig, ImageConfig, InvadersConfig, PacmanConfig, PongConfig, SlideshowConfig, SnakeConfig, SpotifyConfig, TetrisConfig, TextConfig, WeatherConfig
+from matrix_games import GAMES, discover
+from src.domain.models.api_schemas import AgentConfig, ClockConfig, DrawConfig, ImageConfig, SlideshowConfig, SpotifyConfig, TextConfig, WeatherConfig
 from src.domain.models.widget_schemas import LocalWidget, StoreWidget, WidgetConfigField, WidgetConfigOption, WidgetManifest, WidgetPermission, WidgetPreview, WidgetTrigger
 from src.domain.services.config_service import config_service
 from src.domain.services.runtime_service import runtime_service
@@ -34,61 +34,9 @@ WIDGET_MODE_MAP = {
     "core.draw": "draw",
     "core.slideshow": "slideshow",
     "core.testPattern": "testPattern",
-    **{spec.widget_id: spec.mode for spec in GAMES.values()},
-}
-
-# Config model backing each game widget, keyed by the AppConfig field name.
-GAME_CONFIG_MODELS = {
-    "tetris": TetrisConfig,
-    "pacman": PacmanConfig,
-    "snake": SnakeConfig,
-    "breakout": BreakoutConfig,
-    "invaders": InvadersConfig,
-    "flappy": FlappyConfig,
-    "pong": PongConfig,
-    "connect4": ConnectFourConfig,
 }
 
 
-# Config forms for the built-in games, rendered by the app's widget drawer.
-GAME_CONFIG_FIELDS: dict[str, list[WidgetConfigField]] = {
-    "tetris": [
-        WidgetConfigField(key="startLevel", label="Starting level", type="number", default=1, min=1, max=15, step=1, helpText="Higher levels start with faster gravity."),
-        WidgetConfigField(key="ghost", label="Show landing preview", type="boolean", default=True),
-        WidgetConfigField(key="autoRestartSeconds", label="Auto restart seconds", type="number", default=0, min=0, max=120, step=1, helpText="Seconds to wait after game over before dealing a new board. 0 waits for the restart button."),
-    ],
-    "pacman": [
-        WidgetConfigField(key="speed", label="Pac-Man speed", type="number", default=5.5, min=3, max=9, step=0.5, helpText="Tiles per second. Ghosts scale with this."),
-        WidgetConfigField(key="lives", label="Lives", type="number", default=3, min=1, max=5, step=1),
-        WidgetConfigField(key="frightSeconds", label="Power pellet seconds", type="number", default=7, min=2, max=15, step=1),
-    ],
-    "snake": [
-        WidgetConfigField(key="speed", label="Starting speed", type="number", default=6, min=2, max=14, step=1, helpText="Cells per second. Speeds up as you eat."),
-        WidgetConfigField(key="walls", label="Walls are deadly", type="boolean", default=True, helpText="Turn off to wrap around the edges instead."),
-    ],
-    "breakout": [
-        WidgetConfigField(key="paddleWidth", label="Paddle width", type="number", default=12, min=6, max=20, step=1),
-        WidgetConfigField(key="ballSpeed", label="Ball speed", type="number", default=34, min=18, max=60, step=2),
-        WidgetConfigField(key="lives", label="Lives", type="number", default=3, min=1, max=5, step=1),
-    ],
-    "invaders": [
-        WidgetConfigField(key="lives", label="Lives", type="number", default=3, min=1, max=5, step=1),
-    ],
-    "flappy": [
-        WidgetConfigField(key="gap", label="Pipe gap", type="number", default=20, min=14, max=30, step=1, helpText="Smaller is harder."),
-        WidgetConfigField(key="speed", label="Scroll speed", type="number", default=22, min=10, max=40, step=2),
-        WidgetConfigField(key="gravity", label="Gravity", type="number", default=110, min=40, max=200, step=10),
-    ],
-    "pong": [
-        WidgetConfigField(key="opponent", label="Opponent", type="select", default="ai", options=[_option("Computer", "ai"), _option("Second player", "human")], helpText="Second player uses the P2 buttons, so two phones can share one panel."),
-        WidgetConfigField(key="target", label="Play to", type="number", default=7, min=1, max=21, step=1),
-        WidgetConfigField(key="aiSpeed", label="Computer speed", type="number", default=34, min=10, max=60, step=2),
-        WidgetConfigField(key="ballSpeed", label="Ball speed", type="number", default=32, min=18, max=60, step=2),
-    ],
-    "connect4": [
-        WidgetConfigField(key="opponent", label="Opponent", type="select", default="human", options=[_option("Second player", "human"), _option("Computer", "ai")]),
-    ],
-}
 
 def _safe_widget_id(widget_id: str) -> str:
     allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
@@ -135,6 +83,9 @@ def _manifest_from_toml(payload: dict[str, Any]) -> WidgetManifest:
                 "matrixPreview": preview.get("matrixPreview", preview.get("matrix_png", "")),
                 "description": preview.get("description", ""),
             },
+            "kind": widget.get("kind", "widget"),
+            "layout": widget.get("layout", ""),
+            "actions": widget.get("actions", []),
             "permissions": payload.get("permissions", []),
             "config": config_fields,
             "triggers": triggers,
@@ -154,6 +105,29 @@ class WidgetRegistryService:
             if BUILTIN_MODE != "store" or manifest.id in installed_ids
         ]
         widgets.extend(widget for widget in self._installed_store_widgets() if widget.manifest.id not in builtin_ids)
+        seen = {widget.manifest.id for widget in widgets}
+        widgets.extend(widget for widget in self._game_package_widgets() if widget.manifest.id not in seen)
+        return widgets
+
+    def _game_package_widgets(self) -> list[LocalWidget]:
+        """Game plugins found on disk, bundled with the app or installed."""
+        config = config_service.get_config()
+        active_widget_id = config.display.widgetId if config.display.mode == "widget" else ""
+        widgets: list[LocalWidget] = []
+        for spec in discover(config_service.data_dir / "widgets" / "packages").values():
+            manifest = self._read_installed_manifest(spec.widget_id)
+            if manifest is None:
+                continue
+            widgets.append(
+                LocalWidget(
+                    manifest=manifest,
+                    installed=True,
+                    builtIn=spec.bundled,
+                    enabled=True,
+                    configurable=bool(manifest.config),
+                    active=spec.widget_id == active_widget_id and not config.runtime.testPattern,
+                )
+            )
         return widgets
 
     def _installed_ids(self) -> set[str]:
@@ -191,9 +165,6 @@ class WidgetRegistryService:
             return config.draw.model_dump()
         if widget_id == "core.slideshow":
             return config.slideshow.model_dump()
-        game_key = self._game_config_key(widget_id)
-        if game_key:
-            return getattr(config, game_key).model_dump()
         if widget_id == "core.testPattern":
             return {"testPattern": config.runtime.testPattern}
         return self._read_installed_widget_config(widget_id)
@@ -219,9 +190,6 @@ class WidgetRegistryService:
             config.draw = self._merge_model(config.draw, values, DrawConfig)
         elif widget_id == "core.slideshow":
             config.slideshow = self._merge_model(config.slideshow, values, SlideshowConfig)
-        elif self._game_config_key(widget_id):
-            key = self._game_config_key(widget_id)
-            setattr(config, key, self._merge_model(getattr(config, key), values, GAME_CONFIG_MODELS[key]))
         elif widget_id == "core.testPattern":
             config.runtime.testPattern = bool(values.get("testPattern", config.runtime.testPattern))
         else:
@@ -491,7 +459,6 @@ class WidgetRegistryService:
                 ],
                 triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=15)],
             ),
-            *self._game_manifests(),
             WidgetManifest(
                 id="core.testPattern",
                 name="Test Pattern",
@@ -505,31 +472,15 @@ class WidgetRegistryService:
             ),
         ]
 
-    def _game_config_key(self, widget_id: str) -> str:
-        spec = GAMES.get(widget_id[5:]) if widget_id.startswith("core.") else None
-        if spec is None or spec.config_key not in GAME_CONFIG_MODELS:
-            return ""
-        return spec.config_key
-
-    def _game_manifests(self) -> list[WidgetManifest]:
-        return [
-            WidgetManifest(
-                id=spec.widget_id,
-                name=spec.name,
-                version="1.0.0",
-                summary=spec.summary,
-                category="games",
-                runtime="builtin",
-                entrypoint=f"spotify_matrix:run_game[{spec.game_id}]",
-                preview=WidgetPreview(description=f"{spec.name} on the 64x64 panel, played from the app or the joystick."),
-                config=GAME_CONFIG_FIELDS.get(spec.game_id, []),
-                triggers=[WidgetTrigger(event=f"game.{spec.game_id}", defaultEnabled=False, priority=70)],
-            )
-            for spec in GAMES.values()
-        ]
-
     def _widget_package_dir(self, widget_id: str):
-        return config_service.data_dir / "widgets" / "packages" / _safe_widget_id(widget_id)
+        """Installed packages win, so a Store build can replace a shipped game."""
+        installed = config_service.data_dir / "widgets" / "packages" / _safe_widget_id(widget_id)
+        if (installed / "widget.toml").exists():
+            return installed
+        for spec in discover(config_service.data_dir / "widgets" / "packages").values():
+            if spec.widget_id == widget_id:
+                return spec.package_dir
+        return installed
 
     def _widget_config_path(self, widget_id: str):
         return config_service.data_dir / "widgets" / "config" / f"{_safe_widget_id(widget_id)}.json"
@@ -541,7 +492,7 @@ class WidgetRegistryService:
         return _manifest_from_toml(tomllib.loads(manifest_path.read_text(encoding="utf-8")))
 
     def _require_installed_package(self, widget_id: str) -> None:
-        manifest = self._read_installed_manifest(widget_id)
+        manifest = self._read_installed_manifest(widget_id)  # bundled or installed
         if manifest is None:
             raise ValueError(f"Widget {widget_id} is installed as catalog metadata but no runnable package is present.")
         if manifest.runtime != "python" or not manifest.entrypoint:

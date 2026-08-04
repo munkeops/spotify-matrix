@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 ConfigFieldType = Literal["string", "number", "boolean", "select", "secret", "location", "color"]
 WidgetCategory = Literal["media", "time", "assistant", "information", "diagnostics", "games", "custom"]
+WidgetKind = Literal["widget", "game"]
 WidgetRuntime = Literal["builtin", "python"]
 
 
@@ -64,6 +65,9 @@ class WidgetManifest(BaseModel):
     permissions: list[WidgetPermission] = Field(default_factory=list)
     config: list[WidgetConfigField] = Field(default_factory=list)
     triggers: list[WidgetTrigger] = Field(default_factory=list)
+    kind: WidgetKind = "widget"
+    layout: str = ""
+    actions: list[str] = Field(default_factory=list)
 
 
 class LocalWidget(BaseModel):

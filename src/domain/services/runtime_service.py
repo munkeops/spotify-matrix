@@ -179,16 +179,6 @@ class RuntimeService:
             args.append("--text-wrap")
         if config.text.fit:
             args.append("--text-fit")
-        args.extend(
-            [
-                "--tetris-start-level",
-                str(config.tetris.startLevel),
-                "--tetris-auto-restart-seconds",
-                str(config.tetris.autoRestartSeconds),
-            ]
-        )
-        if not config.tetris.ghost:
-            args.append("--tetris-no-ghost")
         active_game = game_service.active_game_id()
         if active_game:
             args.extend(

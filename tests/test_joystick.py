@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from matrix_games import GAMES
+import matrix_games as mg
+
+GAMES = mg.discover()
 from mini_joystick import (
     AXIS_CENTER,
     AXIS_MAX,
@@ -284,7 +286,8 @@ def reload_joystick_stack(monkeypatch, data_dir: Path):
 def test_service_drives_the_active_game(tmp_path, monkeypatch):
     config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "snake"
+    config.display.mode = "widget"
+    config.display.widgetId = "core.snake"
     config_module.config_service.save_config(config)
 
     service = joystick_module.joystick_service

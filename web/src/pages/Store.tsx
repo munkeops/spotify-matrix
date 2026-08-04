@@ -2,7 +2,13 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardActionArea, Typography, Stack, Chip, Button, Box, CircularProgress, Alert } from "@mui/material";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import { StoreWidget, listStoreWidgets, installWidget, previewWidget, PREVIEWABLE } from "../api";
+import { StoreWidget, listStoreWidgets, installWidget, previewWidget } from "../api";
+
+// Built-ins and games render a live preview tile; downloads use their artwork.
+const PREVIEWABLE_STORE = new Set([
+  "core.text", "core.image", "core.draw", "core.slideshow",
+  "core.clock", "core.agent", "core.weather", "core.spotify", "core.testPattern",
+]);
 
 const CATEGORY_COLOR: Record<string, string> = {
   media: "#4be0c0", time: "#8ea2ff", assistant: "#ffb86b", information: "#7ee0a0",
@@ -18,7 +24,7 @@ export default function Store() {
 
   const loadPreviews = useCallback(async (list: StoreWidget[]) => {
     await Promise.all(list.map(async (w) => {
-      if (PREVIEWABLE.has(w.id) || w.runtime === "builtin") {
+      if (PREVIEWABLE_STORE.has(w.id) || w.category === "games" || w.runtime === "builtin") {
         try {
           const p = await previewWidget(w.id, {});
           setPreviews((prev) => ({ ...prev, [w.id]: p.dataUrl }));
