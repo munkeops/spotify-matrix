@@ -25,6 +25,11 @@ services:
       - ./data:/app/data
       # Bluetooth: reach the host BlueZ daemon over the system D-Bus socket.
       - /var/run/dbus:/var/run/dbus
+      # Game controllers. privileged usually shares the host /dev already, but
+      # binding the directory guarantees a pad paired *after* the container
+      # started still shows up. Safe to keep: the directory always exists, so
+      # unlike a `devices:` entry this cannot stop the container booting.
+      - /dev/input:/dev/input
 
   store:
     image: spotify-matrix:local

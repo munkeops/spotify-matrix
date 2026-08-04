@@ -168,8 +168,26 @@ spins a Tetris piece or machine-guns a drop.
 
 ## Docker
 
-The service runs `privileged` and shares the host `/dev`, so `/dev/input/*` is
-already visible. Nothing to map.
+The compose file binds `/dev/input` into the container. `privileged` usually
+shares the host `/dev` anyway, but a pad paired *after* the container started is
+exactly the case where relying on that goes wrong, and a bind makes it certain.
+
+Note the difference from a `devices:` entry: binding a **directory** is safe
+because `/dev/input` always exists, whereas a `devices:` entry naming a node
+that does not exist stops the container from booting at all.
+
+Check what the container can actually see:
+
+```bash
+ls -l /dev/input/event*                                  # on the Pi
+docker compose exec spotify-matrix ls -l /dev/input/     # in the container
+```
+
+They should match. If the Pi has a node the container does not, recreate it:
+
+```bash
+docker compose up -d --force-recreate spotify-matrix
+```
 
 BlueZ itself runs on the host; the container talks to it over the system D-Bus
 socket, which the compose file already mounts:
