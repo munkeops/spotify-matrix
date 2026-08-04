@@ -8,7 +8,7 @@ from typing import Any, Literal
 from assistant_matrix_sdk.config import ConfigField
 
 
-WidgetCategory = Literal["media", "time", "assistant", "information", "diagnostics", "custom"]
+WidgetCategory = Literal["media", "time", "assistant", "information", "diagnostics", "games", "custom"]
 
 
 @dataclass(frozen=True)

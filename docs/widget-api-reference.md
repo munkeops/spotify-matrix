@@ -411,6 +411,69 @@ POST /api/runtime/apply
 
 Restarts the runtime using saved config.
 
+## Tetris APIs
+
+The Tetris widget (`core.tetris`) runs inside the matrix runtime process, so the
+API passes controller input to it through a small command queue file and reads
+back the board the runtime publishes. Apply the widget first:
+
+```text
+POST /api/widgets/local/core.tetris/apply
+```
+
+### Send Controller Input
+
+```text
+POST /api/tetris/input
+```
+
+```json
+{
+  "action": "hardDrop"
+}
+```
+
+Actions: `left`, `right`, `softDrop`, `hardDrop`, `rotateCw`, `rotateCcw`,
+`hold`, `pause`, `resume`, `togglePause`, `restart`.
+
+Each command is stamped with an increasing sequence number. The runtime applies
+everything newer than the last sequence it saw on its next frame, so repeated
+presses are never dropped or replayed twice.
+
+### Read Game State
+
+```text
+GET /api/tetris/state
+```
+
+```json
+{
+  "live": true,
+  "running": true,
+  "active": true,
+  "state": {
+    "board": ["..........", "..........", "…"],
+    "active": [[4, 1], [3, 2], [4, 2], [5, 2]],
+    "activeType": "T",
+    "ghost": [[4, 17], [3, 18], [4, 18], [5, 18]],
+    "next": "I",
+    "hold": "L",
+    "holdLocked": false,
+    "score": 2400,
+    "lines": 12,
+    "level": 2,
+    "gameOver": false,
+    "paused": false,
+    "updatedAt": 1754246400.0
+  }
+}
+```
+
+`board` is 20 rows of 10 characters where `.` is empty and a letter is a locked
+piece. `active` and `ghost` are `[x, y]` cell lists for the falling piece and its
+landing preview. `live` is false when no game has published state recently, which
+means nothing is playing right now.
+
 ## Command API
 
 The command API is the stable path for future voice agents and automations.

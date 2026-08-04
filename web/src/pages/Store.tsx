@@ -6,7 +6,7 @@ import { StoreWidget, listStoreWidgets, installWidget, previewWidget, PREVIEWABL
 
 const CATEGORY_COLOR: Record<string, string> = {
   media: "#4be0c0", time: "#8ea2ff", assistant: "#ffb86b", information: "#7ee0a0",
-  custom: "#c58cff", diagnostics: "#ff8c8c", weather: "#66d0ff",
+  custom: "#c58cff", diagnostics: "#ff8c8c", weather: "#66d0ff", games: "#ff7ab8",
 };
 
 export default function Store() {

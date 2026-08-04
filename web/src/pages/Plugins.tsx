@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardActionArea, Typography, Box, CircularProgress, Alert, Chip, IconButton, Stack } from "@mui/material";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import { LocalWidget, listLocalWidgets, applyWidget, getWidgetConfig, previewWidget, PREVIEWABLE } from "../api";
@@ -7,7 +8,7 @@ import DisplayPolicyPanel from "../components/DisplayPolicyPanel";
 
 const CATEGORY_COLOR: Record<string, string> = {
   media: "#4be0c0", time: "#8ea2ff", assistant: "#ffb86b", information: "#7ee0a0",
-  custom: "#c58cff", diagnostics: "#ff8c8c", weather: "#66d0ff",
+  custom: "#c58cff", diagnostics: "#ff8c8c", weather: "#66d0ff", games: "#ff7ab8",
 };
 
 function Placeholder({ widget }: { widget: LocalWidget }) {
@@ -20,6 +21,7 @@ function Placeholder({ widget }: { widget: LocalWidget }) {
 }
 
 export default function Plugins() {
+  const navigate = useNavigate();
   const [widgets, setWidgets] = useState<LocalWidget[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
@@ -64,6 +66,7 @@ export default function Plugins() {
     try {
       await applyWidget(widget.manifest.id, null);
       await refresh();
+      if (widget.manifest.id === "core.tetris") navigate("/play/tetris");
     } catch (e) {
       setError((e as Error).message);
     } finally {

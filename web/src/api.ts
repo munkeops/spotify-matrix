@@ -89,7 +89,40 @@ export const previewWidget = (widgetId: string, config: Record<string, unknown>)
 export const PREVIEWABLE = new Set([
   "core.text", "core.image", "core.draw", "core.slideshow",
   "core.clock", "core.agent", "core.weather", "core.spotify", "core.testPattern",
+  "core.tetris",
 ]);
+
+export type TetrisAction =
+  | "left" | "right" | "softDrop" | "hardDrop"
+  | "rotateCw" | "rotateCcw" | "hold"
+  | "pause" | "resume" | "togglePause" | "restart";
+
+export interface TetrisState {
+  board: string[];
+  active: number[][];
+  activeType: string;
+  ghost: number[][];
+  next: string;
+  hold: string;
+  holdLocked: boolean;
+  score: number;
+  lines: number;
+  level: number;
+  gameOver: boolean;
+  paused: boolean;
+  updatedAt: number;
+}
+
+export interface TetrisStateResponse {
+  live: boolean;
+  running: boolean;
+  active: boolean;
+  state: TetrisState | null;
+}
+
+export const getTetrisState = () => apiGet<TetrisStateResponse>("/api/tetris/state");
+export const sendTetrisInput = (action: TetrisAction) =>
+  apiPost<{ ok: boolean; seq: number }>("/api/tetris/input", { action });
 
 export const getConfig = () => apiGet<Record<string, any>>("/api/config");
 export const saveConfig = (config: Record<string, unknown>) => apiPost<Record<string, any>>("/api/config", config);

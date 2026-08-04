@@ -72,6 +72,15 @@
     "runtime": "builtin"
   },
   {
+    "id": "core.tetris",
+    "name": "Tetris",
+    "version": "1.0.0",
+    "summary": "Play Tetris on the matrix with the phone or browser gamepad.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
     "id": "core.testPattern",
     "name": "Test Pattern",
     "version": "1.0.0",

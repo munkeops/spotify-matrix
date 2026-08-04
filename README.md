@@ -179,6 +179,34 @@ Render local preview frames:
 python spotify_matrix.py --preview-frames data/preview
 ```
 
+## Playing Tetris on the matrix
+
+The `core.tetris` plugin turns the panel into a playable 10x20 Tetris board with
+next piece, hold, score, lines, and level in the side panel. Open the app, pick
+**Play** in the navigation, and press **Start** to put it on the matrix. The page
+mirrors the board live and drives it with on-screen buttons or the keyboard
+(arrows move, up or `X` rotates, `Z` rotates back, space hard drops, `C` holds,
+`P` pauses, `R` restarts).
+
+The web app talks to the API, which hands input to the runtime process through a
+command queue under `data/widgets/state/`. Everything is also reachable directly:
+
+```bash
+curl -X POST http://<pi-host>:3000/api/tetris/input -H "Content-Type: application/json" -d '{"action":"hardDrop"}'
+curl http://<pi-host>:3000/api/tetris/state
+```
+
+Run the game locally without matrix hardware:
+
+```bash
+python spotify_matrix.py --display-mode tetris --mock-output data/frame.png \
+  --tetris-input data/widgets/state/tetris-input.json \
+  --tetris-state data/widgets/state/tetris-state.json
+```
+
+Settings live under the plugin's config: starting level, landing preview (ghost
+piece), and an optional auto-restart delay after a game over.
+
 ## Legacy env support
 
 The Python runtime still accepts environment variables if `data/config.json` is missing:

@@ -9,6 +9,7 @@ from typing import Any
 
 import spotify_matrix as runtime
 from src.domain.services.config_service import config_service
+from src.domain.services.tetris_service import tetris_service
 
 SIZE = 64
 
@@ -51,6 +52,8 @@ class PreviewService:
             return runtime.render_clock(SIZE, datetime.now(), cfg.get("face", "analog"), bool(cfg.get("use24Hour", False)), bool(cfg.get("showSeconds", False)))
         if widget_id == "core.agent":
             return runtime.render_agent_face(SIZE, 0, cfg.get("faceStyle", "classic"), cfg.get("animationSpeed", "normal"))
+        if widget_id == "core.tetris":
+            return runtime.render_tetris_frame(SIZE, self._tetris_snapshot())
         if widget_id == "core.testPattern":
             return runtime.render_test_pattern(SIZE, 0)
         if widget_id == "core.spotify":
@@ -73,6 +76,13 @@ class PreviewService:
                 int(cfg.get("rotate", 0) or 0),
             )
         raise ValueError(f"Preview is not available for {widget_id}.")
+
+    def _tetris_snapshot(self) -> dict[str, Any]:
+        # Mirror the real board while a game is running, otherwise show a demo board.
+        state = tetris_service.read_state()
+        if tetris_service.is_live(state) and state is not None:
+            return state.model_dump()
+        return runtime.tetris_demo_snapshot()
 
 
 preview_service = PreviewService()

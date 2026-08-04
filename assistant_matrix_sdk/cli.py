@@ -15,7 +15,7 @@ import urllib.parse
 from pathlib import Path
 from typing import Any
 
-ALLOWED_CATEGORIES = {"media", "time", "assistant", "information", "diagnostics", "custom"}
+ALLOWED_CATEGORIES = {"media", "time", "assistant", "information", "diagnostics", "games", "custom"}
 ALLOWED_FIELD_TYPES = {"string", "number", "boolean", "select", "secret", "location", "color"}
 ALLOWED_RUNTIMES = {"python", "builtin"}
 WIDGET_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -551,7 +551,7 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--name", default="", help="Display name. Defaults from widget id.")
     init.add_argument("--summary", default="", help="Short store summary.")
     init.add_argument("--author", default="Assistant Matrix")
-    init.add_argument("--category", default="custom", choices=("media", "time", "assistant", "information", "diagnostics", "custom"))
+    init.add_argument("--category", default="custom", choices=("media", "time", "assistant", "information", "diagnostics", "games", "custom"))
     init.add_argument("--version", default="0.1.0")
     init.add_argument("--license", default="MIT")
     init.add_argument("--force", action="store_true", help="Allow writing into a non-empty directory.")

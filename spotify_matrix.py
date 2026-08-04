@@ -8,6 +8,7 @@ from io import BytesIO
 import json
 import math
 import os
+import random
 import secrets
 import sys
 import threading
@@ -274,6 +275,21 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         value = get_nested(config, "weather", config_name)
         if value is not None:
             setattr(args, attr_name, caster(value))
+
+    tetris_fields = {
+        "startLevel": ("tetris_start_level", int, "--tetris-start-level"),
+        "autoRestartSeconds": ("tetris_auto_restart_seconds", int, "--tetris-auto-restart-seconds"),
+    }
+    for config_name, (attr_name, caster, flag) in tetris_fields.items():
+        if flag in sys.argv[1:]:
+            continue
+        value = get_nested(config, "tetris", config_name)
+        if value is not None:
+            setattr(args, attr_name, caster(value))
+
+    ghost = get_nested(config, "tetris", "ghost")
+    if ghost is not None and "--tetris-no-ghost" not in sys.argv[1:]:
+        args.tetris_no_ghost = not bool(ghost)
 
 
 def spotify_credentials(config: dict[str, Any]) -> tuple[str | None, str | None, str]:
@@ -2023,6 +2039,453 @@ def run_draw(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
         display.clear()
 
 
+TETRIS_COLS = 10
+TETRIS_ROWS = 20
+TETRIS_CELL = 3
+TETRIS_ORIGIN = (1, 2)
+TETRIS_PANEL_X = 34
+
+# Each piece is a rotation box size plus the filled cells inside that box.
+TETRIS_SHAPES: dict[str, tuple[int, tuple[tuple[int, int], ...]]] = {
+    "I": (4, ((0, 1), (1, 1), (2, 1), (3, 1))),
+    "O": (2, ((0, 0), (1, 0), (0, 1), (1, 1))),
+    "T": (3, ((1, 0), (0, 1), (1, 1), (2, 1))),
+    "S": (3, ((1, 0), (2, 0), (0, 1), (1, 1))),
+    "Z": (3, ((0, 0), (1, 0), (1, 1), (2, 1))),
+    "J": (3, ((0, 0), (0, 1), (1, 1), (2, 1))),
+    "L": (3, ((2, 0), (0, 1), (1, 1), (2, 1))),
+}
+
+TETRIS_COLORS = {
+    "I": (0, 214, 228),
+    "O": (240, 206, 46),
+    "T": (176, 84, 232),
+    "S": (72, 214, 96),
+    "Z": (238, 74, 84),
+    "J": (74, 118, 240),
+    "L": (244, 148, 44),
+}
+
+TETRIS_KICKS = ((0, 0), (-1, 0), (1, 0), (-2, 0), (2, 0), (0, -1))
+TETRIS_LINE_SCORES = (0, 100, 300, 500, 800)
+TETRIS_LOCK_DELAY = 0.45
+TETRIS_LOCK_RESET_LIMIT = 12
+TETRIS_FRAME_COLOR = (36, 40, 58)
+TETRIS_LABEL_COLOR = (120, 132, 156)
+TETRIS_VALUE_COLOR = (226, 234, 248)
+TETRIS_ACTIONS = ("left", "right", "softDrop", "hardDrop", "rotateCw", "rotateCcw", "hold", "pause", "resume", "togglePause", "restart")
+
+
+def tetris_cells(piece_type: str, rotation: int) -> tuple[tuple[int, int], ...]:
+    box, cells = TETRIS_SHAPES[piece_type]
+    result = cells
+    for _ in range(rotation % 4):
+        result = tuple((box - 1 - y, x) for x, y in result)
+    return result
+
+
+class TetrisGame:
+    """Headless Tetris driven by queued commands from the Assistant Matrix API."""
+
+    def __init__(self, start_level: int = 1, ghost: bool = True, seed: int | None = None) -> None:
+        self.start_level = max(1, min(15, int(start_level or 1)))
+        self.ghost = bool(ghost)
+        self.random = random.Random(seed)
+        self.reset()
+
+    def reset(self) -> None:
+        self.board: list[list[str]] = [[""] * TETRIS_COLS for _ in range(TETRIS_ROWS)]
+        self.bag: list[str] = []
+        self.score = 0
+        self.lines = 0
+        self.level = self.start_level
+        self.game_over = False
+        self.game_over_elapsed = 0.0
+        self.paused = False
+        self.hold = ""
+        self.hold_locked = False
+        self.drop_timer = 0.0
+        self.lock_timer = 0.0
+        self.lock_resets = 0
+        self.piece_type = ""
+        self.rotation = 0
+        self.piece_x = 0
+        self.piece_y = 0
+        self.next_type = self._take()
+        self._spawn()
+
+    def _take(self) -> str:
+        if not self.bag:
+            self.bag = list(TETRIS_SHAPES)
+            self.random.shuffle(self.bag)
+        return self.bag.pop()
+
+    def _spawn(self, piece_type: str = "") -> None:
+        self.piece_type = piece_type or self.next_type
+        if not piece_type:
+            self.next_type = self._take()
+        self.rotation = 0
+        self.piece_x = (TETRIS_COLS - TETRIS_SHAPES[self.piece_type][0]) // 2
+        self.piece_y = 0
+        self.drop_timer = 0.0
+        self.lock_timer = 0.0
+        self.lock_resets = 0
+        if self._collides(self.piece_x, self.piece_y, self.rotation):
+            self.game_over = True
+
+    def _cells(self, x: int, y: int, rotation: int) -> list[tuple[int, int]]:
+        return [(x + cell_x, y + cell_y) for cell_x, cell_y in tetris_cells(self.piece_type, rotation)]
+
+    def _collides(self, x: int, y: int, rotation: int) -> bool:
+        for cell_x, cell_y in self._cells(x, y, rotation):
+            if cell_x < 0 or cell_x >= TETRIS_COLS or cell_y >= TETRIS_ROWS:
+                return True
+            if cell_y >= 0 and self.board[cell_y][cell_x]:
+                return True
+        return False
+
+    def _reset_lock_delay(self) -> None:
+        if self.lock_timer > 0 and self.lock_resets < TETRIS_LOCK_RESET_LIMIT:
+            self.lock_timer = 0.0
+            self.lock_resets += 1
+
+    def move(self, dx: int, dy: int) -> bool:
+        if self.game_over or self.paused:
+            return False
+        if self._collides(self.piece_x + dx, self.piece_y + dy, self.rotation):
+            return False
+        self.piece_x += dx
+        self.piece_y += dy
+        self._reset_lock_delay()
+        return True
+
+    def rotate(self, direction: int) -> bool:
+        if self.game_over or self.paused:
+            return False
+        rotation = (self.rotation + direction) % 4
+        for dx, dy in TETRIS_KICKS:
+            if not self._collides(self.piece_x + dx, self.piece_y + dy, rotation):
+                self.piece_x += dx
+                self.piece_y += dy
+                self.rotation = rotation
+                self._reset_lock_delay()
+                return True
+        return False
+
+    def soft_drop(self) -> None:
+        if self.move(0, 1):
+            self.score += 1
+            self.drop_timer = 0.0
+
+    def hard_drop(self) -> None:
+        if self.game_over or self.paused:
+            return
+        distance = 0
+        while not self._collides(self.piece_x, self.piece_y + 1, self.rotation):
+            self.piece_y += 1
+            distance += 1
+        self.score += distance * 2
+        self._lock()
+
+    def hold_piece(self) -> None:
+        if self.game_over or self.paused or self.hold_locked:
+            return
+        held = self.hold
+        self.hold = self.piece_type
+        if held:
+            self._spawn(held)
+        else:
+            self._spawn()
+        self.hold_locked = True
+
+    def landing_y(self) -> int:
+        y = self.piece_y
+        while not self._collides(self.piece_x, y + 1, self.rotation):
+            y += 1
+        return y
+
+    def _lock(self) -> None:
+        for cell_x, cell_y in self._cells(self.piece_x, self.piece_y, self.rotation):
+            if 0 <= cell_y < TETRIS_ROWS and 0 <= cell_x < TETRIS_COLS:
+                self.board[cell_y][cell_x] = self.piece_type
+        cleared = self._clear_lines()
+        if cleared:
+            self.lines += cleared
+            self.score += TETRIS_LINE_SCORES[cleared] * self.level
+            self.level = self.start_level + self.lines // 10
+        self.hold_locked = False
+        self._spawn()
+
+    def _clear_lines(self) -> int:
+        kept = [row for row in self.board if not all(row)]
+        cleared = TETRIS_ROWS - len(kept)
+        if cleared:
+            self.board = [[""] * TETRIS_COLS for _ in range(cleared)] + kept
+        return cleared
+
+    def drop_interval(self) -> float:
+        return max(0.06, 0.80 - (self.level - 1) * 0.06)
+
+    def step(self, elapsed: float) -> None:
+        elapsed = max(0.0, elapsed)
+        if self.game_over:
+            self.game_over_elapsed += elapsed
+            return
+        if self.paused:
+            return
+        if self._collides(self.piece_x, self.piece_y + 1, self.rotation):
+            self.lock_timer += elapsed
+            if self.lock_timer >= TETRIS_LOCK_DELAY:
+                self._lock()
+            return
+        self.lock_timer = 0.0
+        self.lock_resets = 0
+        self.drop_timer += elapsed
+        interval = self.drop_interval()
+        while self.drop_timer >= interval and not self._collides(self.piece_x, self.piece_y + 1, self.rotation):
+            self.piece_y += 1
+            self.drop_timer -= interval
+
+    def command(self, action: str) -> None:
+        if action == "restart":
+            self.reset()
+            return
+        if action in ("pause", "resume", "togglePause"):
+            self.paused = action == "pause" or (action == "togglePause" and not self.paused)
+            return
+        if self.game_over:
+            # Any drop button starts a fresh game once the board has topped out.
+            if action in ("hardDrop", "softDrop"):
+                self.reset()
+            return
+        if action == "left":
+            self.move(-1, 0)
+        elif action == "right":
+            self.move(1, 0)
+        elif action == "softDrop":
+            self.soft_drop()
+        elif action == "hardDrop":
+            self.hard_drop()
+        elif action == "rotateCw":
+            self.rotate(1)
+        elif action == "rotateCcw":
+            self.rotate(-1)
+        elif action == "hold":
+            self.hold_piece()
+
+    def snapshot(self) -> dict[str, Any]:
+        active = [] if self.game_over else [[x, y] for x, y in self._cells(self.piece_x, self.piece_y, self.rotation)]
+        ghost: list[list[int]] = []
+        if self.ghost and not self.game_over and not self.paused:
+            landing = self.landing_y()
+            if landing != self.piece_y:
+                ghost = [[x, y] for x, y in self._cells(self.piece_x, landing, self.rotation)]
+        return {
+            "board": ["".join(cell or "." for cell in row) for row in self.board],
+            "active": active,
+            "activeType": "" if self.game_over else self.piece_type,
+            "ghost": ghost,
+            "next": self.next_type,
+            "hold": self.hold,
+            "holdLocked": self.hold_locked,
+            "score": self.score,
+            "lines": self.lines,
+            "level": self.level,
+            "gameOver": self.game_over,
+            "paused": self.paused,
+        }
+
+
+def tetris_demo_snapshot() -> dict[str, Any]:
+    """Static board used for the widget preview tile."""
+    game = TetrisGame(seed=7)
+    game.board[19] = ["J", "J", "L", "L", "O", "O", "S", "S", "Z", ""]
+    game.board[18] = ["J", "", "", "L", "O", "O", "", "S", "Z", ""]
+    game.board[17] = ["", "", "", "L", "", "", "", "", "Z", ""]
+    game.piece_type = "T"
+    game.next_type = "I"
+    game.hold = "L"
+    game.piece_x = 3
+    game.piece_y = 6
+    game.score = 2400
+    game.lines = 12
+    game.level = 2
+    return game.snapshot()
+
+
+def _tetris_block(draw: ImageDraw.ImageDraw, x: int, y: int, color: tuple[int, int, int]) -> None:
+    draw.rectangle((x, y, x + TETRIS_CELL - 1, y + TETRIS_CELL - 1), fill=color)
+    draw.point((x, y), fill=tuple(min(255, channel + 60) for channel in color))
+
+
+def _tetris_mini_piece(draw: ImageDraw.ImageDraw, x: int, y: int, piece_type: str, cell: int = 2, area: int = 8) -> None:
+    if piece_type not in TETRIS_SHAPES:
+        return
+    cells = TETRIS_SHAPES[piece_type][1]
+    min_x = min(cell_x for cell_x, _ in cells)
+    min_y = min(cell_y for _, cell_y in cells)
+    span_x = max(cell_x for cell_x, _ in cells) - min_x + 1
+    span_y = max(cell_y for _, cell_y in cells) - min_y + 1
+    start_x = x + (area - span_x * cell) // 2
+    start_y = y + (area - span_y * cell) // 2
+    color = TETRIS_COLORS[piece_type]
+    for cell_x, cell_y in cells:
+        left = start_x + (cell_x - min_x) * cell
+        top = start_y + (cell_y - min_y) * cell
+        draw.rectangle((left, top, left + cell - 1, top + cell - 1), fill=color)
+
+
+def tetris_score_text(value: int) -> str:
+    value = max(0, int(value))
+    return str(value) if value < 100000 else f"{value // 1000}K"
+
+
+def _render_tetris_panel(draw: ImageDraw.ImageDraw, snapshot: dict[str, Any]) -> None:
+    x = TETRIS_PANEL_X
+    draw_pixel_text(draw, x, 1, "NEXT", TETRIS_LABEL_COLOR, 1)
+    _tetris_mini_piece(draw, x + 2, 8, str(snapshot.get("next", "")))
+    draw_pixel_text(draw, x, 18, "HOLD", TETRIS_LABEL_COLOR, 1)
+    _tetris_mini_piece(draw, x + 2, 25, str(snapshot.get("hold", "")))
+    draw_pixel_text(draw, x, 35, "SCORE", TETRIS_LABEL_COLOR, 1)
+    draw_pixel_text(draw, x, 41, tetris_score_text(snapshot.get("score", 0)), TETRIS_VALUE_COLOR, 1)
+    draw_pixel_text(draw, x, 49, "LINES", TETRIS_LABEL_COLOR, 1)
+    draw_pixel_text(draw, x, 55, str(max(0, int(snapshot.get("lines", 0)))), TETRIS_VALUE_COLOR, 1)
+    level = min(99, max(1, int(snapshot.get("level", 1))))
+    draw_pixel_text(draw, x + 16, 55, f"L{level}", TETRIS_LABEL_COLOR, 1)
+
+
+def _tetris_overlay(draw: ImageDraw.ImageDraw, lines: tuple[str, ...], width: int, height: int) -> None:
+    origin_x, origin_y = TETRIS_ORIGIN
+    top = origin_y + height // 2 - (len(lines) * 7) // 2
+    draw.rectangle((origin_x, top - 3, origin_x + width - 1, top + len(lines) * 7 + 1), fill=(0, 0, 0), outline=TETRIS_FRAME_COLOR)
+    for index, line in enumerate(lines):
+        draw_pixel_text(draw, origin_x + (width - pixel_text_width(line, 1)) // 2, top + index * 7, line, TETRIS_VALUE_COLOR, 1)
+
+
+def render_tetris_frame(size: int, snapshot: dict[str, Any]) -> Image.Image:
+    image = Image.new("RGB", (64, 64), (0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    origin_x, origin_y = TETRIS_ORIGIN
+    width = TETRIS_COLS * TETRIS_CELL
+    height = TETRIS_ROWS * TETRIS_CELL
+    draw.rectangle((origin_x - 1, origin_y - 1, origin_x + width, origin_y + height), outline=TETRIS_FRAME_COLOR)
+
+    for row_index, row in enumerate(snapshot.get("board", [])):
+        for col_index, cell in enumerate(row):
+            if cell != ".":
+                _tetris_block(draw, origin_x + col_index * TETRIS_CELL, origin_y + row_index * TETRIS_CELL, TETRIS_COLORS.get(cell, TETRIS_VALUE_COLOR))
+
+    active_color = TETRIS_COLORS.get(str(snapshot.get("activeType", "")), TETRIS_VALUE_COLOR)
+    ghost_color = tuple(channel // 4 for channel in active_color)
+    for cell_x, cell_y in snapshot.get("ghost", []):
+        if cell_y >= 0:
+            left = origin_x + cell_x * TETRIS_CELL
+            top = origin_y + cell_y * TETRIS_CELL
+            draw.rectangle((left, top, left + TETRIS_CELL - 1, top + TETRIS_CELL - 1), fill=ghost_color)
+    for cell_x, cell_y in snapshot.get("active", []):
+        if cell_y >= 0:
+            _tetris_block(draw, origin_x + cell_x * TETRIS_CELL, origin_y + cell_y * TETRIS_CELL, active_color)
+
+    _render_tetris_panel(draw, snapshot)
+
+    if snapshot.get("gameOver"):
+        _tetris_overlay(draw, ("GAME", "OVER"), width, height)
+    elif snapshot.get("paused"):
+        _tetris_overlay(draw, ("PAUSED",), width, height)
+
+    return image if size == 64 else image.resize((size, size), Image.NEAREST)
+
+
+def read_tetris_commands(path: Path | None, last_seq: int) -> tuple[list[str], int]:
+    """Drain queued controller commands written by the API, newest sequence wins."""
+    if path is None or not path.exists():
+        return [], last_seq
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            payload = json.load(file)
+    except (OSError, json.JSONDecodeError):
+        return [], last_seq
+    entries = payload.get("commands", []) if isinstance(payload, dict) else []
+    pairs = [
+        (int(entry.get("seq", 0) or 0), str(entry.get("action", "")))
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("action")
+    ]
+    if not pairs:
+        return [], last_seq
+    highest = max(seq for seq, _ in pairs)
+    if highest < last_seq:
+        # The API restarted and rewound its counter, so replay from the start.
+        last_seq = 0
+    fresh = sorted((pair for pair in pairs if pair[0] > last_seq), key=lambda pair: pair[0])
+    return [action for _, action in fresh], max(last_seq, highest)
+
+
+def write_tetris_state(path: Path | None, snapshot: dict[str, Any]) -> None:
+    if path is None:
+        return
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = path.with_name(path.name + ".tmp")
+        with temp_path.open("w", encoding="utf-8") as file:
+            json.dump({**snapshot, "updatedAt": time.time()}, file)
+        for _ in range(3):
+            try:
+                os.replace(temp_path, path)
+                return
+            except PermissionError:
+                # Windows refuses the swap while the API has the file open.
+                time.sleep(0.01)
+        with path.open("w", encoding="utf-8") as file:
+            json.dump({**snapshot, "updatedAt": time.time()}, file)
+        temp_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def run_tetris(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    game = TetrisGame(start_level=args.tetris_start_level, ghost=not args.tetris_no_ghost)
+    input_path = args.tetris_input
+    state_path = args.tetris_state
+    auto_restart = max(0, int(args.tetris_auto_restart_seconds or 0))
+    frame_time = 1.0 / max(1.0, float(args.fps))
+    # Ignore anything queued before this game started.
+    _, last_seq = read_tetris_commands(input_path, 0)
+    previous = time.monotonic()
+    next_state_write = 0.0
+    last_written = ""
+    try:
+        while True:
+            started = time.monotonic()
+            elapsed = started - previous
+            previous = started
+
+            actions, last_seq = read_tetris_commands(input_path, last_seq)
+            for action in actions:
+                game.command(action)
+            game.step(elapsed)
+            if auto_restart and game.game_over and game.game_over_elapsed >= auto_restart:
+                game.reset()
+
+            snapshot = game.snapshot()
+            display.show(render_tetris_frame(size, snapshot))
+
+            if state_path is not None and started >= next_state_write:
+                serialized = json.dumps(snapshot, sort_keys=True)
+                if serialized != last_written:
+                    write_tetris_state(state_path, snapshot)
+                    last_written = serialized
+                next_state_write = started + 0.2
+
+            if args.once:
+                break
+            time.sleep(max(0.0, frame_time - (time.monotonic() - started)))
+    except KeyboardInterrupt:
+        pass
+    finally:
+        display.clear()
+
+
 def load_external_widget(widget_dir: Path, entrypoint: str) -> Any:
     if str(widget_dir) not in sys.path:
         sys.path.insert(0, str(widget_dir))
@@ -2215,6 +2678,8 @@ def run(args: argparse.Namespace) -> None:
         run_draw(args, display, size)
     elif mode == "slideshow":
         run_slideshow(args, display, size)
+    elif mode == "tetris":
+        run_tetris(args, display, size)
     elif mode == "widget":
         run_external_widget(args, display, size)
     else:
@@ -2237,7 +2702,7 @@ def render_preview_frames(directory: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
-    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"), default="spotify")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "tetris", "testPattern", "widget"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)
@@ -2294,6 +2759,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--image-fit", choices=("contain", "cover", "stretch"), default="", help="How the image is scaled to the panel.")
     parser.add_argument("--image-background", default="", help="Background color behind a contained image.")
     parser.add_argument("--image-rotate", type=int, choices=(0, 90, 180, 270), default=None, help="Rotate the image before fitting.")
+    parser.add_argument("--tetris-start-level", type=int, default=1, help="Starting gravity level for tetris mode.")
+    parser.add_argument("--tetris-no-ghost", action="store_true", help="Hide the landing preview in tetris mode.")
+    parser.add_argument("--tetris-auto-restart-seconds", type=int, default=0, help="Seconds to wait after game over before starting a new tetris game (0 waits for a button).")
+    parser.add_argument("--tetris-input", type=Path, help="JSON command queue the Assistant Matrix API writes for tetris mode.")
+    parser.add_argument("--tetris-state", type=Path, help="JSON file where tetris mode publishes live game state.")
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")

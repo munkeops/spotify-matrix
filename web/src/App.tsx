@@ -6,15 +6,18 @@ import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import ExtensionRoundedIcon from "@mui/icons-material/ExtensionRounded";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Plugins from "./pages/Plugins";
 import Store from "./pages/Store";
 import Settings from "./pages/Settings";
+import Tetris from "./pages/Tetris";
 
 const NAV = [
   { label: "Home", value: "/", icon: <HomeRoundedIcon /> },
   { label: "Plugins", value: "/plugins", icon: <ExtensionRoundedIcon /> },
+  { label: "Play", value: "/play/tetris", icon: <SportsEsportsRoundedIcon /> },
   { label: "Store", value: "/store", icon: <StorefrontRoundedIcon /> },
   { label: "Settings", value: "/settings", icon: <SettingsRoundedIcon /> },
 ];
@@ -42,6 +45,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/plugins" element={<Plugins />} />
+        <Route path="/play/tetris" element={<Tetris />} />
         <Route path="/store" element={<Store />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

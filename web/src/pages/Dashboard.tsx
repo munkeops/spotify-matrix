@@ -1,17 +1,20 @@
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, Typography, Stack, Chip, Box, CircularProgress, Alert, IconButton, Button } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
 import { apiGet, apiPost, StatusResponse, listLocalWidgets, getWidgetConfig, previewWidget, applyWidget, LocalWidget, PREVIEWABLE } from "../api";
 import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
 
 const CATEGORY_COLOR: Record<string, string> = {
   media: "#4be0c0", time: "#8ea2ff", assistant: "#ffb86b", information: "#7ee0a0",
-  custom: "#c58cff", diagnostics: "#ff8c8c", weather: "#66d0ff",
+  custom: "#c58cff", diagnostics: "#ff8c8c", weather: "#66d0ff", games: "#ff7ab8",
 };
 const color = (w?: LocalWidget | null) => (w ? CATEGORY_COLOR[w.manifest.category] || "#4be0c0" : "#4be0c0");
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [widgets, setWidgets] = useState<LocalWidget[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -100,6 +103,11 @@ export default function Dashboard() {
                 <Chip size="small" color={running ? "success" : "default"} label={running ? "Running" : "Stopped"} sx={{ mt: 0.5 }} />
               </Box>
               <Stack direction="row" spacing={1} alignItems="center">
+                {active?.manifest.id === "core.tetris" ? (
+                  <IconButton onClick={() => navigate("/play/tetris")} sx={{ width: 48, height: 48, border: "1px solid", borderColor: "divider" }} aria-label="Open gamepad">
+                    <SportsEsportsRoundedIcon />
+                  </IconButton>
+                ) : null}
                 {active && active.configurable ? (
                   <IconButton onClick={() => openConfig(active)} sx={{ width: 48, height: 48, border: "1px solid", borderColor: "divider" }} aria-label="Configure">
                     <TuneRoundedIcon />

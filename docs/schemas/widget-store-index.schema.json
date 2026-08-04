@@ -43,7 +43,7 @@
         },
         "category": {
           "type": "string",
-          "enum": ["media", "time", "assistant", "information", "diagnostics", "custom"],
+          "enum": ["media", "time", "assistant", "information", "diagnostics", "games", "custom"],
           "default": "custom"
         },
         "author": {

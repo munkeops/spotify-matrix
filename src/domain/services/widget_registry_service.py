@@ -13,7 +13,7 @@ BUILTIN_MODE = os.environ.get("ASSISTANT_MATRIX_BUILTIN_MODE", "always").lower()
 
 from pydantic import BaseModel
 
-from src.domain.models.api_schemas import AgentConfig, ClockConfig, DrawConfig, ImageConfig, SlideshowConfig, SpotifyConfig, TextConfig, WeatherConfig
+from src.domain.models.api_schemas import AgentConfig, ClockConfig, DrawConfig, ImageConfig, SlideshowConfig, SpotifyConfig, TetrisConfig, TextConfig, WeatherConfig
 from src.domain.models.widget_schemas import LocalWidget, StoreWidget, WidgetConfigField, WidgetConfigOption, WidgetManifest, WidgetPermission, WidgetPreview, WidgetTrigger
 from src.domain.services.config_service import config_service
 from src.domain.services.runtime_service import runtime_service
@@ -32,6 +32,7 @@ WIDGET_MODE_MAP = {
     "core.image": "image",
     "core.draw": "draw",
     "core.slideshow": "slideshow",
+    "core.tetris": "tetris",
     "core.testPattern": "testPattern",
 }
 
@@ -137,6 +138,8 @@ class WidgetRegistryService:
             return config.draw.model_dump()
         if widget_id == "core.slideshow":
             return config.slideshow.model_dump()
+        if widget_id == "core.tetris":
+            return config.tetris.model_dump()
         if widget_id == "core.testPattern":
             return {"testPattern": config.runtime.testPattern}
         return self._read_installed_widget_config(widget_id)
@@ -162,6 +165,8 @@ class WidgetRegistryService:
             config.draw = self._merge_model(config.draw, values, DrawConfig)
         elif widget_id == "core.slideshow":
             config.slideshow = self._merge_model(config.slideshow, values, SlideshowConfig)
+        elif widget_id == "core.tetris":
+            config.tetris = self._merge_model(config.tetris, values, TetrisConfig)
         elif widget_id == "core.testPattern":
             config.runtime.testPattern = bool(values.get("testPattern", config.runtime.testPattern))
         else:
@@ -430,6 +435,40 @@ class WidgetRegistryService:
                     WidgetConfigField(key="background", label="Background color", type="string", default="#000000"),
                 ],
                 triggers=[WidgetTrigger(event="schedule.rotation", defaultEnabled=True, priority=15)],
+            ),
+            WidgetManifest(
+                id="core.tetris",
+                name="Tetris",
+                version="1.0.0",
+                summary="Play Tetris on the matrix with the phone or browser gamepad.",
+                category="games",
+                runtime="builtin",
+                entrypoint="spotify_matrix:run_tetris",
+                preview=WidgetPreview(description="Playable 10x20 Tetris board with next, hold, score, and level."),
+                config=[
+                    WidgetConfigField(
+                        key="startLevel",
+                        label="Starting level",
+                        type="number",
+                        default=1,
+                        min=1,
+                        max=15,
+                        step=1,
+                        helpText="Higher levels start with faster gravity.",
+                    ),
+                    WidgetConfigField(key="ghost", label="Show landing preview", type="boolean", default=True),
+                    WidgetConfigField(
+                        key="autoRestartSeconds",
+                        label="Auto restart seconds",
+                        type="number",
+                        default=0,
+                        min=0,
+                        max=120,
+                        step=1,
+                        helpText="Seconds to wait after game over before dealing a new board. 0 waits for the restart button.",
+                    ),
+                ],
+                triggers=[WidgetTrigger(event="tetris.play", defaultEnabled=False, priority=70)],
             ),
             WidgetManifest(
                 id="core.testPattern",

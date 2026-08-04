@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 ConfigFieldType = Literal["string", "number", "boolean", "select", "secret", "location", "color"]
-WidgetCategory = Literal["media", "time", "assistant", "information", "diagnostics", "custom"]
+WidgetCategory = Literal["media", "time", "assistant", "information", "diagnostics", "games", "custom"]
 WidgetRuntime = Literal["builtin", "python"]
 
 

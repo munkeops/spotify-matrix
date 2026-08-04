@@ -37,7 +37,7 @@ class RuntimeConfig(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    mode: Literal["spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"] = "spotify"
+    mode: Literal["spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "tetris", "testPattern", "widget"] = "spotify"
     widgetId: str = ""
 
 
@@ -120,6 +120,12 @@ class SlideshowConfig(BaseModel):
     shuffle: bool = False
 
 
+class TetrisConfig(BaseModel):
+    startLevel: int = 1
+    ghost: bool = True
+    autoRestartSeconds: int = 0
+
+
 class StoreConfig(BaseModel):
     indexUrl: str = "configs/widget_store_index.json"
 
@@ -195,6 +201,7 @@ class AppConfig(BaseModel):
     image: ImageConfig = Field(default_factory=ImageConfig)
     draw: DrawConfig = Field(default_factory=DrawConfig)
     slideshow: SlideshowConfig = Field(default_factory=SlideshowConfig)
+    tetris: TetrisConfig = Field(default_factory=TetrisConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 
 
@@ -265,6 +272,42 @@ class RuntimeActionResponse(BaseModel):
 class CommandRequest(BaseModel):
     command: Literal["set_mode", "set_widget", "set_clock_face", "set_brightness", "trigger_event", "start_runtime", "stop_runtime"]
     value: str | int | None = None
+
+
+TetrisAction = Literal["left", "right", "softDrop", "hardDrop", "rotateCw", "rotateCcw", "hold", "pause", "resume", "togglePause", "restart"]
+
+
+class TetrisInputRequest(BaseModel):
+    action: TetrisAction
+
+
+class TetrisState(BaseModel):
+    board: list[str] = Field(default_factory=list)
+    active: list[list[int]] = Field(default_factory=list)
+    activeType: str = ""
+    ghost: list[list[int]] = Field(default_factory=list)
+    next: str = ""
+    hold: str = ""
+    holdLocked: bool = False
+    score: int = 0
+    lines: int = 0
+    level: int = 1
+    gameOver: bool = False
+    paused: bool = False
+    updatedAt: float = 0.0
+
+
+class TetrisStateResponse(BaseModel):
+    live: bool
+    running: bool
+    active: bool
+    state: TetrisState | None = None
+
+
+class TetrisInputResponse(BaseModel):
+    ok: bool
+    seq: int
+    action: str
 
 
 class CommandResponse(BaseModel):
