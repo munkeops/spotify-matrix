@@ -76,6 +76,7 @@ class ConnectFourGame(GameWidget):
         self.board[row][column] = player
         cells = self._winning_cells(row, column, player)
         if cells:
+            self.audio.play("win")
             self.winner = player
             self.win_cells = cells
             self.won = True
@@ -91,6 +92,7 @@ class ConnectFourGame(GameWidget):
         row = self._landing_row(column)
         if row is None:
             return
+        self.audio.play("drop")
         self.falling = {
             "column": column,
             "row": row,
@@ -107,6 +109,7 @@ class ConnectFourGame(GameWidget):
         if self.opponent == "ai" and self.player == 2:
             return
         if action == "left":
+            self.audio.play("move", 0.5)
             self.cursor = (self.cursor - 1) % COLUMNS
         elif action == "right":
             self.cursor = (self.cursor + 1) % COLUMNS

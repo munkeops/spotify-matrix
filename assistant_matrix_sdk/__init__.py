@@ -10,6 +10,7 @@ __all__ = [
     "Event",
     "GameWidget",
     "GameStore",
+    "SilentAudio",
     "MatrixCanvas",
     "Widget",
     "WidgetContext",
@@ -52,6 +53,10 @@ def __getattr__(name: str):
         from assistant_matrix_sdk.widget import Widget
 
         return Widget
+    if name == "SilentAudio":
+        from assistant_matrix_sdk.audio import SilentAudio
+
+        return SilentAudio
     if name == "GameStore":
         from assistant_matrix_sdk.store import GameStore
 

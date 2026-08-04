@@ -12,6 +12,7 @@ from typing import Any
 
 from PIL import Image
 
+from assistant_matrix_sdk.audio import Audio, SilentAudio
 from assistant_matrix_sdk.config import ConfigField
 from assistant_matrix_sdk.manifest import (
     COMMON_GAME_ACTIONS,
@@ -64,9 +65,13 @@ class GameWidget:
         config: dict[str, Any] | None = None,
         seed: int | None = None,
         store: GameStore | None = None,
+        audio: Audio | None = None,
     ) -> None:
         self.config = config or {}
         self.random = random.Random(seed)
+        # Set before reset() so a game can make a noise as it starts.
+        # Silent unless the host hands over a real engine.
+        self.audio: Audio = audio if audio is not None else SilentAudio()
         # Set before reset() so a game can read its saved best straight away.
         # Without a path this is in memory, which is what tests and previews get.
         self.store = store if store is not None else GameStore()

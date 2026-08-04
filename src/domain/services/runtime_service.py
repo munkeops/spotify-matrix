@@ -181,6 +181,10 @@ class RuntimeService:
             args.append("--text-wrap")
         if config.text.fit:
             args.append("--text-fit")
+        if config.audio.enabled:
+            args.extend(["--audio", "--audio-volume", str(config.audio.volume)])
+            if config.audio.device:
+                args.extend(["--audio-device", config.audio.device])
         active_game = game_service.active_game_id()
         if active_game:
             args.extend(

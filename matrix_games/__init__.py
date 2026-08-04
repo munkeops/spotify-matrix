@@ -42,11 +42,12 @@ def create_game(
     seed: int | None = None,
     installed_dir: Path | None = None,
     store: GameStore | None = None,
+    audio: Any = None,
 ) -> GameWidget:
     spec = get_spec(game_id, installed_dir)
     if spec is None:
         raise ValueError(f"Unknown game {game_id}.")
-    return spec.create(config, seed, store)
+    return spec.create(config, seed, store, audio)
 
 
 def plugin_module(game_id: str, installed_dir: Path | None = None):

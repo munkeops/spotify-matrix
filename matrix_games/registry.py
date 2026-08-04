@@ -61,8 +61,18 @@ class GameSpec:
     def load(self) -> type[GameWidget]:
         return load_game_class(self)
 
-    def create(self, config: dict[str, Any] | None = None, seed: int | None = None, store: Any = None) -> GameWidget:
-        return self.load()(config or {}, seed, store)
+    def create(
+        self,
+        config: dict[str, Any] | None = None,
+        seed: int | None = None,
+        store: Any = None,
+        audio: Any = None,
+    ) -> GameWidget:
+        return self.load()(config or {}, seed, store, audio)
+
+    @property
+    def sounds_dir(self) -> Path:
+        return self.package_dir / "sounds"
 
 
 def _spec_from_manifest(package_dir: Path, *, bundled: bool) -> GameSpec | None:

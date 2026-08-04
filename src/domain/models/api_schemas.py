@@ -144,6 +144,15 @@ class GamepadConfig(BaseModel):
     deadzone: float = 0.5
 
 
+class AudioConfig(BaseModel):
+    """Sound effects for the games."""
+
+    enabled: bool = False
+    #: Empty means the ALSA default device.
+    device: str = ""
+    volume: int = 80
+
+
 class ControllerConfig(BaseModel):
     """Per-game controller bindings, keyed by widget id then control."""
 
@@ -238,6 +247,7 @@ class AppConfig(BaseModel):
     joystick: JoystickConfig = Field(default_factory=JoystickConfig)
     gamepad: GamepadConfig = Field(default_factory=GamepadConfig)
     controller: ControllerConfig = Field(default_factory=ControllerConfig)
+    audio: AudioConfig = Field(default_factory=AudioConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 
 
@@ -491,3 +501,26 @@ class GameBindingsResponse(BaseModel):
 
 class GameBindingsRequest(BaseModel):
     bindings: dict[str, str] = Field(default_factory=dict)
+
+
+class AudioDevice(BaseModel):
+    name: str
+    description: str = ""
+
+
+class AudioStateResponse(BaseModel):
+    enabled: bool
+    available: bool
+    device: str = ""
+    volume: int = 80
+    devices: list[AudioDevice] = Field(default_factory=list)
+    sounds: list[str] = Field(default_factory=list)
+    advice: str = ""
+
+
+class AudioConfigRequest(BaseModel):
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class AudioTestRequest(BaseModel):
+    sound: str = "start"

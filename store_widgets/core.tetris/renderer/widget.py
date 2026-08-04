@@ -72,6 +72,7 @@ class TetrisGame(GameWidget):
         config: dict[str, Any] | None = None,
         seed: int | None = None,
         store: Any = None,
+        audio: Any = None,
         *,
         start_level: int | None = None,
         ghost: bool | None = None,
@@ -81,7 +82,7 @@ class TetrisGame(GameWidget):
             config["startLevel"] = start_level
         if ghost is not None:
             config["ghost"] = ghost
-        super().__init__(config, seed, store)
+        super().__init__(config, seed, store, audio)
 
     def reset(self) -> None:
         self.start_level = max(1, min(15, int(self.config.get("startLevel", 1) or 1)))
@@ -121,6 +122,7 @@ class TetrisGame(GameWidget):
         self.lock_resets = 0
         if self._collides(self.piece_x, self.piece_y, self.rotation):
             self.game_over = True
+            self.audio.play("game_over")
 
     def _cells(self, x: int, y: int, rotation: int) -> list[tuple[int, int]]:
         return [(x + cell_x, y + cell_y) for cell_x, cell_y in tetris_cells(self.piece_type, rotation)]
@@ -146,6 +148,8 @@ class TetrisGame(GameWidget):
         self.piece_x += dx
         self.piece_y += dy
         self._reset_lock_delay()
+        if dx:
+            self.audio.play("move")
         return True
 
     def rotate(self, direction: int) -> bool:
@@ -158,6 +162,7 @@ class TetrisGame(GameWidget):
                 self.piece_y += dy
                 self.rotation = rotation
                 self._reset_lock_delay()
+                self.audio.play("rotate")
                 return True
         return False
 
@@ -186,6 +191,7 @@ class TetrisGame(GameWidget):
         else:
             self._spawn()
         self.hold_locked = True
+        self.audio.play("hold")
 
     def landing_y(self) -> int:
         y = self.piece_y
@@ -198,6 +204,9 @@ class TetrisGame(GameWidget):
             if 0 <= cell_y < TETRIS_ROWS and 0 <= cell_x < TETRIS_COLS:
                 self.board[cell_y][cell_x] = self.piece_type
         cleared = self._clear_lines()
+        self.audio.play("line" if cleared else "lock")
+        if cleared == 4:
+            self.audio.play("tetris")
         if cleared:
             self.lines += cleared
             self.score += TETRIS_LINE_SCORES[cleared] * self.level

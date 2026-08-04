@@ -62,6 +62,7 @@ class FlappyGame(GameWidget):
             return
         self.started = True
         self.bird_vy = self.flap_velocity
+        self.audio.play("flap")
 
     def advance(self, elapsed: float) -> None:
         if not self.started:
@@ -73,6 +74,7 @@ class FlappyGame(GameWidget):
             pipe["x"] -= self.scroll_speed * elapsed
             if not pipe["scored"] and pipe["x"] + PIPE_WIDTH < BIRD_X:
                 pipe["scored"] = True
+                self.audio.play("score")
                 self.score += 1
                 self.best = max(self.best, self.score)
         if self.pipes and self.pipes[0]["x"] + PIPE_WIDTH < 0:
@@ -84,9 +86,11 @@ class FlappyGame(GameWidget):
         if self.bird_y < 0 or self.bird_y + BIRD_SIZE > GROUND_Y:
             self.bird_y = max(0.0, min(float(GROUND_Y - BIRD_SIZE), self.bird_y))
             self.game_over = True
+            self.audio.play("hit")
             return
         if self._collides():
             self.game_over = True
+            self.audio.play("hit")
 
     def _collides(self) -> bool:
         for pipe in self.pipes:

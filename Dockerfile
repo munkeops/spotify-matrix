@@ -20,6 +20,7 @@ WORKDIR /app
 # System build tools and fonts. Cached until this list changes.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
+        alsa-utils \
         bluez \
         build-essential \
         cmake \
@@ -70,6 +71,7 @@ COPY assistant_matrix_sdk ./assistant_matrix_sdk
 COPY matrix_games ./matrix_games
 COPY mini_joystick ./mini_joystick
 COPY matrix_input ./matrix_input
+COPY matrix_audio ./matrix_audio
 # Bundled game plugins, discovered at runtime alongside anything installed.
 COPY store_widgets ./store_widgets
 COPY store_server ./store_server

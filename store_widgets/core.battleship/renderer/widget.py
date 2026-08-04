@@ -142,6 +142,7 @@ class BattleshipGame(GameWidget):
         if self.turn != "player":
             return
         if action == "left":
+            self.audio.play("move", 0.5)
             self.cursor[0] = (self.cursor[0] - 1) % GRID
         elif action == "right":
             self.cursor[0] = (self.cursor[0] + 1) % GRID
@@ -161,12 +162,15 @@ class BattleshipGame(GameWidget):
         self.player_shots += 1
         if result == "miss":
             self.message = "MISS"
+            self.audio.play("miss")
         else:
+            self.audio.play("sunk" if result == "sunk" else "hit")
             self.hits += 1
             ship = self.enemy.ship_at(cell)
             self.message = f"SUNK {ship.label}" if result == "sunk" and ship else "HIT"
         if self.enemy.defeated:
             self.won = True
+            self.audio.play("win")
             self.message = "YOU WIN"
             return
         self.turn = "enemy"
@@ -219,6 +223,7 @@ class BattleshipGame(GameWidget):
                     self.hunt = [pending for pending in self.hunt if pending not in ship.cells]
         if self.player.defeated:
             self.game_over = True
+            self.audio.play("game_over")
             self.message = "FLEET LOST"
             return
         self.turn = "player"

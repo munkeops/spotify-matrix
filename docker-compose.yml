@@ -30,6 +30,8 @@ services:
       # started still shows up. Safe to keep: the directory always exists, so
       # unlike a `devices:` entry this cannot stop the container booting.
       - /dev/input:/dev/input
+      # Sound card for game effects. Same reasoning as /dev/input.
+      - /dev/snd:/dev/snd
 
   store:
     image: spotify-matrix:local

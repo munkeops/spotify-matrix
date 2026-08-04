@@ -78,6 +78,7 @@ class BreakoutGame(GameWidget):
             self.ball_vx = math.sin(angle) * self.speed()
             self.ball_vy = -math.cos(angle) * self.speed()
             self.launched = True
+            self.audio.play("launch")
         if not self.launched:
             self.ball_x = self.paddle_x + self.paddle_width / 2
 
@@ -98,6 +99,7 @@ class BreakoutGame(GameWidget):
         if self.ball_x <= 1:
             self.ball_x = 1
             self.ball_vx = abs(self.ball_vx)
+            self.audio.play("wall", 0.5)
         elif self.ball_x >= PANEL - 1 - BALL_SIZE:
             self.ball_x = PANEL - 1 - BALL_SIZE
             self.ball_vx = -abs(self.ball_vx)
@@ -114,11 +116,14 @@ class BreakoutGame(GameWidget):
                 self.ball_vx = math.sin(angle) * self.speed()
                 self.ball_vy = -abs(math.cos(angle) * self.speed())
                 self.ball_y = PADDLE_Y - BALL_SIZE
+                self.audio.play("paddle")
 
         if self.ball_y > PANEL:
             self.lives -= 1
+            self.audio.play("lose_life")
             if self.lives <= 0:
                 self.game_over = True
+                self.audio.play("game_over")
             else:
                 self._serve()
 
@@ -135,6 +140,7 @@ class BreakoutGame(GameWidget):
                 left, top, right, bottom = self._brick_rect(row, column)
                 if left <= self.ball_x + BALL_SIZE - 1 and self.ball_x <= right and top <= self.ball_y + BALL_SIZE - 1 and self.ball_y <= bottom:
                     self.bricks[row][column] = False
+                    self.audio.play("brick")
                     self.score += ROW_POINTS[row]
                     # Bounce off whichever face the ball was closest to.
                     if abs((self.ball_y + BALL_SIZE / 2) - (top + BRICK_HEIGHT / 2)) > abs((self.ball_x + BALL_SIZE / 2) - (left + BRICK_WIDTH / 2)):

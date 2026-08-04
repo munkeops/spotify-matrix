@@ -34,6 +34,7 @@ from assistant_matrix_sdk.game import GameWidget
 from matrix_input.shell import read_shell_state, render_brightness, render_menu
 from matrix_input.wheel import render_wheel
 from assistant_matrix_sdk.store import GameStore
+from matrix_audio import AudioEngine, SilentAudio
 from assistant_matrix_sdk.pixels import DIGIT_FONT_3X5, draw_pixel_text, parse_color, pixel_text_width
 
 # Older callers used the Tetris specific names before the shared games layer.
@@ -2056,7 +2057,13 @@ GAME_HEARTBEAT_SECONDS = 1.5
 def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int, game: GameWidget | str) -> None:
     """Drive one game: drain queued input, step, draw, publish state."""
     if isinstance(game, str):
-        game = create_game(game, read_external_widget_config(args.widget_config), store=game_store(args))
+        spec = get_spec(game)
+        game = create_game(
+            game,
+            read_external_widget_config(args.widget_config),
+            store=game_store(args),
+            audio=game_audio(args, spec.sounds_dir if spec else None),
+        )
     input_path = args.game_input
     state_path = args.game_state
     auto_restart = max(0, int(getattr(args, "tetris_auto_restart_seconds", 0) or 0))
@@ -2112,7 +2119,22 @@ def game_store(args: argparse.Namespace) -> GameStore:
     return GameStore(getattr(args, "game_scores", None))
 
 
-def load_game_package(widget_dir: Path, manifest: dict[str, Any], config: dict[str, Any], store: GameStore | None = None) -> GameWidget:
+def game_audio(args: argparse.Namespace, sounds_dir: Path | None):
+    """An audio engine loaded with one game's effects, or silence."""
+    if not getattr(args, "audio", False):
+        return SilentAudio()
+    engine = AudioEngine(
+        enabled=True,
+        device=str(getattr(args, "audio_device", "") or ""),
+        volume=float(getattr(args, "audio_volume", 80) or 80) / 100.0,
+    )
+    if sounds_dir is not None:
+        engine.load_directory(sounds_dir)
+    engine.start()
+    return engine
+
+
+def load_game_package(widget_dir: Path, manifest: dict[str, Any], config: dict[str, Any], store: GameStore | None = None, audio: Any = None) -> GameWidget:
     """Build the game a package declares, without importing the whole arcade."""
     from matrix_games.registry import GameSpec, load_game_class
 
@@ -2128,7 +2150,7 @@ def load_game_package(widget_dir: Path, manifest: dict[str, Any], config: dict[s
         package_dir=widget_dir,
         entrypoint=str(widget_info.get("entrypoint", "")),
     )
-    return load_game_class(spec)(config, None, store)
+    return load_game_class(spec)(config, None, store, audio)
 
 
 def load_external_widget(widget_dir: Path, entrypoint: str) -> Any:
@@ -2173,7 +2195,7 @@ def run_external_widget(args: argparse.Namespace, display: MatrixDisplay | MockD
     config = read_external_widget_config(args.widget_config)
     if str(widget_info.get("kind", "widget")) == "game":
         # A game plugin needs stepping and controller input, not a static frame.
-        run_game(args, display, size, load_game_package(widget_dir, manifest, config, game_store(args)))
+        run_game(args, display, size, load_game_package(widget_dir, manifest, config, game_store(args), game_audio(args, widget_dir / "sounds")))
         return
 
     renderer = load_external_widget(widget_dir, entrypoint)
@@ -2415,6 +2437,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--game-state", "--tetris-state", dest="game_state", type=Path, help="JSON file where game modes publish live state.")
     parser.add_argument("--game-scores", dest="game_scores", type=Path, help="JSON file where a game keeps its high scores between runs.")
     parser.add_argument("--shell-state", dest="shell_state", type=Path, help="JSON file the controller shell uses for its menu and brightness.")
+    parser.add_argument("--audio", action="store_true", help="Play game sound effects through the sound card.")
+    parser.add_argument("--audio-device", dest="audio_device", default="", help="ALSA device for sound effects; empty means the default.")
+    parser.add_argument("--audio-volume", dest="audio_volume", type=int, default=80, help="Sound effect volume, 0-100.")
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")

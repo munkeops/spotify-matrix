@@ -90,6 +90,7 @@ class InvadersGame(GameWidget):
             self.ship_x = min(PANEL - 1 - SHIP_WIDTH, self.ship_x + SHIP_SPEED)
         elif action == "fire" and self.bullet is None:
             self.bullet = [self.ship_x + SHIP_WIDTH // 2, float(SHIP_Y - 3)]
+            self.audio.play("shoot")
 
     def advance(self, elapsed: float) -> None:
         self._advance_fleet(elapsed)
@@ -102,6 +103,7 @@ class InvadersGame(GameWidget):
         while self.step_timer >= interval and not self.finished():
             self.step_timer -= interval
             self.animation ^= 1
+            self.audio.play("march", 0.6)
             columns = [column for column in range(COLUMNS) if any(self.alive[row][column] for row in range(ROWS))]
             if not columns:
                 return
@@ -142,9 +144,11 @@ class InvadersGame(GameWidget):
                 left, top, right, bottom = self._invader_rect(row, column)
                 if left <= bullet_x <= right and top <= bullet_y <= bottom + 2:
                     self.alive[row][column] = False
+                    self.audio.play("hit")
                     self.score += ROW_POINTS[row] * self.wave
                     self.bullet = None
                     if self._alive_count() == 0:
+                        self.audio.play("wave")
                         self.wave += 1
                         self._build_wave()
                     return
@@ -176,6 +180,7 @@ class InvadersGame(GameWidget):
 
     def _hit(self) -> None:
         self.lives -= 1
+        self.audio.play("player_hit")
         self.bullet = None
         self.bombs = []
         self.ship_x = (PANEL - SHIP_WIDTH) // 2

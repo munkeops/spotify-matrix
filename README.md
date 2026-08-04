@@ -19,6 +19,7 @@ Widget platform docs:
 - [Widget manifest schema](docs/schemas/widget-manifest.schema.json)
 - [Widget store index schema](docs/schemas/widget-store-index.schema.json)
 - [Game plugins](docs/game-plugins.md)
+- [Game audio](docs/game-audio.md)
 - [Mini-joystick module](docs/mini-joystick.md)
 - [Bluetooth game controller](docs/game-controller.md)
 
@@ -225,6 +226,10 @@ Run a game locally without matrix hardware:
 ```bash
 python spotify_matrix.py --display-mode widget --widget-id core.pacman   --widget-dir store_widgets/core.pacman --mock-output data/frame.png   --game-input data/widgets/state/pacman-input.json   --game-state data/widgets/state/pacman-state.json
 ```
+
+Games have sound: generated chiptune effects bundled per plugin, mixed so they
+overlap, switched on under **Settings → Game sound**. See
+[docs/game-audio.md](docs/game-audio.md).
 
 High scores are saved. Any game with a score gets a persisted best, a top ten
 and a play count with no code of its own, kept in `<data>/widgets/scores/` and

@@ -100,6 +100,7 @@ class PongGame(GameWidget):
         if self.ball_y <= FIELD_TOP:
             self.ball_y = FIELD_TOP
             self.ball_vy = abs(self.ball_vy)
+            self.audio.play("wall", 0.6)
         elif self.ball_y >= PANEL - BALL_SIZE:
             self.ball_y = PANEL - BALL_SIZE
             self.ball_vy = -abs(self.ball_vy)
@@ -119,6 +120,7 @@ class PongGame(GameWidget):
             self._finish_point(1)
 
     def _bounce(self, paddle_y: float, direction: int) -> None:
+        self.audio.play("paddle")
         self.rally += 1
         offset = (self.ball_y + BALL_SIZE / 2 - (paddle_y + PADDLE_HEIGHT / 2)) / (PADDLE_HEIGHT / 2)
         angle = math.radians(max(-55.0, min(55.0, offset * 55)))
@@ -128,6 +130,7 @@ class PongGame(GameWidget):
         self.ball_x = (LEFT_X + PADDLE_WIDTH) if direction > 0 else (RIGHT_X - BALL_SIZE)
 
     def _finish_point(self, direction: int) -> None:
+        self.audio.play("point")
         if self.left_score >= self.target or self.right_score >= self.target:
             self.winner = "left" if self.left_score > self.right_score else "right"
             self.won = True

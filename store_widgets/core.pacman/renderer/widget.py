@@ -251,6 +251,7 @@ class PacmanGame(GameWidget):
             return
         self.eaten_pellets.add(tile)
         if MAZE[tile[1]][tile[0]] == POWER:
+            self.audio.play("power")
             self.score += 50
             self.fright_timer = max(1.0, self.fright_seconds - (self.level - 1) * 0.5)
             self.fright_chain = 0
@@ -260,7 +261,9 @@ class PacmanGame(GameWidget):
                     ghost.direction = (-ghost.direction[0], -ghost.direction[1])
         else:
             self.score += 10
+            self.audio.play("pellet", 0.5)
         if len(self.eaten_pellets) >= len(self.pellets):
+            self.audio.play("level")
             self._next_level()
 
     def _next_level(self) -> None:
@@ -346,16 +349,19 @@ class PacmanGame(GameWidget):
                 if ghost.frightened:
                     ghost.eaten = True
                     ghost.frightened = False
+                    self.audio.play("eat_ghost")
                     self.score += GHOST_POINTS[min(self.fright_chain, len(GHOST_POINTS) - 1)]
                     self.fright_chain += 1
                 else:
                     self.lives -= 1
                     self.death_timer = 1.6
+                    self.audio.play("death")
                     return
 
     def _after_death(self) -> None:
         if self.lives <= 0:
             self.game_over = True
+            self.audio.play("game_over")
             return
         self._reset_actors(ready=1.5)
 

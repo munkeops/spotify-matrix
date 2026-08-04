@@ -314,3 +314,24 @@ export interface GamepadState {
 export const getGamepad = () => apiGet<GamepadState>("/api/gamepad");
 export const saveGamepadConfig = (config: Record<string, unknown>) =>
   apiPost<GamepadState>("/api/gamepad/config", { config });
+
+export interface AudioDevice {
+  name: string;
+  description: string;
+}
+
+export interface AudioState {
+  enabled: boolean;
+  available: boolean;
+  device: string;
+  volume: number;
+  devices: AudioDevice[];
+  sounds: string[];
+  advice: string;
+}
+
+export const getAudio = () => apiGet<AudioState>("/api/audio");
+export const saveAudioConfig = (config: Record<string, unknown>) =>
+  apiPost<AudioState>("/api/audio/config", { config });
+export const testAudio = (sound: string) =>
+  apiPost<{ ok: boolean; message: string }>("/api/audio/test", { sound });

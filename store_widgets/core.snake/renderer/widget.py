@@ -66,6 +66,7 @@ class SnakeGame(GameWidget):
             return
         if len(self.pending) < 2:
             self.pending.append(step)
+            self.audio.play("turn", 0.4)
 
     def advance(self, elapsed: float) -> None:
         self.move_timer += elapsed
@@ -85,6 +86,7 @@ class SnakeGame(GameWidget):
         if not (0 <= next_x < COLS and 0 <= next_y < ROWS):
             if self.walls:
                 self.game_over = True
+                self.audio.play("crash")
                 return
             next_x %= COLS
             next_y %= ROWS
@@ -93,6 +95,7 @@ class SnakeGame(GameWidget):
         body = self.body if self.grow else self.body[:-1]
         if (next_x, next_y) in body:
             self.game_over = True
+            self.audio.play("crash")
             return
 
         self.body.insert(0, (next_x, next_y))
@@ -102,6 +105,7 @@ class SnakeGame(GameWidget):
             self.body.pop()
 
         if (next_x, next_y) == self.food:
+            self.audio.play("eat")
             self.score += 1
             self.grow += 2
             if len(self.body) + self.grow >= COLS * ROWS:
