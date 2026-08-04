@@ -19,6 +19,8 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import threading
+import time
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -106,16 +108,61 @@ def _spec_from_manifest(package_dir: Path, *, bundled: bool) -> GameSpec | None:
     )
 
 
+# Scanning means a readdir plus a TOML parse per package, and discover() sits on
+# the controller path, which runs at up to 60Hz. Cache it, but keep the window
+# short so an installed plugin still shows up promptly.
+CACHE_SECONDS = 2.0
+_cache: dict[tuple[str, str], tuple[float, tuple, dict[str, GameSpec]]] = {}
+_cache_lock = threading.Lock()
+
+
+def _roots_fingerprint(roots: list[tuple[Path, bool]]) -> tuple:
+    """Cheap signal that a package was added or removed."""
+    marks = []
+    for root, _ in roots:
+        try:
+            marks.append((str(root), root.stat().st_mtime_ns))
+        except OSError:
+            marks.append((str(root), 0))
+    return tuple(marks)
+
+
+def invalidate_cache() -> None:
+    """Drop the cache, for when something has just changed the packages."""
+    with _cache_lock:
+        _cache.clear()
+
+
 def discover(installed_dir: Path | None = None) -> dict[str, GameSpec]:
     """Every game plugin available, keyed by game id.
 
     An installed package shadows a bundled one with the same id, so a user can
     upgrade a shipped game by installing a newer build of it.
+
+    Results are cached briefly: this is called for every controller event.
     """
-    specs: dict[str, GameSpec] = {}
     roots: list[tuple[Path, bool]] = [(BUNDLED_DIR, True)]
     if installed_dir is not None:
         roots.append((installed_dir, False))
+
+    key = (str(BUNDLED_DIR), str(installed_dir or ""))
+    fingerprint = _roots_fingerprint(roots)
+    now = time.monotonic()
+    with _cache_lock:
+        cached = _cache.get(key)
+        if cached is not None:
+            stamped, marks, specs = cached
+            if marks == fingerprint and (now - stamped) < CACHE_SECONDS:
+                return specs
+
+    specs = _scan(roots)
+    with _cache_lock:
+        _cache[key] = (now, fingerprint, specs)
+    return specs
+
+
+def _scan(roots: list[tuple[Path, bool]]) -> dict[str, GameSpec]:
+    specs: dict[str, GameSpec] = {}
     for root, bundled in roots:
         if not root.is_dir():
             continue
@@ -191,4 +238,4 @@ def demo_instance(spec: GameSpec) -> GameWidget:
     return game_class({}, 1)
 
 
-__all__ = ["GameSpec", "BUNDLED_DIR", "discover", "load_game_class", "load_module", "demo_instance", "GAME_KIND"]
+__all__ = ["GameSpec", "BUNDLED_DIR", "discover", "invalidate_cache", "CACHE_SECONDS", "load_game_class", "load_module", "demo_instance", "GAME_KIND"]

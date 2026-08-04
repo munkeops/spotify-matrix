@@ -45,19 +45,37 @@ def migrate_config(payload: Any) -> tuple[dict[str, Any], bool]:
 
 class ConfigService:
     def __init__(self) -> None:
+        # get_config() is called from the controller path and every request, so
+        # parsing the file each time is wasteful. Keyed on the file's identity
+        # so an edit from anywhere is still picked up.
+        self._cache: tuple[tuple[int, int], AppConfig] | None = None
         paths = base_config["paths"]
         self.data_dir = Path(os.environ.get("SPOTIFY_MATRIX_DATA_DIR", paths["data_dir"])).resolve()
         self.config_path = Path(os.environ.get("SPOTIFY_MATRIX_CONFIG", self.data_dir / paths["config_file"])).resolve()
         self.token_path = Path(os.environ.get("SPOTIFY_TOKEN_CACHE", self.data_dir / paths["token_file"])).resolve()
 
+    def _stamp(self) -> tuple[int, int]:
+        try:
+            info = self.config_path.stat()
+            return (info.st_mtime_ns, info.st_size)
+        except OSError:
+            return (0, 0)
+
     def get_config(self) -> AppConfig:
+        stamp = self._stamp()
+        cached = self._cache
+        if cached is not None and cached[0] == stamp:
+            # Copy so a caller mutating the result cannot poison the cache.
+            return cached[1].model_copy(deep=True)
+
         payload = self._read_json(self.config_path, {})
         payload, changed = migrate_config(payload)
         config = AppConfig.model_validate(payload)
         if changed:
             # Write it back so the migration happens once, not on every read.
             self._write_json(self.config_path, config.model_dump())
-        return config
+        self._cache = (self._stamp(), config)
+        return config.model_copy(deep=True)
 
     def get_public_config(self) -> AppConfig:
         config = self.get_config()
@@ -70,6 +88,7 @@ class ConfigService:
         if config.spotify.clientSecret == "********":
             config.spotify.clientSecret = current.spotify.clientSecret
         self._write_json(self.config_path, config.model_dump())
+        self._cache = (self._stamp(), config.model_copy(deep=True))
         return self.get_public_config()
 
     def token_status(self) -> TokenStatus:
