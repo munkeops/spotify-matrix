@@ -9,6 +9,8 @@ from pathlib import Path
 
 SERVICE_MODULES = [
     "src.domain.services.config_service",
+    # Reloaded with the rest so it does not keep a previous test's data dir.
+    "src.domain.services.game_service",
     "src.domain.services.runtime_service",
     "src.domain.services.widget_registry_service",
     "src.domain.services.display_policy_service",
@@ -28,6 +30,7 @@ def reload_services(monkeypatch, data_dir: Path, store_index: Path | None = None
         sys.modules.pop(name, None)
 
     config_module = importlib.import_module("src.domain.services.config_service")
+    importlib.import_module("src.domain.services.game_service")
     registry_module = importlib.import_module("src.domain.services.widget_registry_service")
     store_module = importlib.import_module("src.domain.services.widget_store_service")
     policy_module = importlib.import_module("src.domain.services.display_policy_service")
