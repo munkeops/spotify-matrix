@@ -32,6 +32,10 @@ class JoystickEvent:
     button: Button | None = None
     event: ButtonEvent = ButtonEvent.NONE
     repeat: bool = False
+    #: Raw stick vector for direction events, so a radial menu can use the
+    #: angle rather than the four-way direction. Up is negative y.
+    x: float = 0.0
+    y: float = 0.0
 
     @property
     def name(self) -> str:
@@ -93,12 +97,12 @@ class JoystickReader:
             self._direction_since = now
             self._next_repeat = now + self.repeat_delay
             if direction != Direction.NEUTRAL:
-                yield JoystickEvent(kind="direction", direction=direction)
+                yield JoystickEvent(kind="direction", direction=direction, x=state.stick.x, y=state.stick.y)
             return
         # Held: repeat at a steady rate once the initial delay has passed.
         if direction != Direction.NEUTRAL and now >= self._next_repeat:
             self._next_repeat = now + self.repeat_interval
-            yield JoystickEvent(kind="direction", direction=direction, repeat=True)
+            yield JoystickEvent(kind="direction", direction=direction, repeat=True, x=state.stick.x, y=state.stick.y)
 
     def _button_events(self, state: JoystickState) -> Iterator[JoystickEvent]:
         for button in Button:

@@ -54,11 +54,57 @@ class ShellAction:
     value: str = ""
 
 
-def game_action(event: JoystickEvent, actions: set[str]) -> str:
+#: The controls a player can rebind, in the order a settings screen shows them.
+CONTROLS = ("up", "down", "left", "right", "a", "b", "c", "d", "ok")
+
+
+def control_name(event: JoystickEvent) -> str:
+    """Which rebindable control an event came from, if any."""
+    if event.kind == "direction":
+        return event.direction.value if event.direction != Direction.NEUTRAL else ""
+    if event.kind == "button" and event.button is not None:
+        return event.button.value
+    return ""
+
+
+def default_bindings(actions: set[str]) -> dict[str, str]:
+    """What each control does before anything is rebound."""
+    resolved: dict[str, str] = {}
+    for direction in (Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT):
+        direct = DIRECTION_ACTIONS.get(direction, "")
+        for candidate in ([direct] if direct else []) + list(DIRECTION_FALLBACKS.get(direction, ())):
+            if candidate in actions:
+                resolved[direction.value] = candidate
+                break
+    for button, candidates in BUTTON_FALLBACKS.items():
+        for candidate in candidates:
+            if candidate in actions:
+                resolved[button.value] = candidate
+                break
+    return resolved
+
+
+def game_action(event: JoystickEvent, actions: set[str], overrides: dict[str, str] | None = None) -> str:
     """The action ``event`` should send to a game accepting ``actions``.
 
-    Returns an empty string when the game has nothing sensible bound.
+    ``overrides`` rebinds a control by name; anything the game does not declare
+    is ignored, so a stale binding cannot send a game an action it cannot take.
     """
+    if overrides:
+        control = control_name(event)
+        chosen = overrides.get(control, "")
+        if chosen and chosen in actions:
+            if event.repeat and chosen not in REPEATABLE:
+                return ""
+            if event.kind == "button" and event.event not in (
+                ButtonEvent.PRESS_DOWN,
+                ButtonEvent.SINGLE_CLICK,
+                ButtonEvent.LONG_PRESS_START,
+            ):
+                return ""
+            return chosen
+        if chosen == "none":
+            return ""
     if event.kind == "direction":
         direct = DIRECTION_ACTIONS.get(event.direction, "")
         candidates = ([direct] if direct else []) + list(DIRECTION_FALLBACKS.get(event.direction, ()))

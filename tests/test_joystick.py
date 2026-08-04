@@ -473,3 +473,187 @@ def test_the_menu_scrolls_to_keep_the_cursor_visible():
     assert end == 20 and start == 20 - VISIBLE_ROWS
     start, end = visible_window(10, 20)
     assert start <= 10 < end
+
+
+# --- the radial wheel ----------------------------------------------------
+
+
+def long_press(button: Button = Button.OK) -> JoystickEvent:
+    return JoystickEvent(kind="button", button=button, event=ButtonEvent.LONG_PRESS_START)
+
+
+def stick(x: float, y: float) -> JoystickEvent:
+    direction = Direction.UP if y < 0 else Direction.DOWN if y > 0 else Direction.RIGHT if x > 0 else Direction.LEFT
+    return JoystickEvent(kind="direction", direction=direction, x=x, y=y)
+
+
+def test_the_wheel_picks_by_angle():
+    from matrix_input.wheel import wedge_for_vector
+
+    # Six wedges, zero at the top, running clockwise.
+    assert wedge_for_vector(0, -1, 6) == 0
+    assert wedge_for_vector(0, 1, 6) == 3
+    assert wedge_for_vector(0, 0, 6) is None, "a centred stick points at nothing"
+    # Four wedges line up with the compass points.
+    assert wedge_for_vector(0, -1, 4) == 0
+    assert wedge_for_vector(1, 0, 4) == 1
+    assert wedge_for_vector(0, 1, 4) == 2
+    assert wedge_for_vector(-1, 0, 4) == 3
+
+
+def test_holding_ok_opens_the_wheel_over_a_game(tmp_path, monkeypatch):
+    from matrix_input.shell import read_shell_state
+
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    service = joystick_module.joystick_service
+    shell_path = game_module.game_service.state_dir / "shell.json"
+
+    service._dispatch(long_press())
+    wheel = read_shell_state(shell_path)["wheel"]
+    assert wheel["open"] is True
+    assert [item["action"] for item in wheel["items"]] == [item["action"] for item in joystick_module.WHEEL_IN_GAME]
+
+    # Pushing the stick highlights a wedge without doing anything.
+    service._dispatch(stick(0, -1))
+    assert read_shell_state(shell_path)["wheel"]["selected"] == 0
+    actions, _ = mg.read_commands(game_module.game_service.input_path("snake"), 0)
+    assert actions == [], "browsing the wheel must not reach the game"
+
+
+def test_the_wheel_sends_the_chosen_action(tmp_path, monkeypatch):
+    from matrix_input.shell import read_shell_state
+
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    service = joystick_module.joystick_service
+    service._dispatch(long_press())
+    service._dispatch(stick(0, -1))          # wedge 0 is Pause
+    service._dispatch(button_event(Button.OK, ButtonEvent.PRESS_UP))
+
+    actions, _ = mg.read_commands(game_module.game_service.input_path("snake"), 0)
+    assert actions == ["togglePause"]
+    assert read_shell_state(game_module.game_service.state_dir / "shell.json")["wheel"]["open"] is False
+
+
+def test_the_wheel_can_be_cancelled(tmp_path, monkeypatch):
+    from matrix_input.shell import read_shell_state
+
+    _, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+
+    service._dispatch(long_press())
+    service._dispatch(stick(0, -1))
+    service._dispatch(button_event(Button.B, ButtonEvent.SINGLE_CLICK))
+
+    assert read_shell_state(game_module.game_service.state_dir / "shell.json")["wheel"]["open"] is False
+
+
+def test_releasing_on_nothing_does_nothing(tmp_path, monkeypatch):
+    _, game_module, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    applied: list[str] = []
+    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+
+    service = joystick_module.joystick_service
+    service._dispatch(long_press())
+    # Never pushed the stick, so nothing is selected.
+    service._dispatch(button_event(Button.OK, ButtonEvent.PRESS_UP))
+
+    assert applied == []
+
+
+def test_exit_game_returns_to_the_previous_plugin(tmp_path, monkeypatch):
+    config_module, _, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    applied: list[str] = []
+    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+
+    service = joystick_module.joystick_service
+    # Arrive at a game from the clock.
+    service._apply_widget("core.clock")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    service._run_wheel_action("exitGame")
+
+    assert applied[-1] == "core.clock"
+
+
+def test_exit_falls_back_to_a_non_game(tmp_path, monkeypatch):
+    config_module, _, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    applied: list[str] = []
+    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    joystick_module.joystick_service._run_wheel_action("exitGame")
+
+    assert applied, "there is always somewhere to go back to"
+    assert not applied[-1].startswith("core.snake")
+
+
+# --- per game bindings ---------------------------------------------------
+
+
+def test_defaults_only_use_actions_a_game_declares():
+    from mini_joystick.bindings import default_bindings
+
+    for spec in mg.discover().values():
+        actions = set(spec.actions)
+        for control, action in default_bindings(actions).items():
+            assert action in actions, f"{spec.game_id}: {control} bound to unknown {action}"
+
+
+def test_an_override_replaces_the_default():
+    tetris = set(GAMES["tetris"].actions)
+    press_a = button_event(Button.A)
+
+    assert game_action(press_a, tetris) == "hardDrop"
+    assert game_action(press_a, tetris, {"a": "hold"}) == "hold"
+
+
+def test_an_override_a_game_rejects_is_ignored():
+    flappy = set(GAMES["flappy"].actions)
+    press_a = button_event(Button.A)
+
+    # Flappy has no hold, so the binding falls back rather than sending junk.
+    assert game_action(press_a, flappy, {"a": "hold"}) == "flap"
+
+
+def test_a_control_can_be_unbound():
+    tetris = set(GAMES["tetris"].actions)
+    assert game_action(button_event(Button.A), tetris, {"a": "none"}) == ""
+
+
+def test_overrides_still_respect_auto_repeat():
+    tetris = set(GAMES["tetris"].actions)
+    held = direction_event(Direction.UP, repeat=True)
+    # Rebinding up to a rotate must not let a held stick spin the piece.
+    assert game_action(held, tetris, {"up": "rotateCw"}) == ""
+    assert game_action(direction_event(Direction.UP), tetris, {"up": "rotateCw"}) == "rotateCw"
+
+
+def test_the_service_uses_saved_bindings(tmp_path, monkeypatch):
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.tetris"
+    config.controller.bindings = {"core.tetris": {"a": "hold"}}
+    config_module.config_service.save_config(config)
+
+    joystick_module.joystick_service._dispatch(button_event(Button.A))
+
+    actions, _ = mg.read_commands(game_module.game_service.input_path("tetris"), 0)
+    assert actions == ["hold"]

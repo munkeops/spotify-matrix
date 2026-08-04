@@ -205,6 +205,35 @@ adapts rather than assuming a d-pad:
 Only movement auto-repeats when the stick is held — a held stick never spins a
 Tetris piece or machine-guns a drop.
 
+### Rebinding a game's buttons
+
+The table above is only the default. Every control can be rebound per game, and
+a game only ever offers the actions it declares, so a binding cannot send it
+something it does not understand:
+
+```bash
+curl http://<pi-host>:3000/api/games/tetris/bindings
+curl -X POST http://<pi-host>:3000/api/games/tetris/bindings   -H "Content-Type: application/json"   -d '{"bindings":{"a":"hold","b":"hardDrop","up":"rotateCcw"}}'
+curl -X DELETE http://<pi-host>:3000/api/games/tetris/bindings   # back to defaults
+```
+
+Controls are `up`, `down`, `left`, `right`, `a`, `b`, `c`, `d` and `ok`. Bind a
+control to `none` to disable it. Auto-repeat still applies only to movement, so
+rebinding the stick to a rotate will not let a held stick spin the piece.
+
+### The quick wheel
+
+**Hold OK** (or Start on a gamepad) and a radial menu opens on the panel. Flick
+the stick towards a wedge and release, exactly like a weapon wheel:
+
+| In a game | Otherwise |
+|---|---|
+| Pause, Restart, Exit | Plugins, Power |
+| Brighter, Dimmer, Plugins | Brighter, Dimmer |
+
+**Exit** leaves the game for whatever was on the panel before it. B cancels, and
+releasing without pointing at anything does nothing.
+
 **When no game is running** the controller drives the panel itself.
 
 Click the stick (or **Start** on a gamepad) and a plugin menu appears **on the

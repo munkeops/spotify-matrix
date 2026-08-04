@@ -36,7 +36,12 @@ HINT = (110, 124, 152)
 
 
 def default_state() -> dict[str, Any]:
-    return {"seq": 0, "brightness": 0, "menu": {"open": False, "cursor": 0, "items": []}}
+    return {
+        "seq": 0,
+        "brightness": 0,
+        "menu": {"open": False, "cursor": 0, "items": []},
+        "wheel": {"open": False, "selected": None, "items": []},
+    }
 
 
 def read_shell_state(path: Path | None) -> dict[str, Any]:
@@ -53,6 +58,11 @@ def read_shell_state(path: Path | None) -> dict[str, Any]:
     if not isinstance(menu, dict):
         menu = {}
     items = [item for item in menu.get("items", []) if isinstance(item, dict) and item.get("id")]
+    wheel = payload.get("wheel")
+    if not isinstance(wheel, dict):
+        wheel = {}
+    wheel_items = [item for item in wheel.get("items", []) if isinstance(item, dict)]
+    selected = wheel.get("selected")
     return {
         "seq": int(payload.get("seq", 0) or 0),
         "brightness": int(payload.get("brightness", 0) or 0),
@@ -60,6 +70,11 @@ def read_shell_state(path: Path | None) -> dict[str, Any]:
             "open": bool(menu.get("open", False)),
             "cursor": max(0, int(menu.get("cursor", 0) or 0)),
             "items": items,
+        },
+        "wheel": {
+            "open": bool(wheel.get("open", False)),
+            "selected": int(selected) if isinstance(selected, (int, float)) else None,
+            "items": wheel_items,
         },
     }
 

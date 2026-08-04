@@ -118,12 +118,19 @@ class GamepadMapper:
         self._direction = direction
         if direction == Direction.NEUTRAL:
             return []
-        return [JoystickEvent(kind="direction", direction=direction)]
+        x, y = self._vector()
+        return [JoystickEvent(kind="direction", direction=direction, x=x, y=y)]
+
+    def _vector(self) -> tuple[float, float]:
+        """The stick or d-pad as a vector, for angular selection."""
+        hat_x, hat_y = self._axes[ABS_HAT0X], self._axes[ABS_HAT0Y]
+        if hat_x or hat_y:
+            return hat_x, hat_y
+        return self._axes[ABS_X], self._axes[ABS_Y]
 
     def _direction_now(self) -> Direction:
         # The d-pad wins when it is being used, otherwise fall back to the stick.
-        hat_x, hat_y = self._axes[ABS_HAT0X], self._axes[ABS_HAT0Y]
-        x, y = (hat_x, hat_y) if (hat_x or hat_y) else (self._axes[ABS_X], self._axes[ABS_Y])
+        x, y = self._vector()
         if max(abs(x), abs(y)) < self.deadzone:
             return Direction.NEUTRAL
         if abs(x) >= abs(y):

@@ -16,6 +16,7 @@ from loguru import logger
 
 from mini_joystick import (
     Button,
+    ButtonEvent,
     FakeTransport,
     JoystickReader,
     MiniJoystick,
@@ -35,6 +36,23 @@ RECONNECT_SECONDS = 5.0
 BRIGHTNESS_STEP = 10
 BRIGHTNESS_MIN = 5
 BRIGHTNESS_MAX = 100
+
+# Wheel entries. `action` is handled below; `short` is what fits a wedge.
+WHEEL_IN_GAME = (
+    {"action": "togglePause", "label": "Pause", "short": "PAUSE"},
+    {"action": "restart", "label": "Restart", "short": "RESET"},
+    {"action": "exitGame", "label": "Exit", "short": "EXIT"},
+    {"action": "brightnessDown", "label": "Dimmer", "short": "DIM"},
+    {"action": "openMenu", "label": "Plugins", "short": "PLUG"},
+    {"action": "brightnessUp", "label": "Brighter", "short": "BRIGHT"},
+)
+
+WHEEL_SHELL = (
+    {"action": "openMenu", "label": "Plugins", "short": "PLUG"},
+    {"action": "brightnessUp", "label": "Brighter", "short": "BRIGHT"},
+    {"action": "power", "label": "Power", "short": "POWER"},
+    {"action": "brightnessDown", "label": "Dimmer", "short": "DIM"},
+)
 
 # Buses the kernel creates for other hardware. i2c-20/21 are the HDMI DDC
 # channels on a Pi 4, i2c-10/11 come from the RP1 on a Pi 5, and i2c-0 is the
@@ -63,6 +81,10 @@ class JoystickService:
         self._last_active = ""
         self._menu_open = False
         self._shell_seq = 0
+        self._wheel_open = False
+        self._wheel_items: list = []
+        self._wheel_selected = None
+        self._last_non_game = ""
         # Injected by the tests; production builds one from config.
         self.transport_factory = None
 
@@ -248,16 +270,112 @@ class JoystickService:
         self.connected = True
         self.events_seen += 1
         active = game_service.active_game_id()
+
+        if self._wheel_open:
+            self._dispatch_wheel(event)
+            return
+        if self._wheel_opens(event):
+            self._open_wheel(bool(active))
+            return
+
         if active:
             self._dispatch_game(active, event)
         else:
             self._dispatch_shell(event)
 
+    def _wheel_opens(self, event) -> bool:
+        """Holding OK is the way in, from a game or the shell alike."""
+        return (
+            event.kind == "button"
+            and event.button == Button.OK
+            and event.event == ButtonEvent.LONG_PRESS_START
+        )
+
+    def _open_wheel(self, in_game: bool) -> None:
+        self._wheel_items = [dict(item) for item in (WHEEL_IN_GAME if in_game else WHEEL_SHELL)]
+        self._wheel_selected = None
+        self._wheel_open = True
+        self._menu_open = False
+        self._publish_shell()
+        self._record("wheel:open")
+
+    def _close_wheel(self) -> None:
+        self._wheel_open = False
+        self._wheel_selected = None
+        self._publish_shell()
+
+    def _dispatch_wheel(self, event) -> None:
+        from matrix_input.wheel import wedge_for_vector
+
+        if event.kind == "direction":
+            selected = wedge_for_vector(event.x, event.y, len(self._wheel_items))
+            if selected != self._wheel_selected:
+                self._wheel_selected = selected
+                self._publish_shell()
+            return
+        if event.kind != "button" or event.button is None:
+            return
+        if event.event not in (ButtonEvent.PRESS_DOWN, ButtonEvent.SINGLE_CLICK, ButtonEvent.PRESS_UP):
+            return
+        if event.button in (Button.B, Button.D):
+            self._close_wheel()
+            return
+        if event.button not in (Button.OK, Button.A):
+            return
+        # Releasing the hold, or clicking, takes whatever is pointed at.
+        chosen = self._wheel_selected
+        self._close_wheel()
+        if chosen is not None and 0 <= chosen < len(self._wheel_items):
+            self._run_wheel_action(str(self._wheel_items[chosen].get("action", "")))
+
+    def _run_wheel_action(self, action: str) -> None:
+        active = game_service.active_game_id()
+        if action == "brightnessUp":
+            self._adjust_brightness(BRIGHTNESS_STEP)
+        elif action == "brightnessDown":
+            self._adjust_brightness(-BRIGHTNESS_STEP)
+        elif action == "openMenu":
+            self._open_menu()
+        elif action == "exitGame":
+            self._exit_game()
+        elif action == "power":
+            self._toggle_power()
+        elif active and action:
+            game_service.queue_command(active, action)
+            self._record(f"{active}:{action}")
+
+    def _exit_game(self) -> None:
+        """Leave a game for whatever was on the panel before it."""
+        widgets = self._widgets()
+        if not widgets:
+            return
+        target = self._last_non_game
+        available = {widget.manifest.id for widget in widgets}
+        if target not in available:
+            target = next(
+                (w.manifest.id for w in widgets if w.manifest.kind != "game"),
+                widgets[0].manifest.id,
+            )
+        self._apply_widget(target)
+
+    def _toggle_power(self) -> None:
+        from src.domain.services.runtime_service import runtime_service
+
+        if runtime_service.state().running:
+            runtime_service.stop()
+        else:
+            runtime_service.start()
+        self._record("power")
+
+    def _game_bindings(self, widget_id: str) -> dict:
+        saved = config_service.get_config().controller.bindings
+        return dict(saved.get(widget_id, {}))
+
     def _dispatch_game(self, game_id: str, event) -> None:
         spec = game_service.spec(game_id)
         if spec is None:
             return
-        action = game_action(event, set(spec.actions))
+        action = game_action(event, set(spec.actions), self._game_bindings(spec.widget_id))
         if not action:
             return
         game_service.queue_command(game_id, action)
@@ -286,6 +404,11 @@ class JoystickService:
                 "seq": self._shell_seq,
                 "brightness": int(brightness if brightness is not None else config.matrix.brightness),
                 "menu": {"open": self._menu_open, "cursor": self._cursor, "items": items},
+                "wheel": {
+                    "open": self._wheel_open,
+                    "selected": self._wheel_selected,
+                    "items": list(self._wheel_items),
+                },
             },
         )
 
@@ -401,6 +524,9 @@ class JoystickService:
     def _apply_widget(self, widget_id: str) -> None:
         from src.domain.services.widget_registry_service import widget_registry_service
 
+        spec = game_service.spec(widget_id.replace("core.", "", 1))
+        if spec is None or spec.widget_id != widget_id:
+            self._last_non_game = widget_id
         try:
             widget_registry_service.apply_widget(widget_id)
             self._record(f"apply:{widget_id}")

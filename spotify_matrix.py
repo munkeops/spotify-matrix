@@ -32,6 +32,7 @@ from matrix_games import create_game, discover, get_spec
 from matrix_games.io import read_commands as read_game_commands, write_state as write_game_state
 from assistant_matrix_sdk.game import GameWidget
 from matrix_input.shell import read_shell_state, render_brightness, render_menu
+from matrix_input.wheel import render_wheel
 from assistant_matrix_sdk.store import GameStore
 from assistant_matrix_sdk.pixels import DIGIT_FONT_3X5, draw_pixel_text, parse_color, pixel_text_width
 
@@ -1712,21 +1713,25 @@ class OverlayDisplay:
                     self._brightness_until = time.monotonic() + BRIGHTNESS_HINT_SECONDS
                 self._brightness_level = level
 
-            open_now = bool(menu.get("open"))
+            wheel = state.get("wheel", {})
+            menu_open = bool(menu.get("open"))
+            wheel_open = bool(wheel.get("open"))
             showing_bar = time.monotonic() < self._brightness_until
             with self._lock:
                 base = self._last_frame
                 was_active = self._overlay_active
-                self._overlay_active = open_now or showing_bar
+                self._overlay_active = menu_open or wheel_open or showing_bar
 
             if base is None:
                 continue
-            if open_now:
+            if wheel_open:
+                self._display.show(render_wheel(base, wheel.get("items", []), wheel.get("selected")))
+            elif menu_open:
                 self._display.show(render_menu(base, menu))
             elif showing_bar:
                 self._display.show(render_brightness(base, self._brightness_level))
             elif was_active:
-                # Menu just closed: put the widget's own frame back.
+                # Overlay just closed: put the widget's own frame back.
                 self._display.show(base)
 
 

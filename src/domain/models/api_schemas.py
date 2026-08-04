@@ -144,6 +144,12 @@ class GamepadConfig(BaseModel):
     deadzone: float = 0.5
 
 
+class ControllerConfig(BaseModel):
+    """Per-game controller bindings, keyed by widget id then control."""
+
+    bindings: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+
 class StoreConfig(BaseModel):
     indexUrl: str = "configs/widget_store_index.json"
 
@@ -221,6 +227,7 @@ class AppConfig(BaseModel):
     slideshow: SlideshowConfig = Field(default_factory=SlideshowConfig)
     joystick: JoystickConfig = Field(default_factory=JoystickConfig)
     gamepad: GamepadConfig = Field(default_factory=GamepadConfig)
+    controller: ControllerConfig = Field(default_factory=ControllerConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 
 
@@ -459,3 +466,16 @@ class GamepadStateResponse(BaseModel):
 
 class GamepadConfigRequest(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
+
+
+class GameBindingsResponse(BaseModel):
+    gameId: str
+    widgetId: str
+    controls: list[str] = Field(default_factory=list)
+    actions: list[str] = Field(default_factory=list)
+    bindings: dict[str, str] = Field(default_factory=dict)
+    defaults: dict[str, str] = Field(default_factory=dict)
+
+
+class GameBindingsRequest(BaseModel):
+    bindings: dict[str, str] = Field(default_factory=dict)

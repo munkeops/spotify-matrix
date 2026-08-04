@@ -54,6 +54,7 @@ mini-joystick, so one pad works everywhere without per-game setup.
 | **Y** (triangle) | Secondary |
 | **Start** | Pause and resume |
 | **Select** | Restart |
+| **Start** held | Open the quick wheel |
 
 When no game is on the panel, **Start** opens a plugin menu on the matrix
 itself: the d-pad moves the highlight, **Start** or **A** picks, **B** cancels.
