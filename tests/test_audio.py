@@ -709,3 +709,72 @@ def test_the_bridge_reports_how_many_speakers_reached_it(monkeypatch):
     _fake_daemon(monkeypatch, listing="")
     assert bluealsa.status()["speakers"] == 0
     assert bluealsa.status()["running"] is True
+
+
+TRANSPORT_DBUS = '''   object path "/org/bluez/hci0/dev_E8_07_BF_12_34_56"
+      array [
+         dict entry(
+            string "org.bluez.Device1"
+   object path "/org/bluez/hci0/dev_E8_07_BF_12_34_56/sep1/fd0"
+      array [
+         dict entry(
+            string "org.bluez.MediaTransport1"
+'''
+
+
+def test_a_live_audio_link_is_read_from_bluez(monkeypatch):
+    from matrix_audio import bluealsa
+
+    monkeypatch.setattr(bluealsa.shutil, "which", lambda n: "/usr/bin/dbus-send")
+    monkeypatch.setattr(
+        bluealsa.subprocess, "run",
+        lambda *a, **k: types.SimpleNamespace(stdout=TRANSPORT_DBUS, returncode=0),
+    )
+
+    assert bluealsa.transports() == ["E8:07:BF:12:34:56"]
+
+
+def test_the_two_silent_failures_are_told_apart(monkeypatch):
+    """A transport means the link is live and someone else took it; no
+    transport means the speaker is not streaming and needs a reconnect."""
+    from matrix_audio import bluealsa
+
+    monkeypatch.setattr(bluealsa, "transports", lambda: ["E8:07:BF:12:34:56"])
+    assert bluealsa.why_no_speaker() == bluealsa.TAKEN_ADVICE
+    assert "pipewire" in bluealsa.why_no_speaker().lower()
+
+    monkeypatch.setattr(bluealsa, "transports", lambda: [])
+    assert bluealsa.why_no_speaker() == bluealsa.NO_PCM_ADVICE
+    assert "reconnect" in bluealsa.why_no_speaker().lower()
+
+
+def test_the_test_button_explains_rather_than_echoing_alsa(monkeypatch):
+    """Handing an unusable device to aplay answers with the error for
+    00:00:00:00:00:00, which says nothing about what to do."""
+    from matrix_audio import bluealsa
+    from src.domain.services import audio_service as module
+
+    monkeypatch.setattr(bluealsa, "running", lambda: True)
+    monkeypatch.setattr(bluealsa, "pcms", lambda: [])
+    monkeypatch.setattr(bluealsa, "transports", lambda: ["E8:07:BF:12:34:56"])
+    # The speaker is the chosen output, which is the case that was failing.
+    monkeypatch.setattr(
+        module.audio_service, "settings",
+        lambda: types.SimpleNamespace(enabled=True, device="bluealsa", volume=60),
+    )
+
+    result = module.audio_service.play_test("start")
+
+    assert result["ok"] is False
+    assert "PCM not found" not in result["message"]
+    assert "pipewire" in result["message"].lower()
+
+
+def test_a_working_speaker_is_not_blocked(monkeypatch):
+    from matrix_audio import bluealsa
+    from src.domain.services import audio_service as module
+
+    monkeypatch.setattr(bluealsa, "running", lambda: True)
+    monkeypatch.setattr(bluealsa, "pcms", lambda: [{"name": "bluealsa:DEV=E8:07:BF:12:34:56,PROFILE=a2dp"}])
+
+    assert module.audio_service._unusable("bluealsa:DEV=E8:07:BF:12:34:56,PROFILE=a2dp") == ""

@@ -306,10 +306,21 @@ the speaker appears in Settings under Game sound, by name.
 The panel lists speakers by address, never the bare `bluealsa` PCM: that one
 means device `00:00:00:00:00:00` and fails with "PCM not found".
 
-If the bridge is running but the speaker still is not offered, reconnect it.
+If the bridge is running but the speaker still is not offered, the panel says
+which of two things it is, by asking BlueZ whether an audio link exists at all.
+
+No link: the speaker is paired but not streaming, so reconnect it.
 BlueZ gives the audio connection to whatever was listening when the speaker
 connected, so a speaker already connected before the bridge started is not
 routed through it. Disconnect and reconnect from the Bluetooth panel and it
-will register. Check from the Pi with:
+will register.
+
+A live link that bluealsa did not get means something else took it. PipeWire
+and PulseAudio both register an A2DP endpoint, and Raspberry Pi OS runs
+PipeWire by default, so on a desktop image it usually wins:
+
+    systemctl --user mask wireplumber pipewire pipewire-pulse
+
+then reconnect the speaker. Check what bluealsa has from the Pi with:
 
     bluealsa-aplay -L

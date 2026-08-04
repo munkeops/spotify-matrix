@@ -119,15 +119,74 @@ DBUS_ADVICE = (
 )
 
 
+def transports() -> list[str]:
+    """Addresses BlueZ currently has an audio transport for.
+
+    This is what tells the two silent failures apart. BlueZ creates a
+    MediaTransport1 when a speaker's audio link is live, and hands it to one
+    endpoint. If a transport exists but bluealsa has no PCM, something else
+    on the Pi - PipeWire and PulseAudio both register an A2DP endpoint - took
+    it. If there is no transport at all, the speaker is paired but not
+    actually streaming, and a reconnect is what is needed.
+    """
+    binary = shutil.which("dbus-send")
+    if binary is None:
+        return []
+    try:
+        result = subprocess.run(
+            [
+                binary,
+                "--system",
+                "--print-reply",
+                "--dest=org.bluez",
+                "/",
+                "org.freedesktop.DBus.ObjectManager.GetManagedObjects",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=6,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    if result.returncode != 0:
+        return []
+
+    found: list[str] = []
+    path = ""
+    for line in (result.stdout or "").splitlines():
+        stripped = line.strip()
+        if stripped.startswith('object path "'):
+            path = stripped.split('"', 2)[1]
+        elif "org.bluez.MediaTransport1" in stripped and "/dev_" in path:
+            # /org/bluez/hci0/dev_E8_07_BF_12_34_56/sep1/fd0
+            chunk = path.split("/dev_", 1)[1].split("/", 1)[0]
+            address = chunk.replace("_", ":")
+            if address not in found:
+                found.append(address)
+    return found
+
+
 #: The daemon is up but no speaker has handed it an audio transport.
 NO_PCM_ADVICE = (
     "The bluealsa bridge is running but no speaker has registered a playback "
-    "PCM with it. BlueZ gives the audio connection to whatever was listening "
-    "when the speaker connected, so a speaker that was already connected "
-    "before the bridge started is not routed through it. Disconnect and "
+    "PCM with it, and BlueZ has no audio link for one either. Disconnect and "
     "reconnect the speaker - the Bluetooth panel can do both - and it will "
     "appear as an output."
 )
+
+#: A transport exists, so the link is live; someone else is holding it.
+TAKEN_ADVICE = (
+    "BlueZ has a live audio link to the speaker, but it went to something "
+    "other than the bluealsa bridge. PipeWire and PulseAudio both register an "
+    "A2DP endpoint and Raspberry Pi OS runs PipeWire by default, so it "
+    "usually wins. On the Pi: systemctl --user mask wireplumber pipewire "
+    "pipewire-pulse, then reconnect the speaker."
+)
+
+
+def why_no_speaker() -> str:
+    """Which of the two silent failures this is, in words."""
+    return TAKEN_ADVICE if transports() else NO_PCM_ADVICE
 
 
 def status() -> dict[str, object]:
@@ -140,6 +199,8 @@ def status() -> dict[str, object]:
         "binary": binary(),
         # How many speakers have actually handed it a playback transport.
         "speakers": len(pcms()) if alive else 0,
+        #: Addresses BlueZ has a live audio link for, ours or not.
+        "transports": transports() if alive else [],
     }
 
 
@@ -227,7 +288,11 @@ __all__ = [
     "status",
     "binary",
     "pcms",
+    "transports",
+    "why_no_speaker",
     "PROFILES",
     "BINARIES",
     "DBUS_ADVICE",
+    "NO_PCM_ADVICE",
+    "TAKEN_ADVICE",
 ]

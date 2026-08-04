@@ -113,7 +113,7 @@ class AudioService:
                 )
             if not bluealsa.running():
                 return f"{names} is connected, but the bluealsa bridge is not running. {bluealsa.status()['error'] or bluealsa.DBUS_ADVICE}"
-            return f"{names} is connected, but not through the bridge. {bluealsa.NO_PCM_ADVICE}"
+            return f"{names} is connected, but not through the bridge. {bluealsa.why_no_speaker()}"
         if not self.settings().enabled:
             return "Turn on game sound to hear effects. Use Test to check the output first."
         wireless = sum(1 for device in devices if device["kind"] == BLUETOOTH)
@@ -129,6 +129,10 @@ class AudioService:
         specs = list(game_service.specs().values())
         if not specs:
             return {"ok": False, "message": "No games installed, so there are no sounds to play."}
+
+        blocked = self._unusable(settings.device)
+        if blocked:
+            return {"ok": False, "message": blocked}
 
         engine = AudioEngine(enabled=True, device=settings.device, volume=int(settings.volume) / 100.0)
         spec = self._test_spec()
@@ -159,6 +163,20 @@ class AudioService:
                 "error": engine.error,
             }
         return {"ok": True, "message": f"Playing {sound}.", "error": ""}
+
+    def _unusable(self, device: str) -> str:
+        """Why this output cannot play, when we already know.
+
+        Handing it to aplay anyway answers with the ALSA error for the
+        all-zeros address, which says nothing about what to do next.
+        """
+        if not device.startswith("bluealsa"):
+            return ""
+        if not bluealsa.running():
+            return bluealsa.status()["error"] or bluealsa.DBUS_ADVICE  # type: ignore[return-value]
+        if not bluealsa.pcms():
+            return bluealsa.why_no_speaker()
+        return ""
 
     def _stop_previous(self) -> None:
         previous, self._test_engine = self._test_engine, None
