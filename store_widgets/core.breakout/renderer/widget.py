@@ -147,7 +147,7 @@ class BreakoutGame(GameWidget):
                     return
 
     def hud(self) -> dict[str, Any]:
-        return {"Score": self.score, "Lives": max(0, self.lives), "Level": self.level}
+        return {"Score": self.score, "Best": max(self.store.best, self.score), "Lives": max(0, self.lives), "Level": self.level}
 
     def render(self, size: int = PANEL) -> Image.Image:
         image, draw = new_frame()

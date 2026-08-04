@@ -982,3 +982,149 @@ def test_an_idle_game_keeps_publishing(tmp_path):
 
     assert second > first
     assert runtime.GAME_HEARTBEAT_SECONDS <= 2.0, "must be well inside the staleness window"
+
+
+# --- saved scores --------------------------------------------------------
+
+
+def test_a_store_without_a_path_stays_in_memory():
+    from assistant_matrix_sdk.store import GameStore
+
+    store = GameStore()
+    assert store.record_score(10) is True
+    assert store.best == 10
+    assert store.path is None
+
+
+def test_scores_survive_a_relaunch(tmp_path):
+    from assistant_matrix_sdk.store import GameStore
+
+    path = tmp_path / "flappy.json"
+    game = mg.create_game("flappy", {}, seed=1, store=GameStore(path))
+    game.score = 12
+    game.game_over = True
+    game.step(0.1)
+
+    # A fresh process builds a new game object from the same file.
+    reloaded = mg.create_game("flappy", {}, seed=1, store=GameStore(path))
+    assert reloaded.store.best == 12
+    assert reloaded.best == 12, "flappy should show the saved best straight away"
+
+
+@pytest.mark.parametrize("game_id", ALL_GAMES)
+def test_finishing_a_game_records_it_once(tmp_path, game_id):
+    from assistant_matrix_sdk.store import GameStore
+
+    store = GameStore(tmp_path / f"{game_id}.json")
+    game = mg.create_game(game_id, {}, seed=3, store=store)
+    if hasattr(game, "score"):
+        game.score = 25
+    game.game_over = True
+
+    for _ in range(5):
+        game.step(0.1)
+
+    assert store.plays == 1, "stepping past the end must not file the same game again"
+    if game.final_score() is not None:
+        assert store.best == 25
+
+
+def test_only_a_better_score_takes_the_top_spot(tmp_path):
+    from assistant_matrix_sdk.store import GameStore
+
+    store = GameStore(tmp_path / "snake.json")
+    assert store.record_score(10) is True
+    assert store.record_score(4) is False
+    assert store.record_score(20) is True
+    assert store.best == 20
+    assert [entry["score"] for entry in store.top()] == [20, 10, 4]
+    assert store.plays == 3
+
+
+def test_the_table_is_capped(tmp_path):
+    from assistant_matrix_sdk.store import GameStore, SCORE_HISTORY
+
+    store = GameStore(tmp_path / "capped.json")
+    for value in range(SCORE_HISTORY + 8):
+        store.record_score(value)
+
+    assert len(store.top()) == SCORE_HISTORY
+    assert store.best == SCORE_HISTORY + 7
+    assert store.plays == SCORE_HISTORY + 8
+
+
+def test_restarting_files_each_round_separately(tmp_path):
+    from assistant_matrix_sdk.store import GameStore
+
+    store = GameStore(tmp_path / "rounds.json")
+    game = mg.create_game("snake", {}, seed=4, store=store)
+
+    for value in (5, 9):
+        game.score = value
+        game.game_over = True
+        game.step(0.1)
+        game.step(mg_restart_grace())
+        game.command("restart")
+
+    assert store.plays == 2
+    assert store.best == 9
+
+
+def mg_restart_grace() -> float:
+    from assistant_matrix_sdk.game import RESTART_GRACE_SECONDS
+
+    return RESTART_GRACE_SECONDS
+
+
+def test_a_corrupt_score_file_is_ignored(tmp_path):
+    from assistant_matrix_sdk.store import GameStore
+
+    path = tmp_path / "broken.json"
+    path.write_text("{ not json at all", encoding="utf-8")
+
+    store = GameStore(path)
+
+    assert store.best == 0
+    assert store.plays == 0
+    store.record_score(7)
+    assert GameStore(path).best == 7, "a bad file should be replaced, not fatal"
+
+
+def test_arbitrary_values_persist(tmp_path):
+    from assistant_matrix_sdk.store import GameStore
+
+    path = tmp_path / "values.json"
+    store = GameStore(path)
+    store.set("level", 4)
+    store.update(unlocked=["hard"], nickname="ace")
+
+    reloaded = GameStore(path)
+    assert reloaded.get("level") == 4
+    assert reloaded.get("unlocked") == ["hard"]
+    assert reloaded.get("missing", "fallback") == "fallback"
+
+
+def test_scores_are_served_and_clearable(tmp_path, monkeypatch):
+    from assistant_matrix_sdk.store import GameStore
+
+    _, game_module, _ = reload_game_stack(monkeypatch, tmp_path / "data")
+    service = game_module.game_service
+
+    GameStore(service.scores_path("snake")).record_score(31)
+
+    assert service.read_scores("snake")["best"] == 31
+    assert service.clear_scores("snake")["best"] == 0
+    assert service.read_scores("snake")["plays"] == 0
+
+
+def test_runtime_args_carry_the_score_file(tmp_path, monkeypatch):
+    config_module, game_module, _ = reload_game_stack(monkeypatch, tmp_path / "data")
+    runtime_module = importlib.import_module("src.domain.services.runtime_service")
+
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.flappy"
+    config_module.config_service.save_config(config)
+
+    args = runtime_module.runtime_service._args()
+    assert args[args.index("--game-scores") + 1] == str(game_module.game_service.scores_path("flappy"))

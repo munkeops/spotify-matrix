@@ -44,6 +44,26 @@ class GameService:
     def state_path(self, game_id: str) -> Path:
         return self.state_dir / f"{_safe_game_id(game_id)}-state.json"
 
+    @property
+    def scores_dir(self) -> Path:
+        return config_service.data_dir / "widgets" / "scores"
+
+    def scores_path(self, game_id: str) -> Path:
+        return self.scores_dir / f"{_safe_game_id(game_id)}.json"
+
+    def read_scores(self, game_id: str) -> dict[str, Any]:
+        """High scores a game has saved, straight off disk."""
+        from assistant_matrix_sdk.store import GameStore
+
+        return GameStore(self.scores_path(_safe_game_id(game_id))).snapshot()
+
+    def clear_scores(self, game_id: str) -> dict[str, Any]:
+        from assistant_matrix_sdk.store import GameStore
+
+        store = GameStore(self.scores_path(_safe_game_id(game_id)))
+        store.clear()
+        return store.snapshot()
+
     def packages_dir(self) -> Path:
         return config_service.data_dir / "widgets" / "packages"
 

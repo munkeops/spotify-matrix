@@ -101,6 +101,45 @@ class DodgeGame(GameWidget):
         return fit_panel(image, size)
 ```
 
+### Remembering things between sessions
+
+The runtime restarts whenever the panel switches plugins, so anything a game
+wants to keep has to go to disk. Every game gets `self.store` for that:
+
+```python
+def reset(self) -> None:
+    self.best = self.store.best          # highest score ever recorded
+    self.level = self.store.get("level", 1)
+
+def _on_level_up(self) -> None:
+    self.store.set("level", self.level)  # saved immediately
+```
+
+**High scores need no code at all.** When a game finishes, the base class files
+whatever `final_score()` returns — which defaults to a `score` attribute — so a
+game with `self.score` gets a persisted best, a top ten and a play count for
+free. Override `final_score()` to return something else, or `None` for a game
+that has no meaningful score; it will still count plays.
+
+| | |
+|---|---|
+| `store.best` | Highest score recorded |
+| `store.plays` | Rounds finished |
+| `store.top(n)` | Recent high scores, newest first on a tie |
+| `store.get(key, default)` / `store.set(key, value)` | Anything else |
+| `store.record_score(value)` | File a score yourself; True if it is a new best |
+
+Scores live in `<data>/widgets/scores/<game-id>.json` and are readable over the
+API:
+
+```bash
+curl http://<pi-host>:3000/api/games/flappy/scores
+curl -X DELETE http://<pi-host>:3000/api/games/flappy/scores   # reset
+```
+
+Constructing a game without a store gives an in-memory one, which is what tests
+and preview tiles use, so nothing writes to disk by accident.
+
 What the base class handles for you:
 
 - `pause`, `resume`, `togglePause` and `restart`, so you never implement them.

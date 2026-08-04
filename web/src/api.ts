@@ -277,3 +277,13 @@ export interface JoystickDiagnostics {
 }
 
 export const getJoystickDiagnostics = () => apiGet<JoystickDiagnostics>("/api/joystick/diagnostics");
+
+export interface GameScores {
+  gameId: string;
+  best: number;
+  plays: number;
+  scores: { score: number; at: number }[];
+}
+
+export const getGameScores = (id: string) =>
+  apiGet<GameScores>(`/api/games/${encodeURIComponent(id)}/scores`);

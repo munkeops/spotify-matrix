@@ -187,6 +187,8 @@ class RuntimeService:
                     str(game_service.input_path(active_game)),
                     "--game-state",
                     str(game_service.state_path(active_game)),
+                    "--game-scores",
+                    str(game_service.scores_path(active_game)),
                 ]
             )
         args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background, "--image-rotate", str(config.image.rotate)])

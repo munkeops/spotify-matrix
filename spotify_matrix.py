@@ -31,6 +31,7 @@ from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
 from matrix_games import create_game, discover, get_spec
 from matrix_games.io import read_commands as read_game_commands, write_state as write_game_state
 from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.store import GameStore
 from assistant_matrix_sdk.pixels import DIGIT_FONT_3X5, draw_pixel_text, parse_color, pixel_text_width
 
 # Older callers used the Tetris specific names before the shared games layer.
@@ -1951,7 +1952,7 @@ GAME_HEARTBEAT_SECONDS = 1.5
 def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int, game: GameWidget | str) -> None:
     """Drive one game: drain queued input, step, draw, publish state."""
     if isinstance(game, str):
-        game = create_game(game, read_external_widget_config(args.widget_config))
+        game = create_game(game, read_external_widget_config(args.widget_config), store=game_store(args))
     input_path = args.game_input
     state_path = args.game_state
     auto_restart = max(0, int(getattr(args, "tetris_auto_restart_seconds", 0) or 0))
@@ -2002,7 +2003,12 @@ def run_tetris(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, s
     run_game(args, display, size, "tetris")
 
 
-def load_game_package(widget_dir: Path, manifest: dict[str, Any], config: dict[str, Any]) -> GameWidget:
+def game_store(args: argparse.Namespace) -> GameStore:
+    """Where a game keeps its high scores between runs."""
+    return GameStore(getattr(args, "game_scores", None))
+
+
+def load_game_package(widget_dir: Path, manifest: dict[str, Any], config: dict[str, Any], store: GameStore | None = None) -> GameWidget:
     """Build the game a package declares, without importing the whole arcade."""
     from matrix_games.registry import GameSpec, load_game_class
 
@@ -2018,7 +2024,7 @@ def load_game_package(widget_dir: Path, manifest: dict[str, Any], config: dict[s
         package_dir=widget_dir,
         entrypoint=str(widget_info.get("entrypoint", "")),
     )
-    return load_game_class(spec)(config)
+    return load_game_class(spec)(config, None, store)
 
 
 def load_external_widget(widget_dir: Path, entrypoint: str) -> Any:
@@ -2063,7 +2069,7 @@ def run_external_widget(args: argparse.Namespace, display: MatrixDisplay | MockD
     config = read_external_widget_config(args.widget_config)
     if str(widget_info.get("kind", "widget")) == "game":
         # A game plugin needs stepping and controller input, not a static frame.
-        run_game(args, display, size, load_game_package(widget_dir, manifest, config))
+        run_game(args, display, size, load_game_package(widget_dir, manifest, config, game_store(args)))
         return
 
     renderer = load_external_widget(widget_dir, entrypoint)
@@ -2303,6 +2309,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tetris-auto-restart-seconds", type=int, default=0, help="Seconds to wait after game over before starting a new tetris game (0 waits for a button).")
     parser.add_argument("--game-input", "--tetris-input", dest="game_input", type=Path, help="JSON command queue the Assistant Matrix API writes for game modes.")
     parser.add_argument("--game-state", "--tetris-state", dest="game_state", type=Path, help="JSON file where game modes publish live state.")
+    parser.add_argument("--game-scores", dest="game_scores", type=Path, help="JSON file where a game keeps its high scores between runs.")
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")

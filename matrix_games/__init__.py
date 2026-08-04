@@ -17,6 +17,7 @@ from typing import Any
 from assistant_matrix_sdk.game import GAME_OVER, PAUSED, PLAYING, WON, GameWidget
 from assistant_matrix_sdk.manifest import COMMON_GAME_ACTIONS, GAME_LAYOUTS
 from assistant_matrix_sdk.pixels import PANEL, encode_frame, frame_to_pixels
+from assistant_matrix_sdk.store import GameStore
 from matrix_games.io import read_commands, write_state
 from matrix_games.registry import BUNDLED_DIR, GAME_KIND, GameSpec, demo_instance, discover, load_game_class, load_module
 
@@ -35,11 +36,17 @@ def get_spec(game_id: str, installed_dir: Path | None = None) -> GameSpec | None
     return discover(installed_dir).get(game_id)
 
 
-def create_game(game_id: str, config: dict[str, Any] | None = None, seed: int | None = None, installed_dir: Path | None = None) -> GameWidget:
+def create_game(
+    game_id: str,
+    config: dict[str, Any] | None = None,
+    seed: int | None = None,
+    installed_dir: Path | None = None,
+    store: GameStore | None = None,
+) -> GameWidget:
     spec = get_spec(game_id, installed_dir)
     if spec is None:
         raise ValueError(f"Unknown game {game_id}.")
-    return spec.create(config, seed)
+    return spec.create(config, seed, store)
 
 
 def plugin_module(game_id: str, installed_dir: Path | None = None):
@@ -121,6 +128,7 @@ __all__ = [
     "GAMES",
     "GameSpec",
     "GameWidget",
+    "GameStore",
     "Game",
     "BUNDLED_DIR",
     "GAME_KIND",

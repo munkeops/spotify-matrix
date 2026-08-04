@@ -9,6 +9,7 @@ __all__ = [
     "ConfigField",
     "Event",
     "GameWidget",
+    "GameStore",
     "MatrixCanvas",
     "Widget",
     "WidgetContext",
@@ -51,6 +52,10 @@ def __getattr__(name: str):
         from assistant_matrix_sdk.widget import Widget
 
         return Widget
+    if name == "GameStore":
+        from assistant_matrix_sdk.store import GameStore
+
+        return GameStore
     if name in ("GameWidget", "Game"):
         from assistant_matrix_sdk.game import GameWidget
 

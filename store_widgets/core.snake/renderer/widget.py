@@ -110,7 +110,7 @@ class SnakeGame(GameWidget):
             self.food = self._place_food()
 
     def hud(self) -> dict[str, Any]:
-        return {"Score": self.score, "Length": len(self.body)}
+        return {"Score": self.score, "Best": max(self.store.best, self.score), "Length": len(self.body)}
 
     def render(self, size: int = PANEL) -> Image.Image:
         image, draw = new_frame()

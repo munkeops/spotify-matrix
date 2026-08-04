@@ -61,8 +61,8 @@ class GameSpec:
     def load(self) -> type[GameWidget]:
         return load_game_class(self)
 
-    def create(self, config: dict[str, Any] | None = None, seed: int | None = None) -> GameWidget:
-        return self.load()(config or {}, seed)
+    def create(self, config: dict[str, Any] | None = None, seed: int | None = None, store: Any = None) -> GameWidget:
+        return self.load()(config or {}, seed, store)
 
 
 def _spec_from_manifest(package_dir: Path, *, bundled: bool) -> GameSpec | None:

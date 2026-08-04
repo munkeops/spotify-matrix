@@ -414,3 +414,16 @@ class JoystickDiagnostics(BaseModel):
     detected: bool = False
     #: Plain-language next step when the module is not detected.
     advice: str = ""
+
+
+class GameScoreEntry(BaseModel):
+    score: int
+    at: float = 0.0
+
+
+class GameScoresResponse(BaseModel):
+    gameId: str
+    best: int = 0
+    plays: int = 0
+    scores: list[GameScoreEntry] = Field(default_factory=list)
+    values: dict[str, Any] = Field(default_factory=dict)

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from configs import base_config
-from src.api.http.rest import assets, auth, bluetooth, commands, config, display, games, joystick, runtime, status, tetris, widgets
+from src.api.http.rest import assets, auth, bluetooth, commands, config, display, games, joystick, runtime, scores, status, tetris, widgets
 from src.domain.models.response import ErrorResponse, SuccessResponse
 from src.utils.logging_setup import initialize_logging
 
@@ -95,6 +95,7 @@ def create_app() -> FastAPI:
     app.include_router(bluetooth.router)
     app.include_router(tetris.router)
     app.include_router(games.router)
+    app.include_router(scores.router)
     app.include_router(joystick.router)
 
     public_dir = str(base_config["paths"]["public_dir"])

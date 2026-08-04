@@ -21,6 +21,7 @@ from assistant_matrix_sdk.manifest import (
     build_widget_manifest,
 )
 from assistant_matrix_sdk.pixels import PANEL, encode_frame
+from assistant_matrix_sdk.store import GameStore
 
 PLAYING = "playing"
 PAUSED = "paused"
@@ -58,13 +59,22 @@ class GameWidget:
     config_fields: list[ConfigField] = []
     triggers: list[WidgetTrigger] = []
 
-    def __init__(self, config: dict[str, Any] | None = None, seed: int | None = None) -> None:
+    def __init__(
+        self,
+        config: dict[str, Any] | None = None,
+        seed: int | None = None,
+        store: GameStore | None = None,
+    ) -> None:
         self.config = config or {}
         self.random = random.Random(seed)
+        # Set before reset() so a game can read its saved best straight away.
+        # Without a path this is in memory, which is what tests and previews get.
+        self.store = store if store is not None else GameStore()
         self.paused = False
         self.game_over = False
         self.won = False
         self.game_over_elapsed = 0.0
+        self._scored = False
         self.reset()
 
     # --- subclass hooks -------------------------------------------------
@@ -107,6 +117,8 @@ class GameWidget:
     def step(self, elapsed: float) -> None:
         elapsed = max(0.0, elapsed)
         if self.finished():
+            # File the score once, the moment the game ends.
+            self._record_final_score()
             self.game_over_elapsed += elapsed
             return
         if self.paused:
@@ -128,11 +140,30 @@ class GameWidget:
             return
         self.handle(action)
 
+    def final_score(self) -> int | None:
+        """The number worth remembering, or None for a game without a score.
+
+        Defaults to a ``score`` attribute, so most games need do nothing.
+        """
+        score = getattr(self, "score", None)
+        return int(score) if isinstance(score, (int, float)) else None
+
+    def _record_final_score(self) -> None:
+        if self._scored:
+            return
+        self._scored = True
+        score = self.final_score()
+        if score is None:
+            self.store.record_play()
+        else:
+            self.store.record_score(score)
+
     def restart(self) -> None:
         self.paused = False
         self.game_over = False
         self.won = False
         self.game_over_elapsed = 0.0
+        self._scored = False
         self.reset()
 
     def snapshot(self, image: Image.Image | None = None, size: int = PANEL) -> dict[str, Any]:

@@ -183,7 +183,7 @@ class InvadersGame(GameWidget):
             self.game_over = True
 
     def hud(self) -> dict[str, Any]:
-        return {"Score": self.score, "Lives": max(0, self.lives), "Wave": self.wave}
+        return {"Score": self.score, "Best": max(self.store.best, self.score), "Lives": max(0, self.lives), "Wave": self.wave}
 
     def render(self, size: int = PANEL) -> Image.Image:
         image, draw = new_frame()

@@ -360,7 +360,7 @@ class PacmanGame(GameWidget):
         self._reset_actors(ready=1.5)
 
     def hud(self) -> dict[str, Any]:
-        return {"Score": self.score, "Lives": max(0, self.lives), "Level": self.level}
+        return {"Score": self.score, "Best": max(self.store.best, self.score), "Lives": max(0, self.lives), "Level": self.level}
 
     def extra(self) -> dict[str, Any]:
         return {"pellets": len(self.pellets) - len(self.eaten_pellets)}

@@ -71,6 +71,8 @@ class TetrisGame(GameWidget):
         self,
         config: dict[str, Any] | None = None,
         seed: int | None = None,
+        store: Any = None,
+        *,
         start_level: int | None = None,
         ghost: bool | None = None,
     ) -> None:
@@ -79,7 +81,7 @@ class TetrisGame(GameWidget):
             config["startLevel"] = start_level
         if ghost is not None:
             config["ghost"] = ghost
-        super().__init__(config, seed)
+        super().__init__(config, seed, store)
 
     def reset(self) -> None:
         self.start_level = max(1, min(15, int(self.config.get("startLevel", 1) or 1)))
@@ -244,7 +246,7 @@ class TetrisGame(GameWidget):
             self.hold_piece()
 
     def hud(self) -> dict[str, Any]:
-        return {"Score": self.score, "Lines": self.lines, "Level": self.level}
+        return {"Score": self.score, "Best": max(self.store.best, self.score), "Lines": self.lines, "Level": self.level}
 
     def board_snapshot(self) -> dict[str, Any]:
         """Structured board state, kept for the Tetris specific API and preview."""

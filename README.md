@@ -225,6 +225,11 @@ Run a game locally without matrix hardware:
 python spotify_matrix.py --display-mode widget --widget-id core.pacman   --widget-dir store_widgets/core.pacman --mock-output data/frame.png   --game-input data/widgets/state/pacman-input.json   --game-state data/widgets/state/pacman-state.json
 ```
 
+High scores are saved. Any game with a score gets a persisted best, a top ten
+and a play count with no code of its own, kept in `<data>/widgets/scores/` and
+readable at `/api/games/<id>/scores`, so a best survives switching plugins and
+rebooting.
+
 Each game is also a plugin, so difficulty and rules are editable from its config
 drawer: Pac-Man speed and lives, Snake walls, Breakout paddle width, Pong
 opponent, and so on.

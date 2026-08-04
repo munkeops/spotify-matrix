@@ -14,7 +14,7 @@ import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
-import { GameFrame, GameSummary, applyWidget, getGameState, listGames, sendGameInput } from "../api";
+import { GameFrame, GameScores, GameSummary, applyWidget, getGameScores, getGameState, listGames, sendGameInput } from "../api";
 import PanelMirror from "../components/PanelMirror";
 
 const POLL_MS = 200;
@@ -45,6 +45,7 @@ export default function GamePad() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
+  const [scores, setScores] = useState<GameScores | null>(null);
   const timers = useRef<{ delay?: number; interval?: number }>({});
 
   useEffect(() => {
@@ -78,6 +79,16 @@ export default function GamePad() {
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  // Reload the saved best when a round ends, so a new record shows up.
+  const status = frame?.status ?? "playing";
+  useEffect(() => {
+    let cancelled = false;
+    getGameScores(gameId)
+      .then((r) => { if (!cancelled) setScores(r); })
+      .catch(() => { /* a game with no scores yet is fine */ });
+    return () => { cancelled = true; };
+  }, [gameId, status]);
 
   const actions = useMemo(() => new Set(game?.actions ?? []), [game]);
   const primary = useMemo(() => PRIMARY.find((action) => actions.has(action)) ?? "", [actions]);
@@ -236,7 +247,6 @@ export default function GamePad() {
     return <Alert severity="error" action={<Button size="small" onClick={() => navigate("/store?tab=play")}>Back</Button>}>Unknown game “{gameId}”.</Alert>;
   }
 
-  const status = frame?.status ?? "playing";
 
   return (
     <Stack spacing={2}>
@@ -279,6 +289,11 @@ export default function GamePad() {
                 ))}
               </Box>
               <Typography variant="body2" color="text.secondary">{game.summary}</Typography>
+              {scores && scores.plays > 0 ? (
+                <Typography variant="caption" color="text.secondary">
+                  {scores.best > 0 ? `Best ${scores.best} · ` : ""}{scores.plays} play{scores.plays === 1 ? "" : "s"}
+                </Typography>
+              ) : null}
             </Stack>
           </Stack>
         </CardContent>

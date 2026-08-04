@@ -44,7 +44,8 @@ class FlappyGame(GameWidget):
         self.gravity = max(40.0, float(self.config.get("gravity", 110)))
         self.flap_velocity = -abs(float(self.config.get("flapVelocity", 38)))
         self.score = 0
-        self.best = getattr(self, "best", 0)
+        # Saved between runs, so a best survives switching plugins or a reboot.
+        self.best = max(self.store.best, getattr(self, "best", 0))
         self.started = False
         self.bird_y = float(PANEL // 2)
         self.bird_vy = 0.0
