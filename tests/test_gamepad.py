@@ -225,3 +225,51 @@ def test_no_controller_is_not_an_error(tmp_path, monkeypatch):
         assert service.running() is True, "it should keep waiting for a pad, not die"
     finally:
         service.stop()
+
+
+def test_a_paired_pad_with_no_input_device_blames_ertm(monkeypatch):
+    """BlueZ connected but no evdev node is the Xbox ERTM signature."""
+    import src.domain.services.bluetooth_service as bt_module
+    from src.domain.services.gamepad_service import GamepadService
+
+    service = GamepadService()
+    monkeypatch.setattr("src.domain.services.gamepad_service.evdev_available", lambda: True)
+    monkeypatch.setattr(
+        service,
+        "_bluetooth_controllers",
+        lambda: [{"name": "Xbox Wireless Controller", "connected": True, "role": "controller"}],
+    )
+
+    monkeypatch.setattr(bt_module, "ertm_disabled", lambda: False)
+    advice = service._advice([])
+    assert "ERTM" in advice
+    assert "rebuilding the container will not change it" in advice
+
+    # With ERTM already off the problem is the pairing, not the kernel.
+    monkeypatch.setattr(bt_module, "ertm_disabled", lambda: True)
+    advice = service._advice([])
+    assert "ERTM" not in advice
+    assert "pair again" in advice
+
+
+def test_no_bluetooth_controller_gives_the_plain_hint(monkeypatch):
+    from src.domain.services.gamepad_service import GamepadService
+
+    service = GamepadService()
+    monkeypatch.setattr("src.domain.services.gamepad_service.evdev_available", lambda: True)
+    monkeypatch.setattr(service, "_bluetooth_controllers", lambda: [])
+
+    assert "pairing mode" in service._advice([])
+
+
+def test_the_cross_check_survives_bluetooth_being_unavailable(monkeypatch):
+    from src.domain.services.gamepad_service import GamepadService
+
+    service = GamepadService()
+    monkeypatch.setattr("src.domain.services.gamepad_service.evdev_available", lambda: True)
+    monkeypatch.setattr(
+        "src.domain.services.bluetooth_service.bluetooth_service.list_devices",
+        lambda: (_ for _ in ()).throw(OSError("no bluetoothctl")),
+    )
+
+    assert service._advice([]), "a broken bluetooth stack must not break this panel"

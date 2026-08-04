@@ -59,10 +59,41 @@ class GamepadService:
             "advice": self._advice(pads),
         }
 
+    def _bluetooth_controllers(self) -> list[dict[str, Any]]:
+        """Controllers BlueZ believes are connected, for cross-checking."""
+        try:
+            from src.domain.services.bluetooth_service import bluetooth_service
+
+            return [
+                device
+                for device in bluetooth_service.list_devices()
+                if device.get("connected") and device.get("role") == "controller"
+            ]
+        except Exception:
+            return []
+
     def _advice(self, pads: list[dict[str, Any]]) -> str:
         if not evdev_available():
             return "The evdev library is missing. Rebuild the container so gamepad support is installed."
         if not pads:
+            # Bluetooth saying "connected" while no input device exists is the
+            # signature of a pad that paired but never finished linking.
+            paired = self._bluetooth_controllers()
+            if paired:
+                from src.domain.services.bluetooth_service import ERTM_HELP, ertm_disabled
+
+                name = paired[0].get("name", "The controller")
+                if ertm_disabled() is False:
+                    return (
+                        f"{name} is paired but the kernel created no input device, and Bluetooth ERTM is on. "
+                        f"That combination is what stops an Xbox pad connecting. {ERTM_HELP} "
+                        "This is a setting on the Pi itself, so rebuilding the container will not change it."
+                    )
+                return (
+                    f"{name} shows as connected but the kernel created no input device. Forget it under "
+                    "Bluetooth, put it back in pairing mode and pair again. A blinking light means it never "
+                    "finished connecting."
+                )
             return (
                 "No controller found. Put the pad in pairing mode, pair it under Settings -> Bluetooth, "
                 "and it will appear here. A USB pad works too."
