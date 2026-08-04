@@ -22,6 +22,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         alsa-utils \
         bluez \
+        # BlueZ speaks A2DP but ALSA cannot hear it. bluez-alsa-utils is the
+        # bridge: it runs a `bluealsa` daemon and adds a `bluealsa` PCM, which
+        # is what makes a connected speaker appear as an output to choose.
+        bluez-alsa-utils \
         build-essential \
         cmake \
         cython3 \

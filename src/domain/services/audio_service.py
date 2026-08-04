@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from matrix_audio import AudioEngine, aplay_available, list_output_devices
+from matrix_audio.output import BLUETOOTH
 
 
 class AudioService:
@@ -25,15 +26,27 @@ class AudioService:
     def devices(self) -> list[dict[str, Any]]:
         return list_output_devices()
 
-    def sounds(self) -> list[str]:
-        """Effects the active game ships, so the panel can offer a test."""
+    def _test_spec(self):
+        """The game whose effects the panel offers, and the test plays.
+
+        These must be the same game. They were not, so picking a sound the
+        active game ships - flappy's "flap", say - asked a different game's
+        directory for it and came back "No sound called flap."
+        """
         from src.domain.services.game_service import game_service
 
         active = game_service.active_game_id()
         spec = game_service.spec(active) if active else None
-        if spec is None:
-            specs = list(game_service.specs().values())
-            spec = specs[0] if specs else None
+        if spec is not None and spec.sounds_dir.is_dir():
+            return spec
+        for candidate in game_service.specs().values():
+            if candidate.sounds_dir.is_dir():
+                return candidate
+        return None
+
+    def sounds(self) -> list[str]:
+        """Effects the active game ships, so the panel can offer a test."""
+        spec = self._test_spec()
         if spec is None:
             return []
         directory: Path = spec.sounds_dir
@@ -52,6 +65,20 @@ class AudioService:
             "advice": self._advice(devices),
         }
 
+    def _bluetooth_audio(self) -> list[dict[str, Any]]:
+        """Connected Bluetooth devices that are speakers or headphones."""
+        from src.domain.services.bluetooth_service import bluetooth_service
+
+        try:
+            devices = bluetooth_service.list_devices()
+        except Exception:  # the adapter may be missing entirely
+            return []
+        return [
+            device
+            for device in devices
+            if device.get("connected") and device.get("role") == "audio"
+        ]
+
     def _advice(self, devices: list[dict[str, Any]]) -> str:
         if not aplay_available():
             return (
@@ -63,8 +90,19 @@ class AudioService:
                 "No audio output found. Check the Pi has one with 'aplay -l', and that "
                 "/dev/snd is mapped into the container."
             )
+        speakers = self._bluetooth_audio()
+        if speakers and not any(device["kind"] == BLUETOOTH for device in devices):
+            names = ", ".join(device.get("name") or device.get("mac", "?") for device in speakers)
+            return (
+                f"{names} is connected over Bluetooth but is not an audio output yet. "
+                "Bluetooth audio reaches ALSA through bluealsa, which this image now "
+                "installs - rebuild the container and it will appear in this list."
+            )
         if not self.settings().enabled:
             return "Turn on game sound to hear effects. Use Test to check the output first."
+        wireless = sum(1 for device in devices if device["kind"] == BLUETOOTH)
+        if wireless:
+            return f"Ready. {wireless} Bluetooth speaker(s) and {len(devices) - wireless} wired output(s)."
         return f"Ready, {len(devices)} output(s) available. Test plays a sound straight away."
 
     def play_test(self, sound: str = "start") -> dict[str, Any]:
@@ -77,17 +115,20 @@ class AudioService:
             return {"ok": False, "message": "No games installed, so there are no sounds to play."}
 
         engine = AudioEngine(enabled=True, device=settings.device, volume=int(settings.volume) / 100.0)
-        for spec in specs:
-            if spec.sounds_dir.is_dir():
-                engine.load_directory(spec.sounds_dir)
-                break
+        spec = self._test_spec()
+        if spec is not None:
+            engine.load_directory(spec.sounds_dir)
         engine.start()
         played = engine.play(sound)
         # Replace whatever the last test left running.
         self._stop_previous()
         self._test_engine = engine
         if not played:
-            return {"ok": False, "message": f"No sound called {sound}."}
+            available = ", ".join(self.sounds()[:6]) or "none"
+            return {
+                "ok": False,
+                "message": f"No sound called {sound}. This game has: {available}.",
+            }
         return {"ok": True, "message": f"Playing {sound}.", "error": engine.error}
 
     def _stop_previous(self) -> None:

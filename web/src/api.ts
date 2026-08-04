@@ -318,6 +318,11 @@ export const saveGamepadConfig = (config: Record<string, unknown>) =>
 export interface AudioDevice {
   name: string;
   description: string;
+  /** Something a person would recognise, e.g. "HDMI 1" or the speaker's name. */
+  label: string;
+  /** bluetooth | headphones | hdmi | usb | default | other */
+  kind: string;
+  plumbing: boolean;
 }
 
 export interface AudioState {

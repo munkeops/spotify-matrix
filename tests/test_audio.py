@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import struct
+import types
 import wave
 from array import array
 from pathlib import Path
@@ -302,3 +303,93 @@ def test_flappy_flaps_and_dies_audibly():
     game.bird_y = 500.0
     game.step(0.05)
     assert "hit" in recorder.played
+
+
+APLAY_L = """default
+    Playback/recording through the PulseAudio sound server
+null
+    Discard all samples (playback) or generate zero samples (capture)
+sysdefault:CARD=vc4hdmi0
+    vc4-hdmi-0, MAI PCM i2s-hifi-0
+    Default Audio Device
+hw:CARD=vc4hdmi0,DEV=0
+    vc4-hdmi-0, MAI PCM i2s-hifi-0
+    Direct hardware device without any conversions
+plughw:CARD=vc4hdmi0,DEV=0
+    vc4-hdmi-0, MAI PCM i2s-hifi-0
+    Hardware device with all software conversions
+dmix:CARD=vc4hdmi0,DEV=0
+    vc4-hdmi-0, MAI PCM i2s-hifi-0
+    Direct sample mixing device
+hw:CARD=vc4hdmi1,DEV=0
+    vc4-hdmi-1, MAI PCM i2s-hifi-0
+    Direct hardware device without any conversions
+bluealsa:DEV=F4:6A:D7:6E:8C:90,PROFILE=a2dp
+    JBL Flip 5
+    Bluetooth Audio
+"""
+
+
+def _fake_aplay(monkeypatch, listing=APLAY_L):
+    from matrix_audio import output as module
+
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/aplay")
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *args, **kwargs: types.SimpleNamespace(stdout=listing, returncode=0),
+    )
+    return module
+
+
+def test_output_list_hides_the_plumbing(monkeypatch):
+    """One speaker should be one entry, not four ways of reaching it."""
+    module = _fake_aplay(monkeypatch)
+
+    devices = module.list_output_devices()
+    names = [device["name"] for device in devices]
+
+    assert not any(name.startswith(("plughw:", "dmix:", "sysdefault:")) for name in names)
+    assert not any(name.startswith("null") for name in names)
+    # Two HDMI ports, one Bluetooth speaker, one default.
+    assert sum(1 for device in devices if device["kind"] == "hdmi") == 2
+
+
+def test_output_list_names_things_a_person_would_recognise(monkeypatch):
+    module = _fake_aplay(monkeypatch)
+
+    labels = {device["kind"]: device["label"] for device in module.list_output_devices()}
+
+    assert labels["bluetooth"] == "JBL Flip 5"
+    assert labels["hdmi"].startswith("HDMI")
+    assert labels["default"] == "System default"
+
+
+def test_bluetooth_speaker_is_offered_first(monkeypatch):
+    """It is the one you went to the trouble of pairing."""
+    module = _fake_aplay(monkeypatch)
+
+    assert module.list_output_devices()[0]["kind"] == "bluetooth"
+
+
+def test_the_raw_list_is_still_reachable(monkeypatch):
+    module = _fake_aplay(monkeypatch)
+
+    raw = module.list_output_devices(include_plumbing=True)
+
+    assert any(device["name"].startswith("dmix:") for device in raw)
+    assert any(device["plumbing"] for device in raw)
+
+
+def test_test_button_plays_a_sound_the_panel_offered():
+    """The panel listed the active game's effects, the test loaded another
+    game's directory, so picking one answered "No sound called flap"."""
+    from src.domain.services.audio_service import audio_service
+
+    offered = audio_service.sounds()
+    assert offered, "some game ships effects"
+
+    spec = audio_service._test_spec()
+    shipped = {path.stem for path in spec.sounds_dir.glob("*.wav")}
+
+    assert set(offered) <= shipped, "every offered sound is one the test can find"

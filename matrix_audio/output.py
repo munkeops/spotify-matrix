@@ -30,8 +30,108 @@ def aplay_available() -> bool:
     return shutil.which("aplay") is not None
 
 
-def list_output_devices() -> list[dict[str, Any]]:
-    """ALSA playback devices, as ``aplay -L`` reports them."""
+# `aplay -L` lists every way of reaching every card: the card itself, the
+# rate-converting wrapper, the mixing wrapper, and an alias or two. They are
+# not four speakers, and offering them as four choices is how the panel ended
+# up unreadable. These prefixes are the plumbing.
+PLUMBING = ("plughw:", "sysdefault:", "dmix:", "dsnoop:", "surround", "front:", "iec958:", "spdif:")
+
+#: Rough kind for each device, used to sort and to label.
+BLUETOOTH, HEADPHONES, HDMI, USB, DEFAULT, OTHER = (
+    "bluetooth",
+    "headphones",
+    "hdmi",
+    "usb",
+    "default",
+    "other",
+)
+
+ORDER = {BLUETOOTH: 0, HEADPHONES: 1, USB: 2, HDMI: 3, DEFAULT: 4, OTHER: 5}
+
+
+def _classify(name: str, description: str) -> str:
+    text = f"{name} {description}".lower()
+    if name.startswith("bluealsa") or "bluetooth" in text:
+        return BLUETOOTH
+    if name in ("default", "pulse", "pipewire"):
+        return DEFAULT
+    if "hdmi" in text:
+        return HDMI
+    if "usb" in text:
+        return USB
+    if "headphone" in text or "headset" in text or "analog" in text or "3.5" in text:
+        return HEADPHONES
+    return OTHER
+
+
+def _label(name: str, description: str, kind: str) -> str:
+    """A name someone would recognise, rather than an ALSA PCM string."""
+    if kind == DEFAULT:
+        return "System default"
+    first = description.splitlines()[0].strip() if description else ""
+    if kind == BLUETOOTH:
+        # bluealsa:DEV=F4:6A:D7:..,PROFILE=a2dp -> the speaker's own name if
+        # the description carries it, otherwise the address.
+        if first and not first.lower().startswith("bluetooth"):
+            return first
+        address = ""
+        for part in name.split(","):
+            if part.upper().startswith("DEV=") or part.upper().startswith("BLUEALSA:DEV="):
+                address = part.split("=", 1)[1]
+        return f"Bluetooth speaker {address}".strip()
+    if kind == HDMI:
+        # vc4hdmi0 / vc4hdmi1 are the Pi's two HDMI ports.
+        for port in ("hdmi0", "hdmi1"):
+            if port in name.lower():
+                return f"HDMI {int(port[-1]) + 1}"
+        return "HDMI"
+    return first or name
+
+
+def list_output_devices(include_plumbing: bool = False) -> list[dict[str, Any]]:
+    """Playback devices, named the way a person would name them.
+
+    ``aplay -L`` is the source, but its output is deduplicated by card and
+    given a readable label. Pass ``include_plumbing`` to get the raw list
+    back for the cases where someone really does want ``dmix``.
+    """
+    raw = _raw_output_devices()
+    if not raw:
+        return []
+
+    devices: list[dict[str, Any]] = []
+    seen_cards: set[str] = set()
+    for entry in raw:
+        name = entry["name"]
+        description = entry["description"]
+        plumbing = name.startswith(PLUMBING)
+        if plumbing and not include_plumbing:
+            continue
+
+        kind = _classify(name, description)
+        # One entry per card: `hw:CARD=x` and `default:CARD=x` are one speaker.
+        card = name.split("CARD=", 1)[1].split(",")[0] if "CARD=" in name else name
+        key = f"{kind}:{card}"
+        if not plumbing and key in seen_cards:
+            continue
+        seen_cards.add(key)
+
+        devices.append(
+            {
+                "name": name,
+                "description": description,
+                "label": _label(name, description, kind),
+                "kind": kind,
+                "plumbing": plumbing,
+            }
+        )
+
+    devices.sort(key=lambda device: (ORDER.get(device["kind"], 9), device["label"]))
+    return devices
+
+
+def _raw_output_devices() -> list[dict[str, Any]]:
+    """ALSA playback devices, exactly as ``aplay -L`` reports them."""
     binary = shutil.which("aplay")
     if binary is None:
         return []
@@ -53,7 +153,7 @@ def list_output_devices() -> list[dict[str, Any]]:
             else:
                 name = None
         elif devices and name:
-            devices[-1]["description"] = (devices[-1]["description"] + " " + line.strip()).strip()
+            devices[-1]["description"] = (devices[-1]["description"] + "\n" + line.strip()).strip()
     return devices
 
 

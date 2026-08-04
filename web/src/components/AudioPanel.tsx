@@ -1,5 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, MenuItem, Slider, Stack, Switch, TextField, Typography } from "@mui/material";
+import BluetoothAudioRoundedIcon from "@mui/icons-material/BluetoothAudioRounded";
+import HeadphonesRoundedIcon from "@mui/icons-material/HeadphonesRounded";
+import SettingsInputHdmiRoundedIcon from "@mui/icons-material/SettingsInputHdmiRounded";
+import SpeakerRoundedIcon from "@mui/icons-material/SpeakerRounded";
+import UsbRoundedIcon from "@mui/icons-material/UsbRounded";
+
+// An ALSA PCM string says nothing about which box the sound comes out of.
+// The icon and the label do, which is the whole point of the list.
+const KIND_ICON: Record<string, JSX.Element> = {
+  bluetooth: <BluetoothAudioRoundedIcon fontSize="small" color="primary" />,
+  headphones: <HeadphonesRoundedIcon fontSize="small" />,
+  hdmi: <SettingsInputHdmiRoundedIcon fontSize="small" />,
+  usb: <UsbRoundedIcon fontSize="small" />,
+  other: <SpeakerRoundedIcon fontSize="small" />,
+  default: <SpeakerRoundedIcon fontSize="small" />,
+};
 import VolumeUpRoundedIcon from "@mui/icons-material/VolumeUpRounded";
 import { AudioState, getAudio, saveAudioConfig, testAudio } from "../api";
 
@@ -82,10 +98,16 @@ export default function AudioPanel() {
               value={state.device || ""}
               disabled={busy}
               onChange={(e) => update({ device: e.target.value })}
+              helperText="Bluetooth speakers appear here once they are connected and paired."
             >
-              <MenuItem value="">Default output</MenuItem>
+              <MenuItem value="">System default</MenuItem>
               {state.devices.map((device) => (
-                <MenuItem key={device.name} value={device.name}>{device.name}</MenuItem>
+                <MenuItem key={device.name} value={device.name}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    {KIND_ICON[device.kind || "other"] || KIND_ICON.other}
+                    <span>{device.label || device.name}</span>
+                  </Stack>
+                </MenuItem>
               ))}
             </TextField>
           ) : null}

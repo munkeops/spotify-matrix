@@ -76,6 +76,17 @@ def create_app() -> FastAPI:
         except Exception:
             logger.exception("[spotify-matrix] joystick startup failed, continuing without it")
 
+        try:
+            # Without this a paired speaker is connected but silent, because
+            # ALSA has no way to reach it.
+            from matrix_audio import bluealsa
+
+            started, why = bluealsa.start()
+            if not started and why:
+                logger.info("[spotify-matrix] bluetooth audio unavailable: {}", why)
+        except Exception:
+            logger.exception("[spotify-matrix] bluealsa startup failed, continuing without it")
+
     @app.on_event("shutdown")
     async def _stop_joystick() -> None:
         try:
@@ -86,6 +97,10 @@ def create_app() -> FastAPI:
             from src.domain.services.gamepad_service import gamepad_service
 
             gamepad_service.stop()
+
+            from matrix_audio import bluealsa
+
+            bluealsa.stop()
         except Exception:
             logger.exception("[spotify-matrix] controller shutdown failed")
 
