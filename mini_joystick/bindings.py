@@ -88,9 +88,25 @@ def game_action(event: JoystickEvent, actions: set[str]) -> str:
     return ""
 
 
-def shell_action(event: JoystickEvent) -> ShellAction | None:
-    """The action ``event`` should take when no game is running."""
+#: Button presses count on the way down or as a click, so both the I2C
+#: module (which reports clicks) and a gamepad (which reports presses) work.
+PRESS_EVENTS = (ButtonEvent.PRESS_DOWN, ButtonEvent.SINGLE_CLICK)
+
+
+def shell_action(event: JoystickEvent, menu_open: bool = False) -> ShellAction | None:
+    """The action ``event`` should take when no game is on the panel.
+
+    With the menu closed the buttons are a brightness pair and a way in. With
+    it open the stick moves a highlight and nothing is applied until you pick.
+    """
     if event.kind == "direction":
+        if menu_open:
+            if event.direction in (Direction.DOWN, Direction.RIGHT):
+                return ShellAction(kind="cursorNext")
+            if event.direction in (Direction.UP, Direction.LEFT):
+                return ShellAction(kind="cursorPrevious")
+            return None
+        # Closed, the stick still flicks through plugins directly.
         if event.direction in (Direction.RIGHT, Direction.DOWN):
             return ShellAction(kind="next")
         if event.direction in (Direction.LEFT, Direction.UP):
@@ -99,18 +115,29 @@ def shell_action(event: JoystickEvent) -> ShellAction | None:
 
     if event.kind != "button" or event.button is None:
         return None
-    if event.event not in (ButtonEvent.SINGLE_CLICK, ButtonEvent.LONG_PRESS_START):
+
+    long_press = event.event == ButtonEvent.LONG_PRESS_START
+    if event.event not in PRESS_EVENTS and not long_press:
+        return None
+
+    if event.button == Button.D and long_press:
+        return ShellAction(kind="power")
+
+    if menu_open:
+        if event.button in (Button.OK, Button.A):
+            return ShellAction(kind="select")
+        if event.button in (Button.B, Button.D):
+            return ShellAction(kind="closeMenu")
         return None
 
     if event.button == Button.OK:
-        return ShellAction(kind="apply")
+        return ShellAction(kind="openMenu")
     if event.button == Button.A:
-        return ShellAction(kind="apply")
-    if event.button == Button.D and event.event == ButtonEvent.LONG_PRESS_START:
-        return ShellAction(kind="power")
+        return ShellAction(kind="brightnessUp")
     if event.button == Button.B:
-        # Jump straight to the arcade so games are always two presses away.
-        return ShellAction(kind="open", value="core.pacman")
+        return ShellAction(kind="brightnessDown")
+    if event.button == Button.C:
+        return ShellAction(kind="openMenu")
     return None
 
 

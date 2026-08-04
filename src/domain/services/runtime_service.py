@@ -141,6 +141,8 @@ class RuntimeService:
             args.append("--no-hardware-pulse")
         if config.runtime.mockOutput:
             args.extend(["--mock-output", config.runtime.mockOutput])
+        # The controller shell draws over whatever widget is running.
+        args.extend(["--shell-state", str(game_service.state_dir / "shell.json")])
         if config.clock.use24Hour:
             args.append("--clock-24-hour")
         if config.clock.showSeconds:

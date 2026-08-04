@@ -254,10 +254,22 @@ def test_shell_stick_walks_the_plugin_list():
     assert shell_action(direction_event(Direction.NEUTRAL)) is None
 
 
-def test_shell_ok_applies_and_long_d_powers():
-    assert shell_action(button_event(Button.OK, ButtonEvent.SINGLE_CLICK)).kind == "apply"
+def test_shell_ok_opens_the_menu_and_long_d_powers():
+    assert shell_action(button_event(Button.OK, ButtonEvent.SINGLE_CLICK)).kind == "openMenu"
+    assert shell_action(button_event(Button.OK, ButtonEvent.PRESS_DOWN)).kind == "openMenu"
     assert shell_action(button_event(Button.D, ButtonEvent.LONG_PRESS_START)).kind == "power"
-    assert shell_action(button_event(Button.OK, ButtonEvent.PRESS_DOWN)) is None
+    assert shell_action(button_event(Button.A)).kind == "brightnessUp"
+    assert shell_action(button_event(Button.B)).kind == "brightnessDown"
+
+
+def test_shell_menu_navigates_without_applying():
+    # With the menu up the stick only moves a highlight.
+    assert shell_action(direction_event(Direction.DOWN), True).kind == "cursorNext"
+    assert shell_action(direction_event(Direction.UP), True).kind == "cursorPrevious"
+    assert shell_action(button_event(Button.OK), True).kind == "select"
+    assert shell_action(button_event(Button.B), True).kind == "closeMenu"
+    # Brightness is not reachable while picking, so a press cannot dim by mistake.
+    assert shell_action(button_event(Button.A), True).kind == "select"
 
 
 # --- service ------------------------------------------------------------
@@ -350,3 +362,114 @@ def test_service_thread_starts_and_stops_against_a_fake_bus(tmp_path, monkeypatc
     finally:
         state = service.stop()
     assert state["running"] is False
+
+
+# --- the on-panel shell menu ---------------------------------------------
+
+
+def test_the_menu_opens_moves_and_selects(tmp_path, monkeypatch):
+    from matrix_input.shell import read_shell_state
+
+    config_module, game_module, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    applied: list[str] = []
+    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+
+    service = joystick_module.joystick_service
+    shell_path = game_module.game_service.state_dir / "shell.json"
+
+    # Clicking the stick opens the menu rather than applying anything.
+    service._dispatch(button_event(Button.OK, ButtonEvent.SINGLE_CLICK))
+    state = read_shell_state(shell_path)
+    assert state["menu"]["open"] is True
+    assert state["menu"]["items"], "the menu lists the installed plugins"
+    assert applied == [], "opening the menu must not change the panel"
+
+    # The stick moves a highlight, still without applying.
+    start = read_shell_state(shell_path)["menu"]["cursor"]
+    service._dispatch(direction_event(Direction.DOWN))
+    service._dispatch(direction_event(Direction.DOWN))
+    moved = read_shell_state(shell_path)["menu"]["cursor"]
+    assert moved != start
+    assert applied == []
+
+    # Clicking again picks the highlighted one and closes.
+    service._dispatch(button_event(Button.OK, ButtonEvent.SINGLE_CLICK))
+    assert len(applied) == 1
+    closed = read_shell_state(shell_path)
+    assert closed["menu"]["open"] is False
+    assert applied[0] == closed["menu"].get("selected", applied[0])
+
+
+def test_the_menu_can_be_cancelled(tmp_path, monkeypatch):
+    from matrix_input.shell import read_shell_state
+
+    _, game_module, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    applied: list[str] = []
+    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+
+    service = joystick_module.joystick_service
+    service._dispatch(button_event(Button.OK, ButtonEvent.SINGLE_CLICK))
+    service._dispatch(button_event(Button.B, ButtonEvent.SINGLE_CLICK))
+
+    assert read_shell_state(game_module.game_service.state_dir / "shell.json")["menu"]["open"] is False
+    assert applied == [], "cancelling changes nothing"
+
+
+def test_buttons_step_brightness_without_a_restart(tmp_path, monkeypatch):
+    from matrix_input.shell import read_shell_state
+
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+    shell_path = game_module.game_service.state_dir / "shell.json"
+
+    config = config_module.config_service.get_config()
+    config.matrix.brightness = 50
+    config_module.config_service.save_config(config)
+
+    service._dispatch(button_event(Button.A, ButtonEvent.SINGLE_CLICK))
+    assert config_module.config_service.get_config().matrix.brightness == 50 + joystick_module.BRIGHTNESS_STEP
+    # Published for the runtime to pick up live, not applied by restarting.
+    assert read_shell_state(shell_path)["brightness"] == 50 + joystick_module.BRIGHTNESS_STEP
+
+    service._dispatch(button_event(Button.B, ButtonEvent.SINGLE_CLICK))
+    assert config_module.config_service.get_config().matrix.brightness == 50
+
+
+def test_brightness_stops_at_the_limits(tmp_path, monkeypatch):
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+
+    for _ in range(30):
+        service._dispatch(button_event(Button.A, ButtonEvent.SINGLE_CLICK))
+    assert config_module.config_service.get_config().matrix.brightness == joystick_module.BRIGHTNESS_MAX
+
+    for _ in range(30):
+        service._dispatch(button_event(Button.B, ButtonEvent.SINGLE_CLICK))
+    assert config_module.config_service.get_config().matrix.brightness == joystick_module.BRIGHTNESS_MIN
+
+
+def test_the_menu_is_not_reachable_while_a_game_runs(tmp_path, monkeypatch):
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    service = joystick_module.joystick_service
+    service._dispatch(button_event(Button.OK, ButtonEvent.SINGLE_CLICK))
+
+    # The click paused the game instead of opening a menu over it.
+    actions, _ = mg.read_commands(game_module.game_service.input_path("snake"), 0)
+    assert actions == ["togglePause"]
+
+
+def test_the_menu_scrolls_to_keep_the_cursor_visible():
+    from matrix_input.shell import VISIBLE_ROWS, visible_window
+
+    assert visible_window(0, 3) == (0, 3), "a short list never scrolls"
+    start, end = visible_window(0, 20)
+    assert (start, end) == (0, VISIBLE_ROWS)
+    start, end = visible_window(19, 20)
+    assert end == 20 and start == 20 - VISIBLE_ROWS
+    start, end = visible_window(10, 20)
+    assert start <= 10 < end

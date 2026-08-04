@@ -205,17 +205,28 @@ adapts rather than assuming a d-pad:
 Only movement auto-repeats when the stick is held — a held stick never spins a
 Tetris piece or machine-guns a drop.
 
-**When no game is running** the stick walks the plugin list and applies as it
-goes, so you can flick through Spotify, the clock, weather and the rest without
-touching a phone:
+**When no game is running** the controller drives the panel itself.
 
-| Input | Action |
-|---|---|
-| Stick →/↓ | next plugin |
-| Stick ←/↑ | previous plugin |
-| OK or A | re-apply the current plugin |
-| B | jump to the arcade |
-| D held | start/stop the matrix runtime |
+Click the stick (or **Start** on a gamepad) and a plugin menu appears **on the
+matrix**, drawn over whatever is already showing. Move the highlight, click
+again to pick. Nothing changes until you pick, so browsing is free:
+
+| Input | Menu closed | Menu open |
+|---|---|---|
+| Stick ↑/↓ ←/→ | flick straight to the next/previous plugin | move the highlight |
+| OK / Start | open the menu | select the highlighted plugin |
+| A | brightness up | select |
+| B | brightness down | cancel |
+| C | open the menu | — |
+| D held | start/stop the matrix runtime | — |
+
+Brightness applies **live** — the panel dims as you press, with a bar on screen
+to show the level, and the setting is saved. No restart, so whatever is playing
+keeps playing.
+
+The menu draws over any widget, not just games, because the runtime composites
+it on top of the last frame. It has its own redraw loop, so it stays responsive
+even over a plugin that only redraws once a second, like the clock.
 
 ### Settings
 

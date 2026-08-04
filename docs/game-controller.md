@@ -55,8 +55,10 @@ mini-joystick, so one pad works everywhere without per-game setup.
 | **Start** | Pause and resume |
 | **Select** | Restart |
 
-When no game is on the panel, the pad walks the plugin list: left and right
-change plugin, **A** or **Start** applies the highlighted one.
+When no game is on the panel, **Start** opens a plugin menu on the matrix
+itself: the d-pad moves the highlight, **Start** or **A** picks, **B** cancels.
+With the menu closed, **A** and **B** step the brightness up and down live, and
+the d-pad flicks straight between plugins.
 
 Only movement auto-repeats when a direction is held, so holding the stick never
 spins a Tetris piece or machine-guns a drop.

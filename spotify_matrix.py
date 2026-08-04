@@ -31,6 +31,7 @@ from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
 from matrix_games import create_game, discover, get_spec
 from matrix_games.io import read_commands as read_game_commands, write_state as write_game_state
 from assistant_matrix_sdk.game import GameWidget
+from matrix_input.shell import read_shell_state, render_brightness, render_menu
 from assistant_matrix_sdk.store import GameStore
 from assistant_matrix_sdk.pixels import DIGIT_FONT_3X5, draw_pixel_text, parse_color, pixel_text_width
 
@@ -558,6 +559,13 @@ class MatrixDisplay:
         self.matrix = RGBMatrix(options=options)
         self.canvas = self.matrix.CreateFrameCanvas()
         self.rotation = args.rotation
+
+    def set_brightness(self, level: int) -> None:
+        """Change brightness without restarting; the binding supports it live."""
+        try:
+            self.matrix.brightness = max(1, min(100, int(level)))
+        except Exception:  # pragma: no cover - depends on the binding
+            pass
 
     def show(self, image: Image.Image) -> None:
         if self.rotation:
@@ -1632,13 +1640,104 @@ def poll_spotify(
         stop_event.wait(poll_seconds)
 
 
-def create_display(args: argparse.Namespace) -> MatrixDisplay | MockDisplay:
+# How often the overlay thread checks whether the menu has moved. Fast enough
+# to feel immediate on a stick, cheap enough to ignore.
+SHELL_POLL_SECONDS = 0.06
+
+# How long a brightness bar stays on screen after the last change.
+BRIGHTNESS_HINT_SECONDS = 1.2
+
+
+class OverlayDisplay:
+    """Wraps a display so the controller shell can draw over any widget.
+
+    Widgets have wildly different frame rates - the clock redraws once a
+    second - so the menu is driven by its own thread rather than waiting for
+    the widget to produce a frame. While the menu is open the widget's frames
+    are recorded but not pushed, and the overlay owns the panel.
+    """
+
+    def __init__(self, display, shell_path: Path | None) -> None:
+        self._display = display
+        self._shell_path = shell_path
+        self._lock = threading.Lock()
+        self._last_frame: Image.Image | None = None
+        self._overlay_active = False
+        self._brightness_until = 0.0
+        self._brightness_level = 0
+        self._applied_brightness: int | None = None
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        if shell_path is not None:
+            self._thread = threading.Thread(target=self._run, name="shell-overlay", daemon=True)
+            self._thread.start()
+
+    # The widget side of the display contract.
+
+    def show(self, image: Image.Image) -> None:
+        with self._lock:
+            self._last_frame = image
+            if self._overlay_active:
+                # The overlay thread owns the panel while the menu is up.
+                return
+        self._display.show(image)
+
+    def clear(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+        self._display.clear()
+
+    def _apply_brightness(self, level: int) -> None:
+        if level <= 0 or level == self._applied_brightness:
+            return
+        self._applied_brightness = level
+        setter = getattr(self._display, "set_brightness", None)
+        if setter is not None:
+            setter(level)
+
+    def _run(self) -> None:
+        while not self._stop.wait(SHELL_POLL_SECONDS):
+            try:
+                state = read_shell_state(self._shell_path)
+            except Exception:
+                continue
+            self._apply_brightness(int(state.get("brightness", 0) or 0))
+
+            menu = state.get("menu", {})
+            level = int(state.get("brightness", 0) or 0)
+            if level != self._brightness_level:
+                # Show a bar briefly whenever the level changes.
+                if self._brightness_level:
+                    self._brightness_until = time.monotonic() + BRIGHTNESS_HINT_SECONDS
+                self._brightness_level = level
+
+            open_now = bool(menu.get("open"))
+            showing_bar = time.monotonic() < self._brightness_until
+            with self._lock:
+                base = self._last_frame
+                was_active = self._overlay_active
+                self._overlay_active = open_now or showing_bar
+
+            if base is None:
+                continue
+            if open_now:
+                self._display.show(render_menu(base, menu))
+            elif showing_bar:
+                self._display.show(render_brightness(base, self._brightness_level))
+            elif was_active:
+                # Menu just closed: put the widget's own frame back.
+                self._display.show(base)
+
+
+def create_display(args: argparse.Namespace):
     display: MatrixDisplay | MockDisplay
     if args.mock_output:
         display = MockDisplay(args.mock_output, args.rotation)
     else:
         display = MatrixDisplay(args)
-    return display
+    # Wrapping every mode means the controller menu draws over all of them.
+    return OverlayDisplay(display, getattr(args, "shell_state", None))
 
 
 def run_test_pattern(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
@@ -2310,6 +2409,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--game-input", "--tetris-input", dest="game_input", type=Path, help="JSON command queue the Assistant Matrix API writes for game modes.")
     parser.add_argument("--game-state", "--tetris-state", dest="game_state", type=Path, help="JSON file where game modes publish live state.")
     parser.add_argument("--game-scores", dest="game_scores", type=Path, help="JSON file where a game keeps its high scores between runs.")
+    parser.add_argument("--shell-state", dest="shell_state", type=Path, help="JSON file the controller shell uses for its menu and brightness.")
     parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
     parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
     parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")

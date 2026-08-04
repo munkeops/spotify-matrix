@@ -31,6 +31,23 @@ from src.domain.services.game_service import game_service
 POLL_HZ = float(os.environ.get("ASSISTANT_MATRIX_JOYSTICK_POLL_HZ", "30"))
 RECONNECT_SECONDS = 5.0
 
+# Percentage points per button press.
+BRIGHTNESS_STEP = 10
+BRIGHTNESS_MIN = 5
+BRIGHTNESS_MAX = 100
+
+# Buses the kernel creates for other hardware. i2c-20/21 are the HDMI DDC
+# channels on a Pi 4, i2c-10/11 come from the RP1 on a Pi 5, and i2c-0 is the
+# HAT ID EEPROM. None of them reach the GPIO header, so seeing only these means
+# the header bus has not been enabled rather than that the wiring is wrong.
+NON_GPIO_BUSES = {0, 10, 11, 20, 21, 22}
+
+GPIO_BUS_HELP = (
+    "Enable it with 'sudo raspi-config' (Interface Options -> I2C), or add 'dtparam=i2c_arm=on' to "
+    "/boot/firmware/config.txt, then reboot. This is a boot-time setting, so it cannot be turned on "
+    "from this app and a reboot is required."
+)
+
 
 class JoystickService:
     def __init__(self) -> None:
@@ -44,6 +61,8 @@ class JoystickService:
         self.events_seen = 0
         self._cursor = 0
         self._last_active = ""
+        self._menu_open = False
+        self._shell_seq = 0
         # Injected by the tests; production builds one from config.
         self.transport_factory = None
 
@@ -116,14 +135,24 @@ class JoystickService:
             if bus in found_on:
                 return "The module is responding. If input still does nothing, enable the joystick above."
             return f"The module answered on bus {found_on[0]}, but the app is set to bus {bus}. Change the bus here."
-        seen = sorted({addr for entry in buses for addr in entry["addresses"]})
+
+        gpio_buses = [entry for entry in buses if entry["bus"] not in NON_GPIO_BUSES]
+        if not gpio_buses:
+            others = ", ".join(str(entry["bus"]) for entry in buses)
+            return (
+                f"Only non-GPIO buses are present ({others}). Those belong to HDMI and onboard hardware, "
+                f"not the pin header, so the module cannot be on one. The GPIO bus is not enabled yet. "
+                f"{GPIO_BUS_HELP} Then look for /dev/i2c-1."
+            )
+
+        seen = sorted({addr for entry in gpio_buses for addr in entry["addresses"]})
         if seen:
             return (
-                f"The bus works and sees {', '.join(seen)}, but nothing at 0x{address:02x}. "
+                f"The GPIO bus works and sees {', '.join(seen)}, but nothing at 0x{address:02x}. "
                 "Check the module has 5V power and that SDA and SCL are not swapped."
             )
         return (
-            "The bus is present but empty. Wire SDA to GPIO 2 (physical pin 3) and SCL to GPIO 3 "
+            "The GPIO bus is present but empty. Wire SDA to GPIO 2 (physical pin 3) and SCL to GPIO 3 "
             "(physical pin 5), power the module from 5V, and use a level shifter on both lines."
         )
 
@@ -234,15 +263,111 @@ class JoystickService:
         game_service.queue_command(game_id, action)
         self._record(f"{game_id}:{action}")
 
-    def _dispatch_shell(self, event) -> None:
-        action = shell_action(event)
-        if action is None:
-            return
-        # Imported lazily: the registry imports the runtime supervisor, and this
-        # service is constructed before the app finishes wiring itself up.
+    def _widgets(self) -> list:
         from src.domain.services.widget_registry_service import widget_registry_service
 
-        widgets = [widget for widget in widget_registry_service.list_local_widgets() if widget.enabled]
+        return [widget for widget in widget_registry_service.list_local_widgets() if widget.enabled]
+
+    def _publish_shell(self, brightness: int | None = None) -> None:
+        """Tell the runtime what to draw, and how bright to be."""
+        from matrix_input.shell import write_shell_state
+        from src.domain.services.game_service import game_service
+
+        config = config_service.get_config()
+        widgets = self._widgets() if self._menu_open else []
+        items = [
+            {"id": widget.manifest.id, "name": widget.manifest.name, "active": widget.active}
+            for widget in widgets
+        ]
+        self._shell_seq += 1
+        write_shell_state(
+            game_service.state_dir / "shell.json",
+            {
+                "seq": self._shell_seq,
+                "brightness": int(brightness if brightness is not None else config.matrix.brightness),
+                "menu": {"open": self._menu_open, "cursor": self._cursor, "items": items},
+            },
+        )
+
+    def _adjust_brightness(self, delta: int) -> None:
+        config = config_service.get_config()
+        level = max(BRIGHTNESS_MIN, min(BRIGHTNESS_MAX, int(config.matrix.brightness) + delta))
+        if level == config.matrix.brightness:
+            return
+        config.matrix.brightness = level
+        config_service.save_config(config)
+        # Published, not restarted: the panel picks it up live.
+        self._publish_shell(level)
+        self._record(f"brightness:{level}")
+
+    def _open_menu(self) -> None:
+        widgets = self._widgets()
+        if not widgets:
+            return
+        ids = [widget.manifest.id for widget in widgets]
+        active = next((index for index, widget in enumerate(widgets) if widget.active), 0)
+        self._cursor = active if 0 <= active < len(ids) else 0
+        self._menu_open = True
+        self._publish_shell()
+        self._record("menu:open")
+
+    def _close_menu(self) -> None:
+        self._menu_open = False
+        self._publish_shell()
+        self._record("menu:close")
+
+    def _move_cursor(self, step: int) -> None:
+        widgets = self._widgets()
+        if not widgets:
+            return
+        self._cursor = (self._cursor + step) % len(widgets)
+        self._publish_shell()
+
+    def _select_from_menu(self) -> None:
+        widgets = self._widgets()
+        if not widgets:
+            return
+        widget_id = widgets[self._cursor % len(widgets)].manifest.id
+        # Close first: applying restarts the runtime, which drops the overlay.
+        self._menu_open = False
+        self._publish_shell()
+        self._apply_widget(widget_id)
+
+    def menu_state(self) -> dict:
+        widgets = self._widgets() if self._menu_open else []
+        return {
+            "open": self._menu_open,
+            "cursor": self._cursor,
+            "items": [{"id": w.manifest.id, "name": w.manifest.name, "active": w.active} for w in widgets],
+        }
+
+    def _dispatch_shell(self, event) -> None:
+        action = shell_action(event, self._menu_open)
+        if action is None:
+            return
+
+        if action.kind == "openMenu":
+            self._open_menu()
+            return
+        if action.kind == "closeMenu":
+            self._close_menu()
+            return
+        if action.kind == "cursorNext":
+            self._move_cursor(1)
+            return
+        if action.kind == "cursorPrevious":
+            self._move_cursor(-1)
+            return
+        if action.kind == "select":
+            self._select_from_menu()
+            return
+        if action.kind == "brightnessUp":
+            self._adjust_brightness(BRIGHTNESS_STEP)
+            return
+        if action.kind == "brightnessDown":
+            self._adjust_brightness(-BRIGHTNESS_STEP)
+            return
+        widgets = self._widgets()
         if not widgets:
             return
         ids = [widget.manifest.id for widget in widgets]
