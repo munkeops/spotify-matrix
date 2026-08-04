@@ -14,7 +14,7 @@ from typing import Any
 
 from loguru import logger
 
-from matrix_input.gamepad import GamepadReader, evdev_available, list_gamepads
+from matrix_input.gamepad import GamepadReader, evdev_available, list_gamepads, list_input_devices
 from src.domain.services.config_service import config_service
 
 POLL_HZ = float(os.environ.get("ASSISTANT_MATRIX_GAMEPAD_POLL_HZ", "60"))
@@ -55,6 +55,7 @@ class GamepadService:
             "device": settings.device,
             "deviceName": self.device_name,
             "devices": pads,
+            "inputDevices": list_input_devices(),
             "lastError": self.last_error,
             "advice": self._advice(pads),
         }
@@ -78,21 +79,49 @@ class GamepadService:
         if not pads:
             # Bluetooth saying "connected" while no input device exists is the
             # signature of a pad that paired but never finished linking.
+            # A pad bound to the wrong driver is present but unrecognised,
+            # which otherwise looks exactly like nothing being connected.
+            others = [device for device in list_input_devices() if not device["isGamepad"]]
+            candidates = [
+                device for device in others
+                if any(word in device["name"].lower() for word in ("xbox", "controller", "gamepad", "pad"))
+            ]
+            if candidates:
+                found = candidates[0]
+                return (
+                    f"{found['name']} is connected as an input device but does not report gamepad buttons "
+                    f"({found['buttons']} keys, {found['axes']} axes), so the kernel bound it to the wrong "
+                    "driver. For an Xbox pad install xpadneo on the Pi, or connect it by USB to check the "
+                    "rest of the chain works."
+                )
+
             paired = self._bluetooth_controllers()
             if paired:
                 from src.domain.services.bluetooth_service import ERTM_HELP, ertm_disabled
 
                 name = paired[0].get("name", "The controller")
-                if ertm_disabled() is False:
+                ertm = ertm_disabled()
+                if ertm is False:
                     return (
                         f"{name} is paired but the kernel created no input device, and Bluetooth ERTM is on. "
                         f"That combination is what stops an Xbox pad connecting. {ERTM_HELP} "
                         "This is a setting on the Pi itself, so rebuilding the container will not change it."
                     )
+                if ertm is None:
+                    # Unknown is not the same as fine, and saying so sends you
+                    # off re-pairing a controller that is already connected.
+                    return (
+                        f"{name} shows as connected but the kernel created no input device, and the ERTM "
+                        "setting is not readable from in here. Check on the Pi with: "
+                        "cat /sys/module/bluetooth/parameters/disable_ertm (want Y), and whether the device "
+                        "node exists at all with: ls -l /dev/input/event*"
+                    )
                 return (
-                    f"{name} shows as connected but the kernel created no input device. Forget it under "
-                    "Bluetooth, put it back in pairing mode and pair again. A blinking light means it never "
-                    "finished connecting."
+                    f"{name} is connected and ERTM is already off, but no input device exists. Check on the "
+                    "Pi whether the kernel made one: ls -l /dev/input/event* and "
+                    "grep -i -A5 xbox /proc/bus/input/devices. If the Pi has it but this list is empty, the "
+                    "container is not seeing /dev/input. If the Pi does not have it either, the pad needs a "
+                    "driver: install xpadneo."
                 )
             return (
                 "No controller found. Put the pad in pairing mode, pair it under Settings -> Bluetooth, "

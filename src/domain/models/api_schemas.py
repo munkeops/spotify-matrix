@@ -470,6 +470,8 @@ class GamepadStateResponse(BaseModel):
     device: str = ""
     deviceName: str = ""
     devices: list[GamepadDevice] = Field(default_factory=list)
+    #: Every evdev device, so a pad on the wrong driver is still visible.
+    inputDevices: list[dict[str, Any]] = Field(default_factory=list)
     lastError: str = ""
     advice: str = ""
 

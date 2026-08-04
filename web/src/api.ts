@@ -306,6 +306,7 @@ export interface GamepadState {
   device: string;
   deviceName: string;
   devices: GamepadDevice[];
+  inputDevices: { path: string; name: string; isGamepad: boolean; buttons: number; axes: number }[];
   lastError: string;
   advice: string;
 }

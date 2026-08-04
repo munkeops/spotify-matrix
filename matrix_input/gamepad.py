@@ -174,6 +174,45 @@ def list_gamepads() -> list[GamepadInfo]:
     return found
 
 
+def list_input_devices() -> list[dict[str, Any]]:
+    """Every evdev device, gamepad or not.
+
+    A controller that connects but presents unexpected button codes is filtered
+    out of :func:`list_gamepads`, which looks identical to no controller at all.
+    This shows what is actually there.
+    """
+    try:
+        import evdev
+    except ImportError:
+        return []
+
+    found: list[dict[str, Any]] = []
+    for path in evdev.list_devices():
+        try:
+            device = evdev.InputDevice(path)
+        except OSError:
+            continue
+        try:
+            capabilities = device.capabilities()
+            keys = sorted(set(capabilities.get(EV_KEY, []) or []))
+            axes = sorted({code for code, _ in (capabilities.get(EV_ABS, []) or [])})
+            found.append(
+                {
+                    "path": path,
+                    "name": device.name or Path(path).name,
+                    "isGamepad": bool(set(keys) & set(BUTTON_MAP)),
+                    "buttons": len(keys),
+                    "axes": len(axes),
+                    # The first few codes are usually enough to spot a pad that
+                    # bound to the wrong driver.
+                    "sampleKeys": [hex(code) for code in keys[:8]],
+                }
+            )
+        finally:
+            device.close()
+    return found
+
+
 class GamepadReader:
     """Reads one evdev device and yields controller events."""
 
@@ -242,6 +281,7 @@ __all__ = [
     "GamepadReader",
     "FakeGamepad",
     "list_gamepads",
+    "list_input_devices",
     "evdev_available",
     "BUTTON_MAP",
     "EV_KEY",

@@ -82,6 +82,20 @@ export default function GamepadPanel() {
             </TextField>
           ) : null}
 
+          {!state.devices.length && state.inputDevices?.length ? (
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                Input devices the container can see
+              </Typography>
+              {state.inputDevices.map((device) => (
+                <Typography key={device.path} variant="caption" sx={{ display: "block", fontFamily: "monospace" }}>
+                  {device.name} — {device.buttons} keys, {device.axes} axes
+                  {device.isGamepad ? "  (gamepad)" : ""}
+                </Typography>
+              ))}
+            </Box>
+          ) : null}
+
           {state.devices.length ? (
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Detected</Typography>

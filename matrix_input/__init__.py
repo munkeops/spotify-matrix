@@ -15,6 +15,7 @@ from matrix_input.gamepad import (
     GamepadReader,
     evdev_available,
     list_gamepads,
+    list_input_devices,
 )
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "GamepadReader",
     "FakeGamepad",
     "list_gamepads",
+    "list_input_devices",
     "evdev_available",
     "BUTTON_MAP",
     "DEFAULT_DEADZONE",

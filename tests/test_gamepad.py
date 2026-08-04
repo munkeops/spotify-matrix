@@ -245,11 +245,19 @@ def test_a_paired_pad_with_no_input_device_blames_ertm(monkeypatch):
     assert "ERTM" in advice
     assert "rebuilding the container will not change it" in advice
 
-    # With ERTM already off the problem is the pairing, not the kernel.
+    # With ERTM already off the problem is elsewhere, so point at the driver
+    # and the device node rather than blaming ERTM again.
     monkeypatch.setattr(bt_module, "ertm_disabled", lambda: True)
     advice = service._advice([])
-    assert "ERTM" not in advice
-    assert "pair again" in advice
+    assert "already off" in advice
+    assert "/dev/input/event" in advice
+    assert "xpadneo" in advice
+
+    # Not being able to read the setting is not the same as it being fine.
+    monkeypatch.setattr(bt_module, "ertm_disabled", lambda: None)
+    advice = service._advice([])
+    assert "not readable" in advice
+    assert "disable_ertm" in advice
 
 
 def test_no_bluetooth_controller_gives_the_plain_hint(monkeypatch):
