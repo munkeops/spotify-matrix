@@ -105,8 +105,11 @@ class JoystickService:
             )
         if not buses:
             return (
-                "No I2C bus exists yet. Enable it with 'sudo raspi-config' (Interface Options -> I2C) "
-                "and reboot. In Docker, the bus also has to be mapped into the container."
+                "No /dev/i2c-* device is visible. On the Pi: enable I2C with 'sudo raspi-config' "
+                "(Interface Options -> I2C), check 'dtparam=i2c_arm=on' is in /boot/firmware/config.txt, "
+                "then REBOOT - the device node only appears after a reboot. Confirm with 'ls /dev/i2c-*' "
+                "on the host. In Docker, privileged mode shares the host /dev, so if the host has the "
+                "node and the container does not, recreate the container."
             )
         if detected:
             found_on = [entry["bus"] for entry in buses if entry["joystickFound"]]

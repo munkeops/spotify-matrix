@@ -16,10 +16,11 @@ services:
       ASSISTANT_MATRIX_WIDGET_STORE_INDEX: http://localhost:8080/store-index.json
       # Start as a pure plugin host: no plugins until installed from the store.
       ASSISTANT_MATRIX_BUILTIN_MODE: store
-    # I2C for the mini-joystick. Harmless when the bus is not enabled, but the
-    # container needs it mapped to talk to the module.
-    devices:
-      - /dev/i2c-1:/dev/i2c-1
+    # privileged already shares the host /dev, so the I2C bus for the
+    # mini-joystick is visible without mapping it. Do NOT add an explicit
+    # `devices:` entry: compose refuses to start when the node does not exist,
+    # which breaks the app for anyone not using I2C. If you drop privileged,
+    # add `devices: [/dev/i2c-1:/dev/i2c-1]` and `group_add: [i2c]` instead.
     volumes:
       - ./data:/app/data
       # Bluetooth: reach the host BlueZ daemon over the system D-Bus socket.

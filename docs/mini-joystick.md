@@ -73,8 +73,37 @@ the order things usually go wrong:
 | Other addresses but not `0x5a` | Wiring is fine, the module is not answering | Check the module's power LED is solid red; check the level shifter |
 | Answers on a different bus | The app is set to the wrong bus | Change **I²C bus** in the same panel |
 
-Docker note: the container needs the bus mapped. This repo's `docker-compose.yml`
-already does it, but a hand-rolled `docker run` needs `--device /dev/i2c-1`.
+### "Could not open I2C bus"
+
+That message means the library is installed and the app tried, but the device
+node was not there. It is almost always the host, not the container.
+
+```bash
+ls /dev/i2c-*                    # nothing listed? the bus does not exist yet
+lsmod | grep i2c_dev             # module loaded?
+grep i2c /boot/firmware/config.txt   # expect dtparam=i2c_arm=on
+```
+
+Fix it in this order:
+
+1. `sudo raspi-config` → Interface Options → I2C → Yes.
+2. Confirm `dtparam=i2c_arm=on` is in `/boot/firmware/config.txt`.
+3. **Reboot.** The `/dev/i2c-1` node only appears after one; enabling I2C
+   without rebooting is the single most common cause of this error.
+4. `ls /dev/i2c-*` again — you want `/dev/i2c-1`.
+5. Recreate the container so it picks the node up:
+   `docker compose up -d --force-recreate spotify-matrix`.
+6. Check it arrived: `docker compose exec spotify-matrix ls -l /dev/i2c-1`.
+
+Docker note: this repo's compose runs the service `privileged`, which shares the
+host `/dev` wholesale, so no device mapping is needed. Do **not** add an
+explicit `devices: [/dev/i2c-1:/dev/i2c-1]` — compose refuses to start when that
+node does not exist, so it breaks the app for anyone not using I2C. If you drop
+privileged, add the mapping plus `group_add: [i2c]` then. A hand-rolled
+`docker run` without privileged needs `--device /dev/i2c-1`.
+
+If the node exists on the host but not in the container, the container predates
+it; recreate it.
 
 ## Protocol
 
