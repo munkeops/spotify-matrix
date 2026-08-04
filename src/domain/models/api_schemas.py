@@ -527,8 +527,21 @@ class GameBindingsRequest(BaseModel):
 
 
 class AudioDevice(BaseModel):
+    """One playback device, as the settings panel should show it.
+
+    The label and kind are the whole point of the list - without them the
+    panel falls back to the ALSA PCM string, which is what it was doing
+    before because this model quietly dropped any field it did not name.
+    """
+
     name: str
     description: str = ""
+    #: Something a person would recognise: "HDMI 1", or the speaker's name.
+    label: str = ""
+    #: bluetooth | headphones | hdmi | usb | default | other
+    kind: str = "other"
+    #: True for the rate-converting and mixing wrappers, hidden by default.
+    plumbing: bool = False
 
 
 class AudioStateResponse(BaseModel):

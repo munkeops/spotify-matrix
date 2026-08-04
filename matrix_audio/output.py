@@ -33,8 +33,28 @@ def aplay_available() -> bool:
 # `aplay -L` lists every way of reaching every card: the card itself, the
 # rate-converting wrapper, the mixing wrapper, and an alias or two. They are
 # not four speakers, and offering them as four choices is how the panel ended
-# up unreadable. These prefixes are the plumbing.
-PLUMBING = ("plughw:", "sysdefault:", "dmix:", "dsnoop:", "surround", "front:", "iec958:", "spdif:")
+# up unreadable. These are the plumbing.
+#:
+#: Matched against the part before the colon, because several also appear
+#: bare: `aplay -L` lists both `sysdefault` and `sysdefault:CARD=x`, and only
+#: the second was being filtered.
+PLUMBING = frozenset(
+    {"plughw", "sysdefault", "dmix", "dsnoop", "front", "iec958", "spdif", "hdmi", "surround"}
+)
+
+
+def _is_plumbing(name: str) -> bool:
+    base = name.split(":", 1)[0]
+    return base in PLUMBING or base.startswith("surround")
+
+
+def _bluetooth_address(name: str) -> str:
+    """The speaker's address out of a bluealsa PCM name, if it names one."""
+    for part in name.split(","):
+        key, _, value = part.partition("=")
+        if key.strip().upper().endswith("DEV"):
+            return value.strip()
+    return ""
 
 #: Rough kind for each device, used to sort and to label.
 BLUETOOTH, HEADPHONES, HDMI, USB, DEFAULT, OTHER = (
@@ -72,13 +92,13 @@ def _label(name: str, description: str, kind: str) -> str:
     if kind == BLUETOOTH:
         # bluealsa:DEV=F4:6A:D7:..,PROFILE=a2dp -> the speaker's own name if
         # the description carries it, otherwise the address.
-        if first and not first.lower().startswith("bluetooth"):
-            return first
-        address = ""
-        for part in name.split(","):
-            if part.upper().startswith("DEV=") or part.upper().startswith("BLUEALSA:DEV="):
-                address = part.split("=", 1)[1]
-        return f"Bluetooth speaker {address}".strip()
+        # bluealsa describes a speaker as "JBL Flip 5, trusted, A2DP"; only
+        # the first part is its name.
+        speaker = first.split(",", 1)[0].strip()
+        if speaker and not speaker.lower().startswith("bluetooth"):
+            return speaker
+        address = _bluetooth_address(name)
+        return f"Bluetooth speaker {address}".strip() if address else "Bluetooth speaker"
     if kind == HDMI:
         # vc4hdmi0 / vc4hdmi1 are the Pi's two HDMI ports.
         for port in ("hdmi0", "hdmi1"):
@@ -104,13 +124,19 @@ def list_output_devices(include_plumbing: bool = False) -> list[dict[str, Any]]:
     for entry in raw:
         name = entry["name"]
         description = entry["description"]
-        plumbing = name.startswith(PLUMBING)
+        plumbing = _is_plumbing(name)
         if plumbing and not include_plumbing:
             continue
 
         kind = _classify(name, description)
         # One entry per card: `hw:CARD=x` and `default:CARD=x` are one speaker.
-        card = name.split("CARD=", 1)[1].split(",")[0] if "CARD=" in name else name
+        if kind == BLUETOOTH:
+            # bluealsa lists a bare alias as well as one PCM per speaker.
+            card = _bluetooth_address(name) or "any"
+        elif "CARD=" in name:
+            card = name.split("CARD=", 1)[1].split(",")[0]
+        else:
+            card = name
         key = f"{kind}:{card}"
         if not plumbing and key in seen_cards:
             continue
@@ -125,6 +151,20 @@ def list_output_devices(include_plumbing: bool = False) -> list[dict[str, Any]]:
                 "plumbing": plumbing,
             }
         )
+
+    # The bare `bluealsa` alias means "whichever speaker"; once a real one is
+    # listed it is a confusing duplicate of it.
+    named = {
+        device["name"]
+        for device in devices
+        if device["kind"] == BLUETOOTH and _bluetooth_address(device["name"])
+    }
+    if named:
+        devices = [
+            device
+            for device in devices
+            if device["kind"] != BLUETOOTH or _bluetooth_address(device["name"])
+        ]
 
     devices.sort(key=lambda device: (ORDER.get(device["kind"], 9), device["label"]))
     return devices

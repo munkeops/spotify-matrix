@@ -393,3 +393,81 @@ def test_test_button_plays_a_sound_the_panel_offered():
     shipped = {path.stem for path in spec.sounds_dir.glob("*.wav")}
 
     assert set(offered) <= shipped, "every offered sound is one the test can find"
+
+
+REAL_PI = """default
+    Playback through the default device
+sysdefault
+    Default Audio Device
+bluealsa
+    Bluetooth Audio Hub
+bluealsa:DEV=F4:6A:D7:6E:8C:90,PROFILE=a2dp
+    JBL Flip 5, trusted, A2DP (playback)
+    Bluetooth Audio
+hw:CARD=vc4hdmi0,DEV=0
+    vc4-hdmi-0, MAI PCM i2s-hifi-0
+sysdefault:CARD=vc4hdmi0
+    vc4-hdmi-0, MAI PCM i2s-hifi-0
+plughw:CARD=vc4hdmi0,DEV=0
+    vc4-hdmi-0, MAI PCM i2s-hifi-0
+hw:CARD=vc4hdmi1,DEV=0
+    vc4-hdmi-1, MAI PCM i2s-hifi-0
+"""
+
+
+def test_a_real_pi_listing_becomes_four_choices(monkeypatch):
+    """What a Pi with bluealsa and two HDMI ports should offer."""
+    module = _fake_aplay(monkeypatch, REAL_PI)
+
+    listed = [(device["kind"], device["label"]) for device in module.list_output_devices()]
+
+    assert listed == [
+        ("bluetooth", "JBL Flip 5"),
+        ("hdmi", "HDMI 1"),
+        ("hdmi", "HDMI 2"),
+        ("default", "System default"),
+    ]
+
+
+def test_the_bare_bluealsa_alias_is_dropped_once_a_speaker_is_named(monkeypatch):
+    """It means "whichever speaker", so beside a real one it reads as a
+    duplicate - which is how the panel came to show bluealsa twice."""
+    module = _fake_aplay(monkeypatch, REAL_PI)
+
+    bluetooth = [d for d in module.list_output_devices() if d["kind"] == "bluetooth"]
+
+    assert len(bluetooth) == 1
+    assert bluetooth[0]["name"].startswith("bluealsa:DEV=")
+
+
+def test_the_bare_alias_survives_when_it_is_all_there_is(monkeypatch):
+    module = _fake_aplay(monkeypatch, "bluealsa\n    Bluetooth Audio Hub\ndefault\n    Default\n")
+
+    labels = [d["label"] for d in module.list_output_devices() if d["kind"] == "bluetooth"]
+
+    assert labels == ["Bluetooth speaker"]
+
+
+def test_bare_sysdefault_is_plumbing_too(monkeypatch):
+    """The filter matched "sysdefault:" with the colon, so the bare entry -
+    which is what a Pi actually lists - went straight through."""
+    module = _fake_aplay(monkeypatch, REAL_PI)
+
+    assert not any(d["name"] == "sysdefault" for d in module.list_output_devices())
+
+
+def test_the_api_actually_sends_the_label_and_kind():
+    """The panel showed raw PCM strings because the response model named only
+    `name` and `description`, so pydantic dropped everything else."""
+    from src.domain.models.api_schemas import AudioDevice
+
+    device = AudioDevice(
+        name="bluealsa:DEV=F4:6A:D7:6E:8C:90,PROFILE=a2dp",
+        description="JBL Flip 5",
+        label="JBL Flip 5",
+        kind="bluetooth",
+    )
+    payload = device.model_dump()
+
+    assert payload["label"] == "JBL Flip 5"
+    assert payload["kind"] == "bluetooth"
