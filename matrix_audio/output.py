@@ -170,6 +170,24 @@ def list_output_devices(include_plumbing: bool = False) -> list[dict[str, Any]]:
     return devices
 
 
+def plug_device(device: str) -> str:
+    """Wrap a device so ALSA converts our stream to whatever it wants.
+
+    The mixer renders 22050Hz mono, which a sound card is free to refuse.
+    HDMI happens to accept it; the bluealsa PCM does not, because A2DP is
+    44100Hz stereo - so a Bluetooth speaker connected perfectly well and
+    then played nothing. ALSA's `plug` plugin does that conversion.
+
+    The braces form is deliberate. A bluealsa name is
+    `bluealsa:DEV=...,PROFILE=a2dp`, and plain `plug:` + that would have
+    ALSA read `PROFILE=a2dp` as an argument to plug rather than to
+    bluealsa; naming the slave explicitly keeps it whole.
+    """
+    if not device or device.startswith("plug"):
+        return device
+    return 'plug:{SLAVE="' + device + '"}'
+
+
 def _raw_output_devices() -> list[dict[str, Any]]:
     """ALSA playback devices, exactly as ``aplay -L`` reports them."""
     binary = shutil.which("aplay")
@@ -231,7 +249,7 @@ class AlsaOutput:
     def _command(self) -> list[str]:
         command = ["aplay", "-q", "-t", "raw", "-f", "S16_LE", "-r", str(SAMPLE_RATE), "-c", "1"]
         if self.device:
-            command += ["-D", self.device]
+            command += ["-D", plug_device(self.device)]
         return command + ["-"]
 
     def start(self) -> None:

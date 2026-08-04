@@ -471,3 +471,65 @@ def test_the_api_actually_sends_the_label_and_kind():
 
     assert payload["label"] == "JBL Flip 5"
     assert payload["kind"] == "bluetooth"
+
+
+def test_output_is_wrapped_so_alsa_converts_the_format():
+    """The mixer renders 22050Hz mono. HDMI accepts that; the bluealsa PCM
+    does not, because A2DP is 44100Hz stereo - so a speaker that connected
+    perfectly well played nothing at all."""
+    from matrix_audio.output import plug_device
+
+    assert plug_device("") == "", "the default device is left alone"
+    assert plug_device("plughw:CARD=x") == "plughw:CARD=x", "already converting"
+    assert plug_device("hw:CARD=vc4hdmi0,DEV=0") == 'plug:{SLAVE="hw:CARD=vc4hdmi0,DEV=0"}'
+
+
+def test_a_bluealsa_name_survives_being_wrapped():
+    """`plug:bluealsa:DEV=x,PROFILE=a2dp` would have ALSA read PROFILE as an
+    argument to plug rather than to bluealsa, so the slave is named."""
+    from matrix_audio.output import plug_device
+
+    wrapped = plug_device("bluealsa:DEV=F4:6A:D7:6E:8C:90,PROFILE=a2dp")
+
+    assert wrapped == 'plug:{SLAVE="bluealsa:DEV=F4:6A:D7:6E:8C:90,PROFILE=a2dp"}'
+    assert "PROFILE=a2dp" in wrapped.split('SLAVE="', 1)[1]
+
+
+def test_the_command_asks_for_the_wrapped_device():
+    from matrix_audio.mixer import Mixer
+    from matrix_audio.output import AlsaOutput
+
+    output = AlsaOutput(Mixer(), device="bluealsa")
+
+    command = output._command()
+
+    assert command[command.index("-D") + 1] == 'plug:{SLAVE="bluealsa"}'
+
+
+def test_the_test_button_admits_when_nothing_came_out(monkeypatch):
+    """It reported "Playing death." for a device that never opened."""
+    from src.domain.services import audio_service as module
+
+    class DeadEngine:
+        error = "ALSA: Channels count non available"
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def load_directory(self, *args, **kwargs):
+            return []
+
+        def start(self):
+            return None
+
+        def play(self, name):
+            return True
+
+        def stop(self):
+            return None
+
+    monkeypatch.setattr(module, "AudioEngine", DeadEngine)
+    result = module.audio_service.play_test("death")
+
+    assert result["ok"] is False
+    assert "Channels count non available" in result["message"]

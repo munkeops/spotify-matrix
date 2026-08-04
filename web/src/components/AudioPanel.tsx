@@ -59,7 +59,9 @@ export default function AudioPanel() {
     try {
       // Play from the API process, so this works before a game is running.
       const response = await testAudio(state?.sounds?.[0] || "start");
-      setResult(response.ok ? response.message : response.message || "Nothing played.");
+      // A device that refused the format is a failure, not a status update.
+      if (response.ok) setResult(response.message);
+      else setError(response.message || "Nothing played.");
     } catch (e) {
       setError((e as Error).message);
     } finally {

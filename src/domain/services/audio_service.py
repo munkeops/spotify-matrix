@@ -7,6 +7,7 @@ own, so you can confirm the sound card works before starting a game.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any
 
@@ -120,6 +121,12 @@ class AudioService:
             engine.load_directory(spec.sounds_dir)
         engine.start()
         played = engine.play(sound)
+        # aplay only fails once it has tried to open the device, which is a
+        # moment after the thread starts. Without this wait the panel says
+        # "Playing" for a device that rejected the format outright.
+        deadline = time.monotonic() + 0.6
+        while time.monotonic() < deadline and not engine.error:
+            time.sleep(0.05)
         # Replace whatever the last test left running.
         self._stop_previous()
         self._test_engine = engine
@@ -129,7 +136,14 @@ class AudioService:
                 "ok": False,
                 "message": f"No sound called {sound}. This game has: {available}.",
             }
-        return {"ok": True, "message": f"Playing {sound}.", "error": engine.error}
+        if engine.error:
+            where = settings.device or "the default output"
+            return {
+                "ok": False,
+                "message": f"Could not play through {where}: {engine.error}",
+                "error": engine.error,
+            }
+        return {"ok": True, "message": f"Playing {sound}.", "error": ""}
 
     def _stop_previous(self) -> None:
         previous, self._test_engine = self._test_engine, None

@@ -12,7 +12,7 @@ from typing import Any
 
 from matrix_audio.mixer import MAX_VOICES, Mixer
 from matrix_audio import bluealsa
-from matrix_audio.output import AlsaOutput, NullOutput, aplay_available, list_output_devices
+from matrix_audio.output import plug_device, AlsaOutput, NullOutput, aplay_available, list_output_devices
 from matrix_audio.synth import SAMPLE_RATE, read_wav, write_wav
 
 
@@ -82,6 +82,7 @@ class SilentAudio:
 
 
 __all__ = [
+    "plug_device",
     "bluealsa",
     "AudioEngine",
     "SilentAudio",
