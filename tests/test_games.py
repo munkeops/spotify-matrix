@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 import shutil
 import sys
 import time
@@ -1519,3 +1520,80 @@ def test_kong_running_out_of_lives_ends_it():
     game._die()
     game.advance(1.5)
     assert game.game_over
+
+
+def _breakout_wall(level: int):
+    """A level whose bricks never break, so escaping means a physics bug."""
+    game = mg.create_game("breakout", {}, seed=1)
+    game.level = level
+    game._build_level()
+    game.bricks = [[9 if cell else 0 for cell in row] for row in game.bricks]
+    game.launched = True
+    return game
+
+
+def test_breakout_ball_cannot_slip_through_the_corner_between_bricks():
+    """The overlap test used `ball_x <= right`, but the pixel at `right`
+    covers up to `right + 1`. That made every brick a unit smaller than it
+    was drawn, leaving a slot at the corner the ball fitted through exactly.
+    """
+    breakout = importlib.import_module(mg.game_class("breakout").__module__)
+    escaped = []
+    for level in range(1, len(breakout.LEVELS) + 1):
+        for angle in range(-85, 86, 5):
+            for speed in (30.0, 50.0, 70.0):
+                game = _breakout_wall(level)
+                filled = [(r, c) for r in range(5) for c in range(10) if game.bricks[r][c]]
+                if not filled:
+                    continue
+                ceiling = min(game._brick_rect(r, c)[1] for r, c in filled)
+                game.ball_x = 30.0
+                game.ball_y = float(max(game._brick_rect(r, c)[3] for r, c in filled) + 2)
+                radians = math.radians(angle)
+                game.ball_vx = math.sin(radians) * speed
+                game.ball_vy = -math.cos(radians) * speed
+                for _ in range(14):
+                    game.advance(0.02)
+                if game.ball_y < ceiling - 1:
+                    escaped.append((level, angle, speed))
+    assert not escaped, f"ball got through the wall on {escaped[:5]}"
+
+
+def test_breakout_bounces_off_the_face_it_actually_hit():
+    """Bricks are twice as wide as they are tall, so comparing distance to
+    the centre made a hit on the top face read as a hit on the side."""
+    game = mg.create_game("breakout", {}, seed=1)
+    game.bricks = [[0] * 10 for _ in range(5)]
+    game.bricks[4][5] = 9
+    left, top, right, bottom = game._brick_rect(4, 5)
+
+    # Squarely underneath, moving straight up: that is the bottom face.
+    game.ball_x = float(left + 2)
+    game.ball_y = float(bottom)
+    game.ball_vx, game.ball_vy = 0.0, -40.0
+    game._hit_bricks()
+    assert game.ball_vy > 0, "it should come back down"
+
+    # Against the left face, moving right.
+    game = mg.create_game("breakout", {}, seed=1)
+    game.bricks = [[0] * 10 for _ in range(5)]
+    game.bricks[4][5] = 9
+    game.ball_x = float(left - 1)
+    game.ball_y = float(top + 1)
+    game.ball_vx, game.ball_vy = 40.0, 0.0
+    game._hit_bricks()
+    assert game.ball_vx < 0, "it should come back left"
+
+
+def test_breakout_hitting_two_bricks_at_once_turns_each_axis_once():
+    game = mg.create_game("breakout", {}, seed=1)
+    game.bricks = [[0] * 10 for _ in range(5)]
+    game.bricks[4][4] = game.bricks[4][5] = 9
+    _, _, right, bottom = game._brick_rect(4, 4)
+    game.ball_x = float(right - 0.5)   # straddling the seam
+    game.ball_y = float(bottom)
+    game.ball_vx, game.ball_vy = 10.0, -40.0
+
+    game._hit_bricks()
+
+    assert game.ball_vy > 0, "turned away from the row, not flipped twice"

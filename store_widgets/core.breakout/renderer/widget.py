@@ -17,7 +17,10 @@ BRICK_WIDTH = 6
 BRICK_HEIGHT = 3
 BRICK_LEFT = 2
 BRICK_TOP = 10
-BRICK_GAP_Y = 1
+# Flush, like the arcade. A one pixel gap between rows reads as a seam where
+# two bricks meet at a corner, but in continuous coordinates it is a two unit
+# channel - exactly the width of the ball, which could thread it diagonally.
+BRICK_GAP_Y = 0
 
 FIELD_TOP = 8
 PADDLE_Y = 58
@@ -158,31 +161,96 @@ class BreakoutGame(GameWidget):
         top = BRICK_TOP + row * (BRICK_HEIGHT + BRICK_GAP_Y)
         return left, top, left + BRICK_WIDTH - 1, top + BRICK_HEIGHT - 1
 
+    def _overlaps(self, left: int, top: int, right: int, bottom: int) -> bool:
+        """Do the ball and a brick share any space at all?
+
+        The pixel at ``right`` covers up to ``right + 1`` in continuous
+        coordinates, so testing ``ball_x <= right`` makes the brick a whole
+        unit narrower and shorter than it is drawn. Two bricks meeting at a
+        corner then leave a slot the ball fits through exactly, which is the
+        corner it was slipping past.
+        """
+        return (
+            self.ball_x < right + 1
+            and left < self.ball_x + BALL_SIZE
+            and self.ball_y < bottom + 1
+            and top < self.ball_y + BALL_SIZE
+        )
+
+    def _penetration(self, left: int, top: int, right: int, bottom: int) -> tuple[float, float]:
+        """How far the ball has sunk into a brick along each axis."""
+        width, height = right - left + 1, bottom - top + 1
+        ball_x = self.ball_x + BALL_SIZE / 2
+        ball_y = self.ball_y + BALL_SIZE / 2
+        depth_x = (width + BALL_SIZE) / 2 - abs(ball_x - (left + width / 2))
+        depth_y = (height + BALL_SIZE) / 2 - abs(ball_y - (top + height / 2))
+        return depth_x, depth_y
+
     def _hit_bricks(self) -> None:
+        """Resolve against every brick the ball is touching, not just one.
+
+        Two things were wrong. The bounce axis came from comparing the
+        distance to the brick's centre, which weighs a horizontal gap against
+        a vertical one on a brick twice as wide as it is tall, so a hit on the
+        top face could read as a hit on the side. And only the first
+        overlapping brick was resolved, so at the corner where two bricks meet
+        the ball turned away from one while still inside the other, and the
+        next step turned it back - straight through the seam.
+
+        Overlap depth is the comparison that holds whatever shape the brick
+        is, each axis turns at most once however many bricks are involved,
+        and the ball is pushed clear so it cannot resolve twice against the
+        same brick.
+        """
+        hits = []
         for row in range(BRICK_ROWS):
             for column in range(BRICK_COLS):
                 if not self.bricks[row][column]:
                     continue
-                left, top, right, bottom = self._brick_rect(row, column)
-                if left <= self.ball_x + BALL_SIZE - 1 and self.ball_x <= right and top <= self.ball_y + BALL_SIZE - 1 and self.ball_y <= bottom:
-                    self.bricks[row][column] -= 1
-                    if self.bricks[row][column] > 0:
-                        # A tough brick cracks first and pays on the second hit.
-                        self.audio.play("wall")
-                        self.ball_vy = -self.ball_vy
-                        return
-                    self.audio.play("brick")
-                    self.score += ROW_POINTS[row]
-                    # Bounce off whichever face the ball was closest to.
-                    if abs((self.ball_y + BALL_SIZE / 2) - (top + BRICK_HEIGHT / 2)) > abs((self.ball_x + BALL_SIZE / 2) - (left + BRICK_WIDTH / 2)):
-                        self.ball_vy = -self.ball_vy
-                    else:
-                        self.ball_vx = -self.ball_vx
-                    if not any(any(brick_row) for brick_row in self.bricks):
-                        self.level += 1
-                        self._build_level()
-                        self.audio.play("start")
-                    return
+                rect = self._brick_rect(row, column)
+                if self._overlaps(*rect):
+                    hits.append((row, column, rect))
+        if not hits:
+            return
+
+        flip_x = flip_y = False
+        push_x = push_y = 0.0
+        cracked = destroyed = False
+
+        for row, column, rect in hits:
+            depth_x, depth_y = self._penetration(*rect)
+            left, top, right, bottom = rect
+            ball_x = self.ball_x + BALL_SIZE / 2
+            ball_y = self.ball_y + BALL_SIZE / 2
+            # An exact corner has equal depths and turns the ball on both.
+            if depth_y <= depth_x:
+                flip_y = True
+                away = depth_y if ball_y > top + (bottom - top + 1) / 2 else -depth_y
+                push_y = away if abs(away) > abs(push_y) else push_y
+            if depth_x <= depth_y:
+                flip_x = True
+                away = depth_x if ball_x > left + (right - left + 1) / 2 else -depth_x
+                push_x = away if abs(away) > abs(push_x) else push_x
+
+            self.bricks[row][column] -= 1
+            if self.bricks[row][column] > 0:
+                cracked = True
+            else:
+                destroyed = True
+                self.score += ROW_POINTS[row]
+
+        if flip_x:
+            self.ball_vx = -self.ball_vx
+            self.ball_x += push_x
+        if flip_y:
+            self.ball_vy = -self.ball_vy
+            self.ball_y += push_y
+
+        self.audio.play("brick" if destroyed else "wall")
+        if destroyed and not any(any(brick_row) for brick_row in self.bricks):
+            self.level += 1
+            self._build_level()
+            self.audio.play("start")
 
     def hud(self) -> dict[str, Any]:
         return {
