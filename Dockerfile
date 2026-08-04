@@ -67,6 +67,8 @@ COPY public ./public
 COPY scripts ./scripts
 COPY src ./src
 COPY assistant_matrix_sdk ./assistant_matrix_sdk
+COPY matrix_games ./matrix_games
+COPY mini_joystick ./mini_joystick
 COPY store_server ./store_server
 COPY spotify_matrix.py requirements.txt ./
 
