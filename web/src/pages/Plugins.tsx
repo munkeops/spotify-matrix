@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardActionArea, Typography, Box, CircularProgress, Alert, Chip, IconButton, Stack } from "@mui/material";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
-import { LocalWidget, listLocalWidgets, applyWidget, getWidgetConfig, previewWidget, PREVIEWABLE } from "../api";
+import { GAME_IDS, LocalWidget, listLocalWidgets, applyWidget, getWidgetConfig, previewWidget, PREVIEWABLE } from "../api";
 import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
 import DisplayPolicyPanel from "../components/DisplayPolicyPanel";
 
@@ -66,7 +66,8 @@ export default function Plugins() {
     try {
       await applyWidget(widget.manifest.id, null);
       await refresh();
-      if (widget.manifest.id === "core.tetris") navigate("/play/tetris");
+      const gameId = widget.manifest.id.replace("core.", "");
+      if ((GAME_IDS as readonly string[]).includes(gameId)) navigate(`/play/${gameId}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {

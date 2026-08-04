@@ -10,6 +10,7 @@ import spotify_matrix as runtime
 
 SERVICE_MODULES = [
     "src.domain.services.config_service",
+    "src.domain.services.game_service",
     "src.domain.services.tetris_service",
     "src.domain.services.runtime_service",
     "src.domain.services.widget_registry_service",
@@ -21,6 +22,7 @@ def reload_tetris_stack(monkeypatch, data_dir: Path):
     for name in SERVICE_MODULES:
         sys.modules.pop(name, None)
     config_module = importlib.import_module("src.domain.services.config_service")
+    importlib.import_module("src.domain.services.game_service")
     tetris_module = importlib.import_module("src.domain.services.tetris_service")
     runtime_module = importlib.import_module("src.domain.services.runtime_service")
     registry_module = importlib.import_module("src.domain.services.widget_registry_service")
@@ -125,6 +127,8 @@ def test_drop_button_restarts_after_game_over():
     game.game_over = True
     game.score = 999
 
+    # The board holds the final score briefly before a drop deals a new game.
+    game.step(1.0)
     game.command("hardDrop")
 
     assert game.game_over is False
@@ -228,8 +232,8 @@ def test_runtime_args_pass_the_tetris_paths(tmp_path, monkeypatch):
 
     assert "--tetris-no-ghost" in args
     assert args[args.index("--tetris-start-level") + 1] == "4"
-    assert args[args.index("--tetris-input") + 1] == str(tetris_module.tetris_service.input_path)
-    assert args[args.index("--tetris-state") + 1] == str(tetris_module.tetris_service.state_path)
+    assert args[args.index("--game-input") + 1] == str(tetris_module.tetris_service.input_path)
+    assert args[args.index("--game-state") + 1] == str(tetris_module.tetris_service.state_path)
     assert args[args.index("--display-mode") + 1] == "tetris"
 
 

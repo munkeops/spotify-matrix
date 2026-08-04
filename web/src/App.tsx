@@ -12,12 +12,13 @@ import Dashboard from "./pages/Dashboard";
 import Plugins from "./pages/Plugins";
 import Store from "./pages/Store";
 import Settings from "./pages/Settings";
-import Tetris from "./pages/Tetris";
+import Play from "./pages/Play";
+import GamePad from "./pages/GamePad";
 
 const NAV = [
   { label: "Home", value: "/", icon: <HomeRoundedIcon /> },
   { label: "Plugins", value: "/plugins", icon: <ExtensionRoundedIcon /> },
-  { label: "Play", value: "/play/tetris", icon: <SportsEsportsRoundedIcon /> },
+  { label: "Play", value: "/play", icon: <SportsEsportsRoundedIcon /> },
   { label: "Store", value: "/store", icon: <StorefrontRoundedIcon /> },
   { label: "Settings", value: "/settings", icon: <SettingsRoundedIcon /> },
 ];
@@ -38,14 +39,19 @@ export default function App() {
   const location = useLocation();
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up("md"));
-  const current = NAV.some((n) => n.value === location.pathname) ? location.pathname : "/";
+  const current = NAV.some((n) => n.value === location.pathname)
+    ? location.pathname
+    : location.pathname.startsWith("/play")
+      ? "/play"
+      : "/";
 
   const content = (
     <Container maxWidth={desktop ? "md" : "sm"} sx={{ flex: 1, py: 2, pb: desktop ? 4 : 12 }}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/plugins" element={<Plugins />} />
-        <Route path="/play/tetris" element={<Tetris />} />
+        <Route path="/play" element={<Play />} />
+        <Route path="/play/:gameId" element={<GamePad />} />
         <Route path="/store" element={<Store />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

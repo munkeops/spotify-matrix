@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
-import { apiGet, apiPost, StatusResponse, listLocalWidgets, getWidgetConfig, previewWidget, applyWidget, LocalWidget, PREVIEWABLE } from "../api";
+import { GAME_IDS, apiGet, apiPost, StatusResponse, listLocalWidgets, getWidgetConfig, previewWidget, applyWidget, LocalWidget, PREVIEWABLE } from "../api";
 import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
 
 const CATEGORY_COLOR: Record<string, string> = {
@@ -103,8 +103,8 @@ export default function Dashboard() {
                 <Chip size="small" color={running ? "success" : "default"} label={running ? "Running" : "Stopped"} sx={{ mt: 0.5 }} />
               </Box>
               <Stack direction="row" spacing={1} alignItems="center">
-                {active?.manifest.id === "core.tetris" ? (
-                  <IconButton onClick={() => navigate("/play/tetris")} sx={{ width: 48, height: 48, border: "1px solid", borderColor: "divider" }} aria-label="Open gamepad">
+                {active && GAME_IDS.includes(active.manifest.id.replace("core.", "") as any) ? (
+                  <IconButton onClick={() => navigate(`/play/${active.manifest.id.replace("core.", "")}`)} sx={{ width: 48, height: 48, border: "1px solid", borderColor: "divider" }} aria-label="Open gamepad">
                     <SportsEsportsRoundedIcon />
                   </IconButton>
                 ) : null}

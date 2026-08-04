@@ -81,6 +81,69 @@
     "runtime": "builtin"
   },
   {
+    "id": "core.pacman",
+    "name": "Pac-Man",
+    "version": "1.0.0",
+    "summary": "Clear the maze while four ghosts hunt you down.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.snake",
+    "name": "Snake",
+    "version": "1.0.0",
+    "summary": "Eat, grow, and do not bite yourself.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.breakout",
+    "name": "Breakout",
+    "version": "1.0.0",
+    "summary": "Bounce the ball and clear every brick.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.invaders",
+    "name": "Space Invaders",
+    "version": "1.0.0",
+    "summary": "Hold off descending waves of aliens.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.flappy",
+    "name": "Flappy",
+    "version": "1.0.0",
+    "summary": "One button, endless pipes.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.pong",
+    "name": "Pong",
+    "version": "1.0.0",
+    "summary": "Rally against the computer or a second phone.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.connect4",
+    "name": "Connect Four",
+    "version": "1.0.0",
+    "summary": "Line up four discs before your rival does.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
     "id": "core.testPattern",
     "name": "Test Pattern",
     "version": "1.0.0",

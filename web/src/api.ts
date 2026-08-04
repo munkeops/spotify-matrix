@@ -86,10 +86,14 @@ export const applyWidget = (id: string, config: Record<string, unknown> | null =
 export const previewWidget = (widgetId: string, config: Record<string, unknown>) =>
   apiPost<{ dataUrl: string }>("/api/widgets/preview", { widgetId, config });
 
+export const GAME_IDS = [
+  "tetris", "pacman", "snake", "breakout", "invaders", "flappy", "pong", "connect4",
+] as const;
+
 export const PREVIEWABLE = new Set([
   "core.text", "core.image", "core.draw", "core.slideshow",
   "core.clock", "core.agent", "core.weather", "core.spotify", "core.testPattern",
-  "core.tetris",
+  ...GAME_IDS.map((id) => `core.${id}`),
 ]);
 
 export type TetrisAction =
@@ -191,3 +195,39 @@ export async function uninstallWidget(widgetId: string) {
   if (!r.ok) throw new Error("Uninstall failed");
   return r.json();
 }
+
+export type GameLayout = "dpad" | "horizontal" | "vertical" | "tap" | "tetris";
+
+export interface GameSummary {
+  id: string;
+  name: string;
+  summary: string;
+  widgetId: string;
+  layout: GameLayout;
+  actions: string[];
+  active: boolean;
+}
+
+export interface GameFrame {
+  game: string;
+  status: "playing" | "paused" | "gameOver" | "won";
+  hud: Record<string, string | number>;
+  palette: string[];
+  pixels: string[];
+  updatedAt: number;
+}
+
+export interface GameStateResponse {
+  gameId: string;
+  live: boolean;
+  running: boolean;
+  active: boolean;
+  state: GameFrame | null;
+}
+
+export const listGames = () =>
+  apiGet<{ games: GameSummary[]; activeGameId: string; running: boolean }>("/api/games");
+export const getGameState = (id: string) =>
+  apiGet<GameStateResponse>(`/api/games/${encodeURIComponent(id)}/state`);
+export const sendGameInput = (id: string, action: string) =>
+  apiPost<{ ok: boolean; seq: number }>(`/api/games/${encodeURIComponent(id)}/input`, { action });

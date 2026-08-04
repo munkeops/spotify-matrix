@@ -411,68 +411,103 @@ POST /api/runtime/apply
 
 Restarts the runtime using saved config.
 
-## Tetris APIs
+## Game APIs
 
-The Tetris widget (`core.tetris`) runs inside the matrix runtime process, so the
-API passes controller input to it through a small command queue file and reads
-back the board the runtime publishes. Apply the widget first:
+Every built-in game shares these routes. The Tetris specific routes below are
+kept for compatibility and add its structured board state.
+
+### List Games
 
 ```text
-POST /api/widgets/local/core.tetris/apply
+GET /api/games
+```
+
+```json
+{
+  "activeGameId": "pacman",
+  "running": true,
+  "games": [
+    {
+      "id": "pacman",
+      "name": "Pac-Man",
+      "summary": "Clear the maze while four ghosts hunt you down.",
+      "widgetId": "core.pacman",
+      "layout": "dpad",
+      "actions": ["up", "down", "left", "right", "pause", "resume", "togglePause", "restart"],
+      "active": true
+    }
+  ]
+}
+```
+
+`layout` tells a controller which pad to render: `dpad`, `horizontal`,
+`vertical`, `tap`, or `tetris`. `actions` is the full set the game accepts.
+
+Put a game on the panel with the normal widget route:
+
+```text
+POST /api/widgets/local/core.pacman/apply
 ```
 
 ### Send Controller Input
 
 ```text
-POST /api/tetris/input
+POST /api/games/{game_id}/input
 ```
 
 ```json
-{
-  "action": "hardDrop"
-}
+{ "action": "left" }
 ```
 
-Actions: `left`, `right`, `softDrop`, `hardDrop`, `rotateCw`, `rotateCcw`,
-`hold`, `pause`, `resume`, `togglePause`, `restart`.
+Actions across the set: `up`, `down`, `left`, `right`, `fire`, `flap`, `drop`,
+`softDrop`, `hardDrop`, `rotateCw`, `rotateCcw`, `hold`, `p2Up`, `p2Down`,
+`pause`, `resume`, `togglePause`, `restart`. A game ignores actions it does not
+declare.
 
 Each command is stamped with an increasing sequence number. The runtime applies
 everything newer than the last sequence it saw on its next frame, so repeated
 presses are never dropped or replayed twice.
 
-### Read Game State
+### Read The Live Frame
 
 ```text
-GET /api/tetris/state
+GET /api/games/{game_id}/state
 ```
 
 ```json
 {
+  "gameId": "pacman",
   "live": true,
   "running": true,
   "active": true,
   "state": {
-    "board": ["..........", "..........", "…"],
-    "active": [[4, 1], [3, 2], [4, 2], [5, 2]],
-    "activeType": "T",
-    "ghost": [[4, 17], [3, 18], [4, 18], [5, 18]],
-    "next": "I",
-    "hold": "L",
-    "holdLocked": false,
-    "score": 2400,
-    "lines": 12,
-    "level": 2,
-    "gameOver": false,
-    "paused": false,
-    "updatedAt": 1754246400.0
+    "game": "pacman",
+    "status": "playing",
+    "hud": { "Score": 1240, "Lives": 3, "Level": 2 },
+    "palette": ["#000000", "#283ebe", "#e8d2aa", "#fadc3c"],
+    "pixels": ["0000000000…", "0111111110…"],
+    "updatedAt": 1754308800.0
   }
 }
 ```
 
-`board` is 20 rows of 10 characters where `.` is empty and a letter is a locked
-piece. `active` and `ghost` are `[x, y]` cell lists for the falling piece and its
-landing preview. `live` is false when no game has published state recently, which
-means nothing is playing right now.
+`pixels` is one string per panel row; each character indexes `palette`, encoded
+base62. That is the whole frame, so one client can mirror any game. `status` is
+`playing`, `paused`, `gameOver` or `won`. `live` is false when nothing has
+published a frame recently, which means no game is running.
+
+Once a game finishes, a fire or drop button starts a new one, but only after a
+short grace period so the final score is readable.
+
+## Tetris APIs
+
+`/api/tetris/input` and `/api/tetris/state` behave as before and additionally
+return the structured board (`board`, `active`, `ghost`, `next`, `hold`).
+
+```text
+POST /api/tetris/input
+GET  /api/tetris/state
+```
 
 ## Command API
 

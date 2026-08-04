@@ -179,33 +179,47 @@ Render local preview frames:
 python spotify_matrix.py --preview-frames data/preview
 ```
 
-## Playing Tetris on the matrix
+## The arcade
 
-The `core.tetris` plugin turns the panel into a playable 10x20 Tetris board with
-next piece, hold, score, lines, and level in the side panel. Open the app, pick
-**Play** in the navigation, and press **Start** to put it on the matrix. The page
-mirrors the board live and drives it with on-screen buttons or the keyboard
-(arrows move, up or `X` rotates, `Z` rotates back, space hard drops, `C` holds,
-`P` pauses, `R` restarts).
+Eight games run on the panel and are played from the app, a phone, or the
+mini-joystick module. Open **Play** in the navigation to see them all, tap one
+to put it on the matrix, and its gamepad opens with a live mirror of the panel.
 
-The web app talks to the API, which hands input to the runtime process through a
-command queue under `data/widgets/state/`. Everything is also reachable directly:
+| Game | Controls | Notes |
+|---|---|---|
+| Tetris | move, rotate, hold, hard drop | next/hold/score panel, ghost piece |
+| Pac-Man | d-pad | full 28x29 maze, four ghosts with scatter/chase/frightened targeting |
+| Snake | d-pad | speeds up as you eat; walls can be turned off to wrap |
+| Breakout | left/right, fire | five brick rows, three lives, faster each level |
+| Space Invaders | left/right, fire | descending waves, bombs, three lives |
+| Flappy | one button | tap to fly, tracks your best |
+| Pong | up/down | versus the computer, or a second phone on the P2 buttons |
+| Connect Four | left/right, drop | hot seat or versus the computer |
+
+Every game shares one contract: the runtime steps it, renders a 64x64 frame, and
+publishes that frame as a palette plus one row string per line. The app decodes
+it onto a canvas, so the mirror shows exactly what the panel shows and adding a
+game needs no new UI. Games live in `matrix_games/`; adding one is a module plus
+a single entry in `matrix_games/__init__.py`.
+
+Controller input reaches the runtime through a sequenced command queue under
+`data/widgets/state/`, so presses are never dropped or replayed twice:
 
 ```bash
-curl -X POST http://<pi-host>:3000/api/tetris/input -H "Content-Type: application/json" -d '{"action":"hardDrop"}'
-curl http://<pi-host>:3000/api/tetris/state
+curl http://<pi-host>:3000/api/games
+curl -X POST http://<pi-host>:3000/api/games/pacman/input -H "Content-Type: application/json" -d '{"action":"left"}'
+curl http://<pi-host>:3000/api/games/pacman/state
 ```
 
-Run the game locally without matrix hardware:
+Run a game locally without matrix hardware:
 
 ```bash
-python spotify_matrix.py --display-mode tetris --mock-output data/frame.png \
-  --tetris-input data/widgets/state/tetris-input.json \
-  --tetris-state data/widgets/state/tetris-state.json
+python spotify_matrix.py --display-mode pacman --mock-output data/frame.png   --game-input data/widgets/state/pacman-input.json   --game-state data/widgets/state/pacman-state.json
 ```
 
-Settings live under the plugin's config: starting level, landing preview (ghost
-piece), and an optional auto-restart delay after a game over.
+Each game is also a plugin, so difficulty and rules are editable from its config
+drawer: Pac-Man speed and lives, Snake walls, Breakout paddle width, Pong
+opponent, and so on.
 
 ## Legacy env support
 

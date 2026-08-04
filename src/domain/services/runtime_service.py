@@ -10,7 +10,7 @@ from pathlib import Path
 from configs import base_config
 from src.domain.models.api_schemas import RuntimeExit, RuntimeState
 from src.domain.services.config_service import config_service
-from src.domain.services.tetris_service import tetris_service
+from src.domain.services.game_service import game_service
 
 
 class RuntimeService:
@@ -185,14 +185,20 @@ class RuntimeService:
                 str(config.tetris.startLevel),
                 "--tetris-auto-restart-seconds",
                 str(config.tetris.autoRestartSeconds),
-                "--tetris-input",
-                str(tetris_service.input_path),
-                "--tetris-state",
-                str(tetris_service.state_path),
             ]
         )
         if not config.tetris.ghost:
             args.append("--tetris-no-ghost")
+        active_game = game_service.active_game_id()
+        if active_game:
+            args.extend(
+                [
+                    "--game-input",
+                    str(game_service.input_path(active_game)),
+                    "--game-state",
+                    str(game_service.state_path(active_game)),
+                ]
+            )
         args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background, "--image-rotate", str(config.image.rotate)])
         if config.image.assetPath:
             asset_file = config_service.data_dir / "widgets" / "assets" / config.image.assetPath

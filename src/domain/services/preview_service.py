@@ -9,7 +9,9 @@ from typing import Any
 
 import spotify_matrix as runtime
 from src.domain.services.config_service import config_service
-from src.domain.services.tetris_service import tetris_service
+from src.utils.frame_codec import decode_frame
+from matrix_games import GAMES, demo_game
+from src.domain.services.game_service import game_service
 
 SIZE = 64
 
@@ -52,8 +54,8 @@ class PreviewService:
             return runtime.render_clock(SIZE, datetime.now(), cfg.get("face", "analog"), bool(cfg.get("use24Hour", False)), bool(cfg.get("showSeconds", False)))
         if widget_id == "core.agent":
             return runtime.render_agent_face(SIZE, 0, cfg.get("faceStyle", "classic"), cfg.get("animationSpeed", "normal"))
-        if widget_id == "core.tetris":
-            return runtime.render_tetris_frame(SIZE, self._tetris_snapshot())
+        if widget_id.startswith("core.") and widget_id[5:] in GAMES:
+            return self._game_frame(widget_id[5:])
         if widget_id == "core.testPattern":
             return runtime.render_test_pattern(SIZE, 0)
         if widget_id == "core.spotify":
@@ -77,12 +79,12 @@ class PreviewService:
             )
         raise ValueError(f"Preview is not available for {widget_id}.")
 
-    def _tetris_snapshot(self) -> dict[str, Any]:
-        # Mirror the real board while a game is running, otherwise show a demo board.
-        state = tetris_service.read_state()
-        if tetris_service.is_live(state) and state is not None:
-            return state.model_dump()
-        return runtime.tetris_demo_snapshot()
+    def _game_frame(self, game_id: str):
+        # Mirror the real panel while a game is running, otherwise pose a demo board.
+        state = game_service.read_state(game_id)
+        if game_service.is_live(state) and state is not None and state.pixels:
+            return decode_frame(state.palette, state.pixels, SIZE)
+        return demo_game(game_id).render(SIZE)
 
 
 preview_service = PreviewService()
