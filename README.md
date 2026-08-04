@@ -278,3 +278,27 @@ SPOTIFY_REDIRECT_URI=http://127.0.0.1:8888/callback
 ```
 
 Direct auth through `spotify_matrix.py --auth-only` still works for local loopback redirects, but the FastAPI setup UI plus laptop helper is the recommended no-port-forwarding path.
+
+### Bluetooth speakers
+
+BlueZ holds the A2DP connection, but ALSA cannot see it without a bridge, so a
+paired speaker is connected and silent until one is running. The container
+installs `bluez-alsa-utils` and tries to start the daemon itself, and on most
+setups that is all it takes.
+
+It can fail with:
+
+    Couldn't get BlueALSA PCM: The name org.bluealsa was not provided by any .service files
+
+That is a D-Bus policy boundary rather than a missing package. Owning the name
+`org.bluealsa` requires the policy in `/etc/dbus-1/system.d/bluealsa.conf`, and
+the bus enforcing it is the Pi's, reached through the mapped socket - so it
+reads the Pi's policy directory and never sees the copy inside the container.
+Install the bridge on the Pi itself and it gets both the daemon and the policy
+in the place the bus looks:
+
+    sudo apt install bluez-alsa-utils
+    sudo systemctl enable --now bluealsa
+
+The container's ALSA plugin then talks to that daemon over the same socket, and
+the speaker appears in Settings under Game sound.

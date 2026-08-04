@@ -544,6 +544,15 @@ class AudioDevice(BaseModel):
     plumbing: bool = False
 
 
+class AudioBridge(BaseModel):
+    """State of the Bluetooth-to-ALSA daemon, so the panel can explain itself."""
+
+    installed: bool = False
+    running: bool = False
+    error: str = ""
+    binary: str = ""
+
+
 class AudioStateResponse(BaseModel):
     enabled: bool
     available: bool
@@ -552,6 +561,7 @@ class AudioStateResponse(BaseModel):
     devices: list[AudioDevice] = Field(default_factory=list)
     sounds: list[str] = Field(default_factory=list)
     advice: str = ""
+    bridge: AudioBridge = Field(default_factory=AudioBridge)
 
 
 class AudioConfigRequest(BaseModel):

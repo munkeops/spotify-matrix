@@ -533,3 +533,54 @@ def test_the_test_button_admits_when_nothing_came_out(monkeypatch):
 
     assert result["ok"] is False
     assert "Channels count non available" in result["message"]
+
+
+def test_the_bridge_state_reaches_the_panel():
+    """Same shape of bug as the missing device labels: a field the service
+    returns but the response model does not name is dropped in transit."""
+    from src.domain.models.api_schemas import AudioStateResponse
+
+    assert "bridge" in AudioStateResponse.model_fields
+
+    payload = AudioStateResponse(
+        enabled=True, available=True, bridge={"installed": True, "running": False, "error": "nope"}
+    ).model_dump()
+
+    assert payload["bridge"]["running"] is False
+    assert payload["bridge"]["error"] == "nope"
+
+
+def test_a_bluetooth_output_is_not_offered_while_the_bridge_is_down(monkeypatch):
+    """ALSA lists the bluealsa PCM whenever the plugin is installed, daemon
+    or no daemon, so selecting it failed with "No such device"."""
+    from matrix_audio import bluealsa
+    from src.domain.services import audio_service as module
+
+    monkeypatch.setattr(
+        module, "list_output_devices", lambda: [
+            {"name": "bluealsa", "kind": "bluetooth", "label": "Bluetooth speaker", "description": "", "plumbing": False},
+            {"name": "default", "kind": "default", "label": "System default", "description": "", "plumbing": False},
+        ]
+    )
+
+    monkeypatch.setattr(bluealsa, "running", lambda: False)
+    kinds = [d["kind"] for d in module.audio_service.devices()]
+    assert "bluetooth" not in kinds
+
+    monkeypatch.setattr(bluealsa, "running", lambda: True)
+    kinds = [d["kind"] for d in module.audio_service.devices()]
+    assert "bluetooth" in kinds
+
+
+def test_the_daemon_is_found_under_either_debian_name(monkeypatch):
+    """Debian shipped it as `bluealsa` up to 3.x and `bluealsad` from 4.x."""
+    from matrix_audio import bluealsa
+
+    monkeypatch.setattr(bluealsa.shutil, "which", lambda n: "/usr/bin/bluealsad" if n == "bluealsad" else None)
+    assert bluealsa.installed() and bluealsa.binary().endswith("bluealsad")
+
+    monkeypatch.setattr(bluealsa.shutil, "which", lambda n: "/usr/bin/bluealsa" if n == "bluealsa" else None)
+    assert bluealsa.installed() and bluealsa.binary().endswith("bluealsa")
+
+    monkeypatch.setattr(bluealsa.shutil, "which", lambda n: None)
+    assert not bluealsa.installed()

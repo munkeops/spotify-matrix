@@ -329,6 +329,13 @@ export interface AudioDevice {
   plumbing: boolean;
 }
 
+export interface AudioBridge {
+  installed: boolean;
+  running: boolean;
+  error: string;
+  binary: string;
+}
+
 export interface AudioState {
   enabled: boolean;
   available: boolean;
@@ -337,6 +344,8 @@ export interface AudioState {
   devices: AudioDevice[];
   sounds: string[];
   advice: string;
+  /** The Bluetooth-to-ALSA daemon; without it a speaker cannot be an output. */
+  bridge?: AudioBridge;
 }
 
 export const getAudio = () => apiGet<AudioState>("/api/audio");

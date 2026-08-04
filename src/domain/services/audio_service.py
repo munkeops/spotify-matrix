@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from matrix_audio import AudioEngine, aplay_available, list_output_devices
+from matrix_audio import AudioEngine, aplay_available, bluealsa, list_output_devices
 from matrix_audio.output import BLUETOOTH
 
 
@@ -25,7 +25,17 @@ class AudioService:
         return config_service.get_config().audio
 
     def devices(self) -> list[dict[str, Any]]:
-        return list_output_devices()
+        """Outputs that could actually play something.
+
+        The bluealsa PCM is listed by ALSA whenever the plugin is installed,
+        whether or not the daemon behind it is up. Offering it while the
+        daemon is down is offering a choice that can only fail, which is
+        exactly what it did.
+        """
+        devices = list_output_devices()
+        if bluealsa.running():
+            return devices
+        return [device for device in devices if device["kind"] != BLUETOOTH]
 
     def _test_spec(self):
         """The game whose effects the panel offers, and the test plays.
@@ -64,6 +74,7 @@ class AudioService:
             "devices": devices,
             "sounds": self.sounds(),
             "advice": self._advice(devices),
+            "bridge": bluealsa.status(),
         }
 
     def _bluetooth_audio(self) -> list[dict[str, Any]]:
@@ -94,10 +105,17 @@ class AudioService:
         speakers = self._bluetooth_audio()
         if speakers and not any(device["kind"] == BLUETOOTH for device in devices):
             names = ", ".join(device.get("name") or device.get("mac", "?") for device in speakers)
+            if not bluealsa.installed():
+                return (
+                    f"{names} is connected over Bluetooth but is not an audio output yet. "
+                    "Bluetooth audio reaches ALSA through bluealsa, which this image now "
+                    "installs - rebuild the container and it will appear in this list."
+                )
+            if not bluealsa.running():
+                return f"{names} is connected, but the bluealsa bridge is not running. {bluealsa.status()['error'] or bluealsa.DBUS_ADVICE}"
             return (
-                f"{names} is connected over Bluetooth but is not an audio output yet. "
-                "Bluetooth audio reaches ALSA through bluealsa, which this image now "
-                "installs - rebuild the container and it will appear in this list."
+                f"{names} is connected and the bridge is up, but ALSA is not offering it "
+                "as an output yet. Reconnect the speaker and refresh."
             )
         if not self.settings().enabled:
             return "Turn on game sound to hear effects. Use Test to check the output first."

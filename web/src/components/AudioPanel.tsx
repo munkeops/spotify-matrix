@@ -86,6 +86,9 @@ export default function AudioPanel() {
           <Alert severity={state.available ? (state.enabled ? "success" : "info") : "warning"}>
             {state.advice}
           </Alert>
+          {state.bridge?.installed && !state.bridge.running ? (
+            <Alert severity="warning">{state.bridge.error || "The Bluetooth audio bridge is not running."}</Alert>
+          ) : null}
 
           <FormControlLabel
             control={<Switch checked={state.enabled} disabled={busy} onChange={(e) => update({ enabled: e.target.checked })} />}
