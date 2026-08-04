@@ -95,6 +95,17 @@ SOUNDS: dict[str, dict[str, object]] = {
         "drop": lambda: sweep(700, 260, 0.14, wave_shape="triangle"),
         "win": lambda: sequence(blip(523, 0.09), blip(659, 0.09), blip(784, 0.09), blip(1046, 0.22)),
     },
+    "core.tron": {
+        "turn": lambda: blip(520, 0.025, volume=0.4),
+        "crash": lambda: sequence(noise(0.16, 0.9), sweep(300, 70, 0.3, wave_shape="triangle")),
+        "win": lambda: sequence(blip(660, 0.07), blip(880, 0.07), blip(1175, 0.16)),
+    },
+    "core.roadrash": {
+        "swing": lambda: sweep(700, 300, 0.07, wave_shape="noise", volume=0.6),
+        "knockdown": lambda: sequence(noise(0.12, 0.9), sweep(260, 80, 0.24, wave_shape="triangle")),
+        "crash": lambda: sequence(noise(0.24, 1.0), sweep(340, 60, 0.36, wave_shape="triangle")),
+        "win": lambda: sequence(blip(523, 0.09), blip(659, 0.09), blip(880, 0.09), blip(1046, 0.22)),
+    },
     "core.battleship": {
         "move": lambda: blip(300, 0.03, volume=0.4),
         "miss": lambda: sequence(noise(0.14, 0.45), blip(180, 0.07, wave_shape="triangle", volume=0.5)),

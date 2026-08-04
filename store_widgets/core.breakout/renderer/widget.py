@@ -70,12 +70,12 @@ class BreakoutGame(GameWidget):
         self.level = 1
         self._build_level()
 
-    def layout(self) -> tuple[str, ...]:
-        """The pattern for this level, cycling once they run out."""
+    def level_pattern(self) -> tuple[str, ...]:
+        """The brick pattern for this level, cycling once they run out."""
         return LEVELS[(self.level - 1) % len(LEVELS)]
 
     def _build_level(self) -> None:
-        rows = self.layout()
+        rows = self.level_pattern()
         # 0 is empty, 1 needs one hit, 2 needs two.
         self.bricks = [
             [2 if cell == chr(61) else 1 if cell == chr(35) else 0 for cell in rows[row]]

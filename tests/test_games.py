@@ -1150,9 +1150,9 @@ def test_breakout_levels_cycle_rather_than_running_out():
     breakout = mg.plugin_module("breakout")
     game = mg.create_game("breakout", {}, seed=1)
     game.level = 1
-    first = game.layout()
+    first = game.level_pattern()
     game.level = len(breakout.LEVELS) + 1
-    assert game.layout() == first
+    assert game.level_pattern() == first
 
 
 def test_a_tough_brick_takes_two_hits():
@@ -1188,3 +1188,106 @@ def test_clearing_a_wall_advances_and_rebuilds():
 
     assert game.level == 2
     assert any(any(row) for row in game.bricks), "the next wall is built"
+
+
+@pytest.mark.parametrize("game_id", ALL_GAMES)
+def test_layout_is_a_control_pad_not_a_method(game_id):
+    """`layout` names the pad the app draws; a game must not reuse the name.
+
+    Breakout once added a `layout()` for its brick pattern, which silently
+    replaced the pad name and broke manifest generation.
+    """
+    layout = mg.game_class(game_id).layout
+    assert isinstance(layout, str), f"{game_id}.layout must stay a string"
+    assert layout in mg.GAME_LAYOUTS, f"{game_id} uses unknown layout {layout!r}"
+
+
+def test_tron_cycles_do_not_start_on_a_collision_course():
+    game = mg.create_game("tron", {}, seed=1)
+    # Opposed headings are fine apart; sharing a lane makes a head-on certain.
+    assert game.player[0] != game.rival[0] and game.player[1] != game.rival[1]
+
+    # Straight ahead, well clear of any wall: the only thing that could end
+    # the round this early is running into the rival.
+    for _ in range(15):
+        game.advance(1.0 / game.speed())
+    assert not game.round_over, "the round survives the opening second"
+
+
+def test_tron_trail_is_fatal():
+    game = mg.create_game("tron", {}, seed=1)
+    ahead = (game.player[0] + game.player_dir[0], game.player[1] + game.player_dir[1])
+    game.grid[ahead[1]][ahead[0]] = mg.game_class("tron").__module__ and 1  # any trail
+
+    game._step()
+
+    assert game.round_over
+    assert game.rival_wins == 1
+
+
+def test_tron_will_not_reverse_into_itself():
+    game = mg.create_game("tron", {}, seed=1)
+    behind = (-game.player_dir[0], -game.player_dir[1])
+    reverse = next(name for name, step in _tron_directions().items() if step == behind)
+
+    game.handle(reverse)
+
+    assert game.pending is None
+
+
+def _tron_directions():
+    return importlib.import_module(mg.game_class("tron").__module__).DIRECTIONS
+
+
+def test_tron_best_of_ends_the_match():
+    game = mg.create_game("tron", {"rounds": 2}, seed=1)
+    game.player_wins = 2
+    game._end_round(player_dead=False, rival_dead=True)
+    game.advance(2.0)
+    assert game.won
+
+
+def test_roadrash_swing_only_reaches_a_rival_alongside_you():
+    game = mg.create_game("roadrash", {}, seed=1)
+    rival = game.rivals[0]
+    rival.distance, rival.offset, game.offset = 40.0, 0.0, 0.0
+
+    game.handle("fire")
+    assert not rival.down, "out of reach up the road"
+
+    rival.distance = 2.0
+    game.handle("fire")
+    assert rival.down and game.knockdowns == 1
+
+
+def test_roadrash_combat_can_be_switched_off():
+    game = mg.create_game("roadrash", {"combat": False}, seed=1)
+    rival = game.rivals[0]
+    rival.distance, rival.offset, game.offset = 1.0, 0.0, 0.0
+    game.handle("fire")
+    assert not rival.down
+
+
+def test_roadrash_is_won_by_placing_first_not_by_finishing():
+    game = mg.create_game("roadrash", {"distance": 400, "rivals": 2}, seed=1)
+    game.position, game.speed_now = 399.0, 60.0
+    game.advance(0.5)
+    assert game.game_over and not game.won, "the pack was still up the road"
+    assert game.place == 3
+
+    game = mg.create_game("roadrash", {"distance": 400, "rivals": 2}, seed=1)
+    for rival in game.rivals:
+        rival.distance = -20.0
+    game.position, game.speed_now = 399.0, 60.0
+    game.advance(0.5)
+    assert game.won and game.place == 1 and game.status() == "won"
+
+
+def test_roadrash_leaving_the_road_costs_you():
+    game = mg.create_game("roadrash", {}, seed=1)
+    game.speed_now = 50.0
+    game.offset = 1.3
+    before = game.speed_now
+    for _ in range(20):
+        game.advance(0.05)
+    assert game.speed_now < before, "the verge slows you down"
