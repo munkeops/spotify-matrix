@@ -189,6 +189,7 @@ class BluetoothStatusResponse(BaseModel):
     powered: bool = False
     adapter: str = ""
     blocked: bool = False
+    powerState: str = ""
     advice: str = ""
 
 

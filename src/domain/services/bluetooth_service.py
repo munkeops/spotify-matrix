@@ -96,6 +96,8 @@ class BluetoothService:
         ok, output = self._run(["show"])
         powered = "Powered: yes" in output
         name_match = re.search(r"Name:\s*(.+)", output)
+        state_match = re.search(r"PowerState:\s*(\S+)", output)
+        power_state = state_match.group(1).strip() if state_match else ("on" if powered else "off")
         no_adapter = "No default controller" in output
         blocked = self.blocked()
         return {
@@ -103,10 +105,17 @@ class BluetoothService:
             "powered": powered,
             "adapter": name_match.group(1).strip() if name_match else "",
             "blocked": blocked,
-            "advice": self._advice(no_adapter, blocked, powered),
+            "powerState": power_state,
+            "advice": self._advice(no_adapter, blocked, powered, power_state),
         }
 
-    def _advice(self, no_adapter: bool, blocked: bool, powered: bool) -> str:
+    def _advice(self, no_adapter: bool, blocked: bool, powered: bool, power_state: str = "") -> str:
+        # "off-enabling" is the adapter coming up, typically right after an
+        # rfkill unblock. Saying "it is off" there would send you round again.
+        if power_state.endswith("-enabling"):
+            return "The adapter is powering on. Give it a second and this will clear."
+        if power_state.endswith("-disabling"):
+            return "The adapter is powering off."
         if no_adapter:
             return (
                 "No Bluetooth adapter is visible. Check the bluetooth service is running "

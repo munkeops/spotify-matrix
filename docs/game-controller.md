@@ -34,6 +34,29 @@ Common lines and what they mean:
 | `Failed to connect: ... br-connection-profile-unavailable` | Paired, but nothing on the host can use it — for a speaker that means no A2DP sink |
 | `Failed to add UUID` / `Failed to set privacy` | Harmless startup noise |
 
+### Powered: no, PowerState: off-enabling
+
+The adapter was blocked and is coming back up. Unblocking is not instant, so
+give it a second:
+
+```bash
+sudo rfkill unblock bluetooth
+bluetoothctl power on
+bluetoothctl show | grep -E "Powered|PowerState"     # want: yes / on
+```
+
+An adapter blocked at boot stays blocked, and a scan then finds nothing with no
+obvious reason, so make it stick:
+
+```bash
+systemctl is-enabled systemd-rfkill.service          # want: enabled
+sudo systemctl enable --now systemd-rfkill.service
+```
+
+systemd remembers the unblocked state in `/var/lib/systemd/rfkill/` and restores
+it on boot. If it still comes back blocked, something is re-blocking it — check
+for a `bluetooth` line in `/etc/rc.local` or a conflicting service.
+
 Nothing needs enabling in `config.txt` and no reboot is required — unlike I2C,
 Bluetooth is on by default on a Pi with onboard radio. If `bluetoothctl show`
 says "No default controller", the daemon is down or the adapter is blocked.
