@@ -167,7 +167,8 @@ export interface BtDevice {
   trusted: boolean;
   icon: string;
 }
-export const btStatus = () => apiGet<{ available: boolean; powered: boolean; adapter: string }>("/api/bluetooth/status");
+export const btStatus = () =>
+  apiGet<{ available: boolean; powered: boolean; adapter: string; blocked: boolean; advice: string }>("/api/bluetooth/status");
 export const btDevices = () => apiGet<{ available: boolean; devices: BtDevice[] }>("/api/bluetooth/devices");
 export const btScan = (seconds = 8) => apiPost<{ available: boolean; devices: BtDevice[] }>("/api/bluetooth/scan", { seconds });
 export const btConnect = (mac: string) => apiPost("/api/bluetooth/connect", { mac });

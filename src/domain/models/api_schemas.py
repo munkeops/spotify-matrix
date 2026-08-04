@@ -188,6 +188,8 @@ class BluetoothStatusResponse(BaseModel):
     available: bool
     powered: bool = False
     adapter: str = ""
+    blocked: bool = False
+    advice: str = ""
 
 
 class BluetoothDevicesResponse(BaseModel):

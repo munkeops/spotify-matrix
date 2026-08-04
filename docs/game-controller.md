@@ -5,6 +5,30 @@ the matrix games. BlueZ pairs it, the kernel exposes it as an input device, and
 Assistant Matrix reads it and feeds the same command queue the on-screen pad
 and the mini-joystick use.
 
+## Before you scan
+
+Pairing needs three things on the Pi. The Bluetooth panel checks all of them and
+says which one is missing.
+
+```bash
+sudo systemctl status bluetooth     # the daemon must be running
+rfkill list bluetooth               # "Soft blocked: yes" means it is disabled
+sudo rfkill unblock bluetooth       # ...so unblock it
+bluetoothctl show                   # expect a controller, and Powered: yes
+```
+
+Nothing needs enabling in `config.txt` and no reboot is required — unlike I2C,
+Bluetooth is on by default on a Pi with onboard radio. If `bluetoothctl show`
+says "No default controller", the daemon is down or the adapter is blocked.
+
+**The device has to be advertising.** Nothing appears in a scan unless the
+controller or speaker is actively in pairing mode, and most only advertise for
+a minute or two before giving up. Put it in pairing mode, *then* press Scan.
+
+Scanning is not passive: the app runs a timed discovery when you press Scan and
+lists what answered. Devices that were not advertising during that window will
+not be there, so re-arm the device and scan again.
+
 ## Pairing
 
 1. Put the controller in pairing mode.

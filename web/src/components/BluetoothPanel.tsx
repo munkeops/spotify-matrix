@@ -7,6 +7,8 @@ export default function BluetoothPanel() {
   const [available, setAvailable] = useState(true);
   const [adapter, setAdapter] = useState("");
   const [powered, setPowered] = useState(false);
+  const [advice, setAdvice] = useState("");
+  const [blocked, setBlocked] = useState(false);
   const [devices, setDevices] = useState<BtDevice[]>([]);
   const [scanning, setScanning] = useState(false);
   const [busy, setBusy] = useState("");
@@ -18,6 +20,8 @@ export default function BluetoothPanel() {
       setAvailable(s.available);
       setAdapter(s.adapter);
       setPowered(s.powered);
+      setAdvice(s.advice || "");
+      setBlocked(Boolean(s.blocked));
       setDevices(d.devices || []);
     } catch (e) {
       setError((e as Error).message);
@@ -59,7 +63,7 @@ export default function BluetoothPanel() {
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
           <Stack direction="row" spacing={1} alignItems="center">
             <BluetoothRoundedIcon color="primary" />
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Bluetooth Audio</Typography>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Bluetooth</Typography>
           </Stack>
           <Button size="small" variant="outlined" onClick={scan} disabled={!available || scanning}>
             {scanning ? "Scanning…" : "Scan"}
@@ -68,9 +72,13 @@ export default function BluetoothPanel() {
 
         {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
 
-        {!available ? (
-          <Typography variant="body2" color="text.secondary">Bluetooth is not available on this device.</Typography>
-        ) : (
+        {advice ? (
+          <Alert severity={!available || blocked ? "warning" : powered ? "info" : "warning"} sx={{ mb: 1 }}>
+            {advice}
+          </Alert>
+        ) : null}
+
+        {!available ? null : (
           <>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Adapter {adapter || "ready"} · power {powered ? "on" : "off"}
@@ -78,7 +86,7 @@ export default function BluetoothPanel() {
             <Stack spacing={1}>
               {sorted.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
-                  No devices yet. Put your speaker in pairing mode and tap Scan.
+                  No devices yet. Put the device in pairing mode first, then tap Scan.
                 </Typography>
               ) : null}
               {sorted.map((device) => (

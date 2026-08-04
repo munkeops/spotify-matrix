@@ -46,13 +46,56 @@ class BluetoothService:
             raise ValueError("Invalid Bluetooth address.")
         return candidate
 
+    def blocked(self) -> bool:
+        """True when rfkill has Bluetooth soft or hard blocked."""
+        binary = shutil.which("rfkill")
+        if binary is None:
+            return False
+        try:
+            result = subprocess.run([binary, "list", "bluetooth"], capture_output=True, text=True, timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return "blocked: yes" in (result.stdout or "").lower()
+
     def status(self) -> dict[str, Any]:
         if not self.available():
-            return {"available": False, "powered": False, "adapter": ""}
+            return {
+                "available": False,
+                "powered": False,
+                "adapter": "",
+                "blocked": False,
+                "advice": (
+                    "bluetoothctl is not present. On the Pi install it with 'sudo apt install bluez'; "
+                    "in Docker rebuild the image."
+                ),
+            }
         ok, output = self._run(["show"])
         powered = "Powered: yes" in output
         name_match = re.search(r"Name:\s*(.+)", output)
-        return {"available": True, "powered": powered, "adapter": name_match.group(1).strip() if name_match else ""}
+        no_adapter = "No default controller" in output
+        blocked = self.blocked()
+        return {
+            "available": True,
+            "powered": powered,
+            "adapter": name_match.group(1).strip() if name_match else "",
+            "blocked": blocked,
+            "advice": self._advice(no_adapter, blocked, powered),
+        }
+
+    def _advice(self, no_adapter: bool, blocked: bool, powered: bool) -> str:
+        if no_adapter:
+            return (
+                "No Bluetooth adapter is visible. Check the bluetooth service is running "
+                "('sudo systemctl status bluetooth'), and that the container can reach the host D-Bus socket."
+            )
+        if blocked:
+            return "Bluetooth is blocked by rfkill. Unblock it with 'sudo rfkill unblock bluetooth'."
+        if not powered:
+            return "The adapter is off. Turn it on above, or run 'bluetoothctl power on'."
+        return (
+            "Ready. Put the device into pairing mode first - most controllers and speakers only "
+            "advertise for a minute or two - then press Scan."
+        )
 
     def set_power(self, on: bool) -> tuple[bool, str]:
         return self._run(["power", "on" if on else "off"])
