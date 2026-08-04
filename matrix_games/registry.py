@@ -109,21 +109,39 @@ def _spec_from_manifest(package_dir: Path, *, bundled: bool) -> GameSpec | None:
 
 
 # Scanning means a readdir plus a TOML parse per package, and discover() sits on
-# the controller path, which runs at up to 60Hz. Cache it, but keep the window
-# short so an installed plugin still shows up promptly.
-CACHE_SECONDS = 2.0
+# the controller path at up to 60Hz. Two tiers: inside TRUST_SECONDS the cache
+# is returned without touching the disk at all, and after that a cheap
+# fingerprint decides whether a rescan is needed. A change is therefore noticed
+# within a quarter second while the hot path stays close to free.
+TRUST_SECONDS = 0.25
+CACHE_SECONDS = TRUST_SECONDS
 _cache: dict[tuple[str, str], tuple[float, tuple, dict[str, GameSpec]]] = {}
 _cache_lock = threading.Lock()
 
 
 def _roots_fingerprint(roots: list[tuple[Path, bool]]) -> tuple:
-    """Cheap signal that a package was added or removed."""
-    marks = []
+    """A signal that any package was added, removed or edited.
+
+    The root's own mtime is not enough: a directory timestamp only moves as far
+    as the clock's tick, so a package installed in the same tick as the last
+    scan would go unnoticed. Listing the package directories and stating each
+    one costs a readdir and a handful of stats, which is still far cheaper than
+    parsing every manifest.
+    """
+    marks: list[tuple] = []
     for root, _ in roots:
         try:
-            marks.append((str(root), root.stat().st_mtime_ns))
+            entries = sorted(entry.name for entry in root.iterdir() if entry.is_dir())
         except OSError:
-            marks.append((str(root), 0))
+            marks.append((str(root), ()))
+            continue
+        stamped = []
+        for name in entries:
+            try:
+                stamped.append((name, (root / name / "widget.toml").stat().st_mtime_ns))
+            except OSError:
+                stamped.append((name, 0))
+        marks.append((str(root), tuple(stamped)))
     return tuple(marks)
 
 
@@ -146,14 +164,19 @@ def discover(installed_dir: Path | None = None) -> dict[str, GameSpec]:
         roots.append((installed_dir, False))
 
     key = (str(BUNDLED_DIR), str(installed_dir or ""))
-    fingerprint = _roots_fingerprint(roots)
     now = time.monotonic()
     with _cache_lock:
         cached = _cache.get(key)
-        if cached is not None:
-            stamped, marks, specs = cached
-            if marks == fingerprint and (now - stamped) < CACHE_SECONDS:
-                return specs
+        if cached is not None and (now - cached[0]) < TRUST_SECONDS:
+            return cached[2]
+
+    # Past the trust window: check whether anything actually changed.
+    fingerprint = _roots_fingerprint(roots)
+    with _cache_lock:
+        cached = _cache.get(key)
+        if cached is not None and cached[1] == fingerprint:
+            _cache[key] = (now, fingerprint, cached[2])
+            return cached[2]
 
     specs = _scan(roots)
     with _cache_lock:

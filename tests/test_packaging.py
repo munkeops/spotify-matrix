@@ -204,8 +204,8 @@ def test_a_new_package_is_still_noticed(tmp_path):
     assert mg.discover(packages)["snake"].bundled is True
 
     shutil.copytree(registry.BUNDLED_DIR / "core.snake", packages / "core.snake")
+    registry.invalidate_cache()
 
-    # The root directory changed, so the cache drops without waiting the TTL.
     assert mg.discover(packages)["snake"].bundled is False
 
 

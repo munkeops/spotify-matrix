@@ -15,6 +15,7 @@ import hashlib
 from pathlib import Path
 
 from src.domain.models.widget_schemas import StoreWidget, WidgetStoreIndex
+from matrix_games.registry import invalidate_cache
 from src.domain.services.config_service import config_service
 from src.domain.services.display_policy_service import display_policy_service
 from src.domain.services.widget_registry_service import widget_registry_service
@@ -39,6 +40,7 @@ class WidgetStoreService:
 
     def install_widget(self, widget_id: str) -> StoreWidget:
         widget = self.get_widget(widget_id)
+        invalidate_cache()
         if widget is None:
             raise ValueError(f"Unknown store widget {widget_id}.")
         installed = self.read_installed_widgets()
@@ -52,6 +54,7 @@ class WidgetStoreService:
 
     def uninstall_widget(self, widget_id: str) -> None:
         installed = self.read_installed_widgets()
+        invalidate_cache()
         if widget_id not in {widget.id for widget in installed}:
             raise ValueError(f"Widget {widget_id} is not installed.")
 

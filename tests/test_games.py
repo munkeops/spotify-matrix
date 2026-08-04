@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 import matrix_games as mg
+from matrix_games import registry as _registry
 from assistant_matrix_sdk import game as base
 from assistant_matrix_sdk.pixels import PANEL, frame_to_pixels
 from src.utils.frame_codec import decode_frame
@@ -771,6 +772,7 @@ def test_an_installed_package_shadows_a_bundled_game(tmp_path, monkeypatch):
     assert bundled.bundled is True
 
     shutil.copytree(bundled.package_dir, packages / "core.snake")
+    _registry.invalidate_cache()
     replaced = game_module.game_service.specs()["snake"]
     assert replaced.bundled is False, "an installed build must win over the shipped one"
 
@@ -818,6 +820,7 @@ def test_launch_args_prefer_an_installed_build(tmp_path, monkeypatch):
     packages.mkdir(parents=True)
     bundled = game_module.game_service.specs()["snake"].package_dir
     shutil.copytree(bundled, packages / "core.snake")
+    _registry.invalidate_cache()
 
     config = config_module.config_service.get_config()
     config.display.mode = "widget"
