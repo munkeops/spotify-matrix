@@ -474,13 +474,9 @@ class WidgetRegistryService:
 
     def _widget_package_dir(self, widget_id: str):
         """Installed packages win, so a Store build can replace a shipped game."""
-        installed = config_service.data_dir / "widgets" / "packages" / _safe_widget_id(widget_id)
-        if (installed / "widget.toml").exists():
-            return installed
-        for spec in discover(config_service.data_dir / "widgets" / "packages").values():
-            if spec.widget_id == widget_id:
-                return spec.package_dir
-        return installed
+        from src.domain.services.game_service import game_service
+
+        return game_service.widget_package_dir(_safe_widget_id(widget_id))
 
     def _widget_config_path(self, widget_id: str):
         return config_service.data_dir / "widgets" / "config" / f"{_safe_widget_id(widget_id)}.json"

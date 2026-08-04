@@ -62,16 +62,23 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _start_joystick() -> None:
-        from src.domain.services.joystick_service import joystick_service
+        # An optional peripheral must never stop the service from booting.
+        try:
+            from src.domain.services.joystick_service import joystick_service
 
-        if joystick_service.enabled():
-            joystick_service.start()
+            if joystick_service.enabled():
+                joystick_service.start()
+        except Exception:
+            logger.exception("[spotify-matrix] joystick startup failed, continuing without it")
 
     @app.on_event("shutdown")
     async def _stop_joystick() -> None:
-        from src.domain.services.joystick_service import joystick_service
+        try:
+            from src.domain.services.joystick_service import joystick_service
 
-        joystick_service.stop()
+            joystick_service.stop()
+        except Exception:
+            logger.exception("[spotify-matrix] joystick shutdown failed")
 
     @app.get("/healthz", response_model=SuccessResponse)
     async def healthz() -> dict[str, object]:

@@ -202,7 +202,7 @@ class RuntimeService:
                     "--widget-id",
                     widget_id,
                     "--widget-dir",
-                    str(config_service.data_dir / "widgets" / "packages" / widget_id),
+                    str(game_service.widget_package_dir(widget_id)),
                     "--widget-config",
                     str(config_service.data_dir / "widgets" / "config" / f"{widget_id}.json"),
                 ]

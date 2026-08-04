@@ -80,3 +80,77 @@ def test_pyproject_lists_every_shipped_package():
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     for package in ("src", "assistant_matrix_sdk", "matrix_games", "mini_joystick"):
         assert f'include = "{package}"' in pyproject, f"pyproject packages must list {package}"
+
+
+# --- config migration ----------------------------------------------------
+
+
+def test_a_config_naming_an_old_game_mode_still_boots(tmp_path, monkeypatch):
+    """Games used to be display modes; an existing config must not brick the app."""
+    import importlib
+    import json
+    import sys
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "config.json").write_text(
+        json.dumps(
+            {
+                "display": {"mode": "tetris", "widgetId": ""},
+                "spotify": {"clientId": "abc", "clientSecret": "shh"},
+                "tetris": {"startLevel": 4},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("SPOTIFY_MATRIX_DATA_DIR", str(data_dir))
+    sys.modules.pop("src.domain.services.config_service", None)
+    module = importlib.import_module("src.domain.services.config_service")
+
+    config = module.config_service.get_config()
+
+    assert config.display.mode == "widget"
+    assert config.display.widgetId == "core.tetris"
+    # Unrelated settings survive the migration.
+    assert config.spotify.clientId == "abc"
+    assert config.spotify.clientSecret == "shh"
+
+    # And it is written back, so the next read needs no migration.
+    saved = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
+    assert saved["display"]["mode"] == "widget"
+    assert saved["display"]["widgetId"] == "core.tetris"
+
+
+def test_an_unknown_display_mode_falls_back_instead_of_crashing(tmp_path, monkeypatch):
+    import importlib
+    import json
+    import sys
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    (data_dir / "config.json").write_text(json.dumps({"display": {"mode": "hologram"}}), encoding="utf-8")
+
+    monkeypatch.setenv("SPOTIFY_MATRIX_DATA_DIR", str(data_dir))
+    sys.modules.pop("src.domain.services.config_service", None)
+    module = importlib.import_module("src.domain.services.config_service")
+
+    assert module.config_service.get_config().display.mode == "spotify"
+
+
+def test_every_legacy_game_mode_maps_to_its_widget():
+    from src.domain.services.config_service import LEGACY_GAME_MODES, migrate_config
+
+    for mode in LEGACY_GAME_MODES:
+        payload, changed = migrate_config({"display": {"mode": mode, "widgetId": ""}})
+        assert changed is True
+        assert payload["display"]["mode"] == "widget"
+        assert payload["display"]["widgetId"] == f"core.{mode}"
+
+
+def test_a_current_config_is_left_alone():
+    from src.domain.services.config_service import migrate_config
+
+    payload, changed = migrate_config({"display": {"mode": "widget", "widgetId": "core.snake"}})
+    assert changed is False
+    assert payload["display"]["widgetId"] == "core.snake"

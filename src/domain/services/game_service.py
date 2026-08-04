@@ -60,6 +60,16 @@ class GameService:
             raise ValueError(f"Unknown game {game_id}.")
         return spec
 
+    def widget_package_dir(self, widget_id: str) -> Path:
+        """Where a widget's package lives: installed if present, else bundled."""
+        installed = self.packages_dir() / widget_id
+        if (installed / "widget.toml").exists():
+            return installed
+        for spec in self.specs().values():
+            if spec.widget_id == widget_id:
+                return spec.package_dir
+        return installed
+
     def active_game_id(self) -> str:
         config = config_service.get_config()
         if config.runtime.testPattern or config.display.mode != "widget":

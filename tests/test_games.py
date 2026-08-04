@@ -785,3 +785,45 @@ def test_a_broken_package_does_not_break_discovery(tmp_path, monkeypatch):
 
     assert "snake" in specs, "a bad package must not hide the good ones"
     assert "game" not in specs and "manifest" not in specs
+
+
+@pytest.mark.parametrize("game_id", ALL_GAMES)
+def test_runtime_launch_args_point_at_a_real_package(tmp_path, monkeypatch, game_id):
+    """The runtime must be handed a directory that actually holds the game.
+
+    Bundled games do not live under the installed packages directory, so a
+    launch that assumed they did failed for every shipped game.
+    """
+    config_module, _, registry_module = reload_game_stack(monkeypatch, tmp_path / "data")
+    runtime_module = importlib.import_module("src.domain.services.runtime_service")
+
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = f"core.{game_id}"
+    config_module.config_service.save_config(config)
+
+    args = runtime_module.runtime_service._args()
+    widget_dir = Path(args[args.index("--widget-dir") + 1])
+
+    assert widget_dir.is_dir(), f"{game_id}: {widget_dir} does not exist"
+    assert (widget_dir / "widget.toml").exists(), f"{game_id}: no manifest at {widget_dir}"
+
+
+def test_launch_args_prefer_an_installed_build(tmp_path, monkeypatch):
+    config_module, game_module, _ = reload_game_stack(monkeypatch, tmp_path / "data")
+    runtime_module = importlib.import_module("src.domain.services.runtime_service")
+
+    packages = tmp_path / "data" / "widgets" / "packages"
+    packages.mkdir(parents=True)
+    bundled = game_module.game_service.specs()["snake"].package_dir
+    shutil.copytree(bundled, packages / "core.snake")
+
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    args = runtime_module.runtime_service._args()
+    widget_dir = Path(args[args.index("--widget-dir") + 1])
+
+    assert widget_dir == packages / "core.snake"

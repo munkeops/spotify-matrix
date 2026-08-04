@@ -8,8 +8,39 @@ import time
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from configs import base_config
 from src.domain.models.api_schemas import AppConfig, TokenStatus
+
+# Games used to be display modes of their own before they became plugins. A
+# config saved by an older build still names one, so map it onto the widget it
+# is now rather than refusing to start.
+LEGACY_GAME_MODES = ("tetris", "pacman", "snake", "breakout", "invaders", "flappy", "pong", "connect4")
+
+VALID_MODES = frozenset(("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"))
+
+
+def migrate_config(payload: Any) -> tuple[dict[str, Any], bool]:
+    """Bring an older config file up to date. Returns the payload and whether it changed."""
+    if not isinstance(payload, dict):
+        return {}, False
+    display = payload.get("display")
+    if not isinstance(display, dict):
+        return payload, False
+
+    mode = display.get("mode")
+    if mode in LEGACY_GAME_MODES:
+        display["mode"] = "widget"
+        display["widgetId"] = display.get("widgetId") or f"core.{mode}"
+        logger.info("[spotify-matrix] migrated display mode {} to widget {}", mode, display["widgetId"])
+        return payload, True
+    if isinstance(mode, str) and mode not in VALID_MODES:
+        # An unknown mode should not stop the service from booting.
+        logger.warning("[spotify-matrix] unknown display mode {}, falling back to spotify", mode)
+        display["mode"] = "spotify"
+        return payload, True
+    return payload, False
 
 
 class ConfigService:
@@ -21,7 +52,12 @@ class ConfigService:
 
     def get_config(self) -> AppConfig:
         payload = self._read_json(self.config_path, {})
-        return AppConfig.model_validate(payload)
+        payload, changed = migrate_config(payload)
+        config = AppConfig.model_validate(payload)
+        if changed:
+            # Write it back so the migration happens once, not on every read.
+            self._write_json(self.config_path, config.model_dump())
+        return config
 
     def get_public_config(self) -> AppConfig:
         config = self.get_config()
