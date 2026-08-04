@@ -106,6 +106,17 @@ SOUNDS: dict[str, dict[str, object]] = {
         "crash": lambda: sequence(noise(0.24, 1.0), sweep(340, 60, 0.36, wave_shape="triangle")),
         "win": lambda: sequence(blip(523, 0.09), blip(659, 0.09), blip(880, 0.09), blip(1046, 0.22)),
     },
+    "core.kong": {
+        "jump": lambda: sweep(300, 620, 0.09, volume=0.6),
+        "climb": lambda: blip(240, 0.03, volume=0.35),
+        "barrel": lambda: sweep(180, 120, 0.12, wave_shape="triangle", volume=0.6),
+        "point": lambda: sequence(blip(784, 0.05), blip(1046, 0.08)),
+        "hammer": lambda: sequence(blip(523, 0.06), blip(784, 0.06), blip(1046, 0.12)),
+        "smash": lambda: sequence(noise(0.08, 0.9), blip(150, 0.06, wave_shape="triangle")),
+        "hit": lambda: sequence(sweep(520, 90, 0.36, wave_shape="triangle"), noise(0.1, 0.5)),
+        "level": lambda: sequence(blip(440, 0.07), blip(587, 0.07), blip(880, 0.14)),
+        "win": lambda: sequence(blip(523, 0.1), blip(659, 0.1), blip(784, 0.1), blip(1046, 0.26)),
+    },
     "core.chess": {
         "move": lambda: blip(300, 0.025, volume=0.35),
         "pick": lambda: blip(560, 0.04, volume=0.6),

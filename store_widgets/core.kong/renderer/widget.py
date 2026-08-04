@@ -202,9 +202,8 @@ class KongGame(GameWidget):
             self.climbing = None
 
     def _reached_girder(self) -> None:
+        # Climbing onto the top girder is not the rescue; walking to her is.
         self.score += 20
-        if self.girder == TOP:
-            self._win_stage()
 
     # --- stepping --------------------------------------------------------
 
@@ -264,7 +263,7 @@ class KongGame(GameWidget):
             barrel.x += direction * speed * elapsed
             barrel.y = float(surface(barrel.girder, barrel.x) - BARREL)
 
-            if barrel.girder > 0 and self._crosses_ladder(before, barrel.x):
+            if barrel.girder > 0 and self._crosses_ladder(barrel.girder, before, barrel.x):
                 # Most barrels carry on; the ones that drop are what make the
                 # lower girders dangerous.
                 if self.random.random() < 0.35:
@@ -280,9 +279,14 @@ class KongGame(GameWidget):
                     barrel.falling = True
                     barrel.fall_to = barrel.girder - 1
 
-    def _crosses_ladder(self, before: float, after: float) -> bool:
+    def _crosses_ladder(self, girder: int, before: float, after: float) -> bool:
+        """Did a barrel on ``girder`` just pass a ladder leading down from it?
+
+        A ladder is stored against the girder below it, so the one that takes
+        a barrel off girder G is the ladder recorded against G - 1.
+        """
         low, high = (before, after) if before <= after else (after, before)
-        return any(low <= ladder_x <= high for below, ladder_x in LADDERS if below == self.girder or True)
+        return any(low <= ladder_x <= high for below, ladder_x in LADDERS if below == girder - 1)
 
     def _pick_up_hammer(self) -> None:
         if self.hammer_at is None:

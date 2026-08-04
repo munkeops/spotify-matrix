@@ -1,0 +1,52 @@
+[widget]
+id = "core.kong"
+name = "Kong"
+version = "1.0.0"
+summary = "Climb the girders, jump the barrels, reach the top."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.widget:KongGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "dpad"
+actions = ["left", "right", "up", "down", "fire", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "lives"
+label = "Lives"
+type = "number"
+required = false
+default = 3
+placeholder = ""
+helpText = ""
+min = 1
+max = 5
+step = 1
+
+[[config]]
+key = "barrelRate"
+label = "Barrel rate"
+type = "number"
+required = false
+default = 100
+placeholder = ""
+helpText = "Percent of the normal throw rate."
+min = 40
+max = 200
+step = 10
+
+[[config]]
+key = "hammer"
+label = "Hammer"
+type = "boolean"
+required = false
+default = true
+placeholder = ""
+helpText = "A hammer appears on each stage."

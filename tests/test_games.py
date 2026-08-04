@@ -1430,3 +1430,92 @@ def test_chess_will_not_pick_up_the_engines_pieces():
     game.cursor = [1, 4]  # a black pawn
     game.command("fire")
     assert game.picked is None
+
+
+def _kong():
+    return importlib.import_module(mg.game_class("kong").__module__)
+
+
+def test_kong_barrels_find_their_way_down_the_girders():
+    """A barrel that only ever rolls along the top girder is not a hazard.
+
+    The ladder test once read `if below == self.girder or True`, which both
+    ignored the girder and asked about the player's rather than the barrel's.
+    """
+    game = mg.create_game("kong", {}, seed=3)
+    for _ in range(400):
+        game.step(0.05)
+
+    reached = {barrel.girder for barrel in game.barrels}
+    assert len(reached) > 1, f"barrels stuck on {reached}"
+    assert min(reached) < _kong().TOP
+
+
+def test_kong_reaching_the_top_girder_is_not_the_rescue():
+    kong = _kong()
+    game = mg.create_game("kong", {}, seed=1)
+    game.girder = kong.TOP
+    game.x = 10.0
+    game.y = float(kong.surface(kong.TOP, 10.0) - kong.PLAYER_H)
+
+    game.advance(0.05)
+    assert not game.won and game.stage == 1, "she is at the other end"
+
+    game.x = 46.0
+    game.advance(0.05)
+    assert game.stage == 2, "walking to her clears the stage"
+
+
+def test_kong_a_barrel_costs_a_life_but_the_hammer_smashes_it():
+    kong = _kong()
+    game = mg.create_game("kong", {}, seed=1)
+    on_top = game.x + 1
+    game.barrels = [kong.Barrel(on_top, 0)]
+    game.barrels[0].y = game.y + 1
+
+    game._check_hit()
+    assert game.lives == game.max_lives - 1
+
+    game = mg.create_game("kong", {}, seed=1)
+    game.hammer_for = 3.0
+    game.barrels = [kong.Barrel(game.x + 1, 0)]
+    game.barrels[0].y = game.y + 1
+
+    game._check_hit()
+    assert game.lives == game.max_lives and not game.barrels
+
+
+def test_kong_jumping_a_barrel_scores_once():
+    kong = _kong()
+    game = mg.create_game("kong", {}, seed=1)
+    game.jumping = True
+    game.y -= 6.0
+    barrel = kong.Barrel(game.x + 1, 0)
+    game.barrels = [barrel]
+
+    game._check_hit()
+    first = game.score
+    game._check_hit()
+
+    assert first > 0 and game.score == first, "it does not pay twice for one barrel"
+
+
+def test_kong_climbing_only_works_at_a_ladder():
+    kong = _kong()
+    game = mg.create_game("kong", {}, seed=1)
+    game.x = 30.0  # nowhere near one
+    game.command("up")
+    assert game.climbing is None
+
+    below, ladder_x = kong.LADDERS[0]
+    game.x = float(ladder_x - kong.PLAYER_W / 2)
+    game.girder = below
+    game.command("up")
+    assert game.climbing == (below, ladder_x)
+
+
+def test_kong_running_out_of_lives_ends_it():
+    game = mg.create_game("kong", {"lives": 1}, seed=1)
+    game._die()
+    game.advance(1.5)
+    assert game.game_over
