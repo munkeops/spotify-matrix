@@ -106,6 +106,14 @@ SOUNDS: dict[str, dict[str, object]] = {
         "crash": lambda: sequence(noise(0.24, 1.0), sweep(340, 60, 0.36, wave_shape="triangle")),
         "win": lambda: sequence(blip(523, 0.09), blip(659, 0.09), blip(880, 0.09), blip(1046, 0.22)),
     },
+    "core.chess": {
+        "move": lambda: blip(300, 0.025, volume=0.35),
+        "pick": lambda: blip(560, 0.04, volume=0.6),
+        "place": lambda: sequence(blip(200, 0.04, wave_shape="triangle"), noise(0.02, 0.25)),
+        "capture": lambda: sequence(noise(0.06, 0.6), blip(160, 0.07, wave_shape="triangle")),
+        "deny": lambda: blip(140, 0.06, wave_shape="square", volume=0.4),
+        "win": lambda: sequence(blip(523, 0.1), blip(659, 0.1), blip(784, 0.1), blip(1046, 0.24)),
+    },
     "core.battleship": {
         "move": lambda: blip(300, 0.03, volume=0.4),
         "miss": lambda: sequence(noise(0.14, 0.45), blip(180, 0.07, wave_shape="triangle", volume=0.5)),

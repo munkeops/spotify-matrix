@@ -1291,3 +1291,142 @@ def test_roadrash_leaving_the_road_costs_you():
     for _ in range(20):
         game.advance(0.05)
     assert game.speed_now < before, "the verge slows you down"
+
+
+def _chess():
+    return importlib.import_module(mg.game_class("chess").__module__)
+
+
+def _perft(board, depth):
+    if depth == 0:
+        return 1
+    return sum(_perft(child, depth - 1) for _, child in board.children())
+
+
+@pytest.mark.parametrize("depth,expected", [(1, 20), (2, 400), (3, 8902), (4, 197281)])
+def test_chess_move_generation_matches_known_perft(depth, expected):
+    """Perft from the start position. Any rule bug moves these numbers."""
+    assert _perft(_chess().Board(), depth) == expected
+
+
+@pytest.mark.parametrize("depth,expected", [(1, 48), (2, 2039)])
+def test_chess_perft_on_the_castling_position(depth, expected):
+    """Kiwipete: the standard position for castling, en passant and pins."""
+    board = _chess().Board()
+    board.squares = [
+        list(row)
+        for row in (
+            "r...k..r",
+            "p.ppqpb.",
+            "bn..pnp.",
+            "...PN...",
+            ".p..P...",
+            "..N..Q.p",
+            "PPPBBPPP",
+            "R...K..R",
+        )
+    ]
+    assert _perft(board, depth) == expected
+
+
+def test_chess_castling_moves_the_rook_and_spends_the_right():
+    chess = _chess()
+    board = chess.Board()
+    for column in (5, 6):
+        board.squares[7][column] = "."
+
+    castle = next(move for move in board.legal_moves() if move.castle == "K")
+    board.apply(castle)
+
+    assert board.squares[7][6] == "K" and board.squares[7][5] == "R"
+    assert not board.rights["K"] and not board.rights["Q"]
+
+
+def test_chess_cannot_castle_out_of_or_through_check():
+    chess = _chess()
+    board = chess.Board()
+    for column in (5, 6):
+        board.squares[7][column] = "."
+    # A rook down a clear f-file covers f1, which the king would pass over.
+    board.squares[6][5] = "."
+    board.squares[3][5] = "r"
+
+    assert not any(move.castle for move in board.legal_moves())
+
+
+def test_chess_en_passant_takes_the_pawn_beside_you():
+    chess = _chess()
+    board = chess.Board()
+    board.squares[3][4] = "P"
+    board.squares[6][4] = "."
+    board.to_move = "b"
+    board.apply(chess.Move((1, 3), (3, 3)))  # black pawn runs past
+
+    capture = next(move for move in board.legal_moves() if move.en_passant)
+    board.apply(capture)
+
+    assert board.squares[2][3] == "P"
+    assert board.squares[3][3] == ".", "the pawn it passed is gone"
+
+
+def test_chess_a_pinned_piece_may_not_move():
+    chess = _chess()
+    board = chess.Board()
+    board.squares[6][4] = "."   # open the file in front of the king
+    board.squares[5][4] = "N"   # knight pinned by...
+    board.squares[3][4] = "r"   # ...a rook down the e-file
+
+    assert not [move for move in board.legal_moves() if move.origin == (5, 4)]
+
+
+def test_chess_detects_checkmate_and_stalemate():
+    game = mg.create_game("chess", {}, seed=1)
+    for origin, target in (((6, 4), (4, 4)), ((1, 4), (3, 4)), ((7, 5), (4, 2)),
+                           ((0, 1), (2, 2)), ((7, 3), (3, 7)), ((0, 6), (2, 5))):
+        game.board.apply(next(m for m in game.board.legal_moves()
+                              if m.origin == origin and m.target == target))
+    game._play(next(m for m in game.board.legal_moves()
+                    if m.origin == (3, 7) and m.target == (1, 5)))
+    assert game.won and game.result == "MATE"
+
+    chess = _chess()
+    stale = mg.create_game("chess", {}, seed=1)
+    stale.board.squares = [list(row) for row in (
+        ".......k", "........", "......QK", "........", "........", "........", "........", "........")]
+    stale.board.kings = {"w": (2, 7), "b": (0, 7)}
+    stale.board.to_move = "b"
+    assert not stale.board.in_check("b")
+    assert stale._settle() and stale.result == "STALEMATE"
+
+
+def test_chess_engine_answers_within_its_allotted_time():
+    """The clock is the bound, not the node count: a Pi must not stall."""
+    game = mg.create_game("chess", {"level": "hard"}, seed=1)
+    game.board.apply(game.board.legal_moves()[0])
+
+    start = time.monotonic()
+    game._begin_thinking()
+    game.advance(1.0)
+    taken = time.monotonic() - start
+
+    assert taken < game.think_seconds + 0.5, f"took {taken:.2f}s"
+    assert game.reached_depth >= 1, "it always returns a searched move"
+
+
+def test_chess_engine_takes_a_free_queen():
+    game = mg.create_game("chess", {"level": "normal"}, seed=1)
+    game.board.squares = [list(row) for row in (
+        "....k...", "........", "........", "...q....", "........", "..N.....", "........", "....K...")]
+    game.board.kings = {"w": (7, 4), "b": (0, 4)}
+    game.board.rights = dict.fromkeys("KQkq", False)
+
+    move = game.best_move()
+
+    assert move.target == (3, 3), "the knight takes the queen"
+
+
+def test_chess_will_not_pick_up_the_engines_pieces():
+    game = mg.create_game("chess", {"side": "w"}, seed=1)
+    game.cursor = [1, 4]  # a black pawn
+    game.command("fire")
+    assert game.picked is None
