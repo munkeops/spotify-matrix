@@ -233,7 +233,7 @@ export default function GamePad() {
   }
 
   if (!game) {
-    return <Alert severity="error" action={<Button size="small" onClick={() => navigate("/play")}>Back</Button>}>Unknown game “{gameId}”.</Alert>;
+    return <Alert severity="error" action={<Button size="small" onClick={() => navigate("/store?tab=play")}>Back</Button>}>Unknown game “{gameId}”.</Alert>;
   }
 
   const status = frame?.status ?? "playing";
@@ -243,7 +243,7 @@ export default function GamePad() {
       {error ? <Alert severity="error">{error}</Alert> : null}
 
       <Stack direction="row" alignItems="center" spacing={1}>
-        <IconButton size="small" onClick={() => navigate("/play")} aria-label="Back to games"><ChevronLeftRoundedIcon /></IconButton>
+        <IconButton size="small" onClick={() => navigate("/store?tab=play")} aria-label="Back to games"><ChevronLeftRoundedIcon /></IconButton>
         <Typography variant="h6" sx={{ flex: 1 }} noWrap>{game.name}</Typography>
         <Chip size="small" color={live ? "success" : "default"} label={live ? "Live" : "Idle"} />
       </Stack>

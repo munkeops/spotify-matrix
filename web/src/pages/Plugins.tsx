@@ -1,18 +1,15 @@
-import { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardActionArea, Typography, Box, CircularProgress, Alert, Chip, IconButton, Stack } from "@mui/material";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
 import { canPreview, gameIdOf, isGame, LocalWidget, listLocalWidgets, applyWidget, getWidgetConfig, previewWidget } from "../api";
 import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
 import DisplayPolicyPanel from "../components/DisplayPolicyPanel";
-
-const CATEGORY_COLOR: Record<string, string> = {
-  media: "#4be0c0", time: "#8ea2ff", assistant: "#ffb86b", information: "#7ee0a0",
-  custom: "#c58cff", diagnostics: "#ff8c8c", weather: "#66d0ff", games: "#ff7ab8",
-};
+import { SHELVES, ShelfKey, ShelfTabs, colorFor, groupByShelf } from "../shelves";
 
 function Placeholder({ widget }: { widget: LocalWidget }) {
-  const color = CATEGORY_COLOR[widget.manifest.category] || "#4be0c0";
+  const color = colorFor(widget.manifest.category);
   return (
     <Box sx={{ width: "100%", height: "100%", display: "grid", placeItems: "center", background: `radial-gradient(circle at 50% 35%, ${color}22, #050607 75%)` }}>
       <Typography sx={{ fontSize: 34, fontWeight: 800, color }}>{widget.manifest.name.charAt(0)}</Typography>
@@ -22,6 +19,7 @@ function Placeholder({ widget }: { widget: LocalWidget }) {
 
 export default function Plugins() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const [widgets, setWidgets] = useState<LocalWidget[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
@@ -29,6 +27,10 @@ export default function Plugins() {
   const [selected, setSelected] = useState<LocalWidget | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [applyingId, setApplyingId] = useState("");
+
+  const requested = params.get("tab") as ShelfKey | null;
+  const tab: ShelfKey = SHELVES.some((shelf) => shelf.key === requested) ? (requested as ShelfKey) : "apps";
+  const setTab = (next: ShelfKey) => setParams(next === "apps" ? {} : { tab: next }, { replace: true });
 
   const loadPreviews = useCallback(async (list: LocalWidget[]) => {
     await Promise.all(
@@ -80,18 +82,47 @@ export default function Plugins() {
     setDrawerOpen(true);
   };
 
+  // Same three shelves as the Store, so a game sits in the same place whether
+  // you are browsing or managing what you already have.
+  const shelves = useMemo(
+    () => groupByShelf(widgets.map((widget) => ({ widget, id: widget.manifest.id, category: widget.manifest.category, isGame: isGame(widget) }))),
+    [widgets],
+  );
+
   if (loading) {
     return <Box sx={{ display: "grid", placeItems: "center", py: 8 }}><CircularProgress /></Box>;
   }
+
+  const shelf = shelves[tab];
 
   return (
     <Stack spacing={2}>
       {error ? <Alert severity="error">{error}</Alert> : null}
       <DisplayPolicyPanel />
 
+      <Box>
+        <Typography variant="h6">Installed</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {SHELVES.find((entry) => entry.key === tab)!.blurb}
+        </Typography>
+      </Box>
+
+      <ShelfTabs
+        value={tab}
+        onChange={setTab}
+        counts={{ apps: shelves.apps.length, play: shelves.play.length, creative: shelves.creative.length }}
+      />
+
+      {shelf.length === 0 ? (
+        <Alert severity="info" action={<Chip size="small" label="Store" onClick={() => navigate(`/store?tab=${tab}`)} />}>
+          Nothing installed on this shelf yet.
+        </Alert>
+      ) : null}
+
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(auto-fill, minmax(150px, 1fr))" }, gap: 1.5 }}>
-        {widgets.map((widget) => {
+        {shelf.map(({ widget }) => {
           const id = widget.manifest.id;
+          const game = isGame(widget);
           return (
             <Card key={id} sx={{ position: "relative", borderColor: widget.active ? "primary.main" : "divider" }}>
               <CardActionArea onClick={() => openSettings(widget)}>
@@ -112,23 +143,30 @@ export default function Plugins() {
                 size="small"
                 onClick={() => runNow(widget)}
                 disabled={applyingId === id}
+                aria-label={game ? "Play" : "Put on matrix"}
                 sx={{ position: "absolute", top: 4, right: 4, bgcolor: "rgba(0,0,0,0.55)", "&:hover": { bgcolor: "rgba(0,0,0,0.75)" } }}
               >
-                <PlayArrowRoundedIcon fontSize="small" sx={{ color: "#fff" }} />
+                {game ? (
+                  <SportsEsportsRoundedIcon fontSize="small" sx={{ color: "#fff" }} />
+                ) : (
+                  <PlayArrowRoundedIcon fontSize="small" sx={{ color: "#fff" }} />
+                )}
               </IconButton>
             </Card>
           );
         })}
 
-        <Card component="a" href="/studio/" sx={{ textDecoration: "none" }}>
-          <Box sx={{ aspectRatio: "1", display: "grid", placeItems: "center", background: "radial-gradient(circle at 50% 35%, #c58cff22, #050607 75%)" }}>
-            <Typography sx={{ fontSize: 30, fontWeight: 800, color: "#c58cff" }}>🎨</Typography>
-          </Box>
-          <Box sx={{ p: 1 }}>
-            <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>Meme Studio</Typography>
-            <Typography variant="caption" color="text.secondary">create</Typography>
-          </Box>
-        </Card>
+        {tab === "creative" ? (
+          <Card component="a" href="/studio/" sx={{ textDecoration: "none" }}>
+            <Box sx={{ aspectRatio: "1", display: "grid", placeItems: "center", background: "radial-gradient(circle at 50% 35%, #c58cff22, #050607 75%)" }}>
+              <Typography sx={{ fontSize: 30, fontWeight: 800, color: "#c58cff" }}>🎨</Typography>
+            </Box>
+            <Box sx={{ p: 1 }}>
+              <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>Meme Studio</Typography>
+              <Typography variant="caption" color="text.secondary">create</Typography>
+            </Box>
+          </Card>
+        ) : null}
       </Box>
 
       <WidgetConfigDrawer widget={selected} open={drawerOpen} onClose={() => setDrawerOpen(false)} onApplied={refresh} />

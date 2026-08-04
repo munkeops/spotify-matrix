@@ -75,7 +75,10 @@ type HasManifest = { manifest: WidgetManifest } | null | undefined;
 
 /** Games are plugins, so identify them by manifest rather than a fixed list. */
 export const isGame = (widget: HasManifest) => widget?.manifest.kind === "game";
-export const gameIdOf = (widget: HasManifest) => (widget?.manifest.id ?? "").replace(/^core\./, "");
+export const gameIdOf = (widget: HasManifest) => gameIdFromWidgetId(widget?.manifest.id ?? "");
+
+/** "core.pacman" -> "pacman", the id the game routes use. */
+export const gameIdFromWidgetId = (widgetId: string) => widgetId.replace(/^[^.]+\./, "");
 
 export interface LocalWidget {
   manifest: WidgetManifest;

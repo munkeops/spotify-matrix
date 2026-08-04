@@ -183,9 +183,14 @@ python spotify_matrix.py --preview-frames data/preview
 
 ## The arcade
 
-Eight games run on the panel and are played from the app, a phone, or the
-mini-joystick module. Open **Play** in the navigation to see them all, tap one
-to put it on the matrix, and its gamepad opens with a live mirror of the panel.
+Nine games run on the panel and are played from the app, a phone, or the
+mini-joystick module. They live on the **Play** shelf of the Store and of your
+installed plugins; tap one to put it on the matrix and its gamepad opens with a
+live mirror of the panel.
+
+Both the Store and the Plugins page are split into the same three shelves —
+**Apps**, **Play** and **Creative** — so a game is in the same place whether you
+are browsing for one or managing what you already have.
 
 | Game | Controls | Notes |
 |---|---|---|
