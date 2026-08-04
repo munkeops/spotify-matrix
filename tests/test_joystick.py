@@ -650,10 +650,91 @@ def test_the_service_uses_saved_bindings(tmp_path, monkeypatch):
     config = config_module.config_service.get_config()
     config.display.mode = "widget"
     config.display.widgetId = "core.tetris"
-    config.controller.bindings = {"core.tetris": {"a": "hold"}}
+    config.controller.profiles = {"module": {"core.tetris": {"a": "hold"}}}
     config_module.config_service.save_config(config)
 
-    joystick_module.joystick_service._dispatch(button_event(Button.A))
+    joystick_module.joystick_service.dispatch_event(button_event(Button.A), device="module")
 
     actions, _ = mg.read_commands(game_module.game_service.input_path("tetris"), 0)
     assert actions == ["hold"]
+
+
+def test_each_device_keeps_its_own_bindings(tmp_path, monkeypatch):
+    """Rebinding A on the pad must not rebind A on the module."""
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.tetris"
+    config.controller.profiles = {
+        "module": {"core.tetris": {"a": "hold"}},
+        "gamepad": {"core.tetris": {"a": "rotateCcw"}},
+    }
+    config_module.config_service.save_config(config)
+
+    service = joystick_module.joystick_service
+    service.dispatch_event(button_event(Button.A), device="module")
+    service.dispatch_event(button_event(Button.A), device="gamepad")
+
+    actions, _ = mg.read_commands(game_module.game_service.input_path("tetris"), 0)
+    assert actions == ["hold", "rotateCcw"]
+
+
+# --- per-device binding profiles -----------------------------------------
+
+
+def test_each_device_offers_the_controls_it_actually_has():
+    from mini_joystick.bindings import GAMEPAD, MODULE, PROFILES
+
+    module = PROFILES[MODULE].controls
+    gamepad = PROFILES[GAMEPAD].controls
+
+    assert set(module) < set(gamepad), "a pad is a superset of the module"
+    for control in ("lb", "rb", "lt", "rt", "start", "select"):
+        assert control in gamepad and control not in module
+
+
+def test_the_same_control_is_labelled_for_the_device_in_hand():
+    """Control "c" is silkscreened C on the module and printed X on a pad."""
+    from mini_joystick.bindings import GAMEPAD, MODULE, profile
+
+    assert profile(MODULE).label("c") == "C"
+    assert profile(GAMEPAD).label("c") == "X"
+    assert profile(MODULE).label("ok") != profile(GAMEPAD).label("ok")
+
+
+def test_defaults_use_a_pads_spare_buttons():
+    from mini_joystick.bindings import GAMEPAD, MODULE, default_bindings
+
+    actions = set(mg.game_class("tetris").all_actions())
+    module = default_bindings(actions, MODULE)
+    gamepad = default_bindings(actions, GAMEPAD)
+
+    assert set(module) < set(gamepad)
+    assert gamepad["lb"] == "rotateCcw" and gamepad["rb"] == "rotateCw"
+    assert gamepad["start"] == "togglePause"
+    # A control the device does not have never gets a default.
+    assert "lb" not in module
+
+
+def test_defaults_never_offer_an_action_the_game_does_not_have():
+    from mini_joystick.bindings import PROFILES, default_bindings
+
+    for game_id in sorted(mg.discover()):
+        actions = set(mg.game_class(game_id).all_actions())
+        for name in PROFILES:
+            for control, action in default_bindings(actions, name).items():
+                assert action in actions, f"{game_id}/{name}: {control} -> {action}"
+
+
+def test_old_configs_keep_their_bindings_on_both_devices():
+    """The single mapping applied to both, so neither should lose it."""
+    from src.domain.services.config_service import migrate_config
+
+    payload, changed = migrate_config(
+        {"controller": {"bindings": {"core.tetris": {"a": "hold"}}}, "display": {"mode": "spotify"}}
+    )
+
+    assert changed
+    assert "bindings" not in payload["controller"]
+    assert payload["controller"]["profiles"]["module"]["core.tetris"] == {"a": "hold"}
+    assert payload["controller"]["profiles"]["gamepad"]["core.tetris"] == {"a": "hold"}

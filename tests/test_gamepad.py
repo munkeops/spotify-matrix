@@ -8,6 +8,13 @@ import pytest
 
 import matrix_games as mg
 from matrix_input.gamepad import (
+    BTN_SELECT,
+    BTN_THUMBL,
+    BTN_THUMBR,
+    BTN_TL,
+    BTN_TL2,
+    BTN_TR,
+    BTN_TR2,
     ABS_HAT0X,
     ABS_HAT0Y,
     ABS_X,
@@ -40,9 +47,22 @@ def mapper() -> GamepadMapper:
 
 @pytest.mark.parametrize(
     "code,button",
-    [(BTN_SOUTH, Button.A), (BTN_EAST, Button.B), (BTN_WEST, Button.C), (BTN_NORTH, Button.D), (BTN_START, Button.OK)],
+    [
+        (BTN_SOUTH, Button.A),
+        (BTN_EAST, Button.B),
+        (BTN_WEST, Button.C),
+        (BTN_NORTH, Button.D),
+        (BTN_START, Button.START),
+        (BTN_SELECT, Button.SELECT),
+        (BTN_TL, Button.LB),
+        (BTN_TR, Button.RB),
+        (BTN_TL2, Button.LT),
+        (BTN_TR2, Button.RT),
+        (BTN_THUMBL, Button.L3),
+        (BTN_THUMBR, Button.R3),
+    ],
 )
-def test_face_buttons_map_to_the_shared_set(code, button):
+def test_every_pad_button_gets_its_own_control(code, button):
     events = mapper().feed(EV_KEY, code, 1)
     assert [(e.button, e.event) for e in events] == [(button, ButtonEvent.PRESS_DOWN)]
 

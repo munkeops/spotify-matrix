@@ -28,24 +28,39 @@ BTN_SELECT = 0x13A
 BTN_START = 0x13B
 BTN_MODE = 0x13C
 BTN_THUMBL = 0x13D
+BTN_THUMBR = 0x13E
+BTN_TL = 0x136     # left bumper
+BTN_TR = 0x137     # right bumper
+BTN_TL2 = 0x138    # left trigger, when the pad reports it as a button
+BTN_TR2 = 0x139    # right trigger
 
 ABS_X = 0x00
 ABS_Y = 0x01
 ABS_HAT0X = 0x10
 ABS_HAT0Y = 0x11
 
-#: Face buttons mapped onto the five the binding layer knows. South is the
-#: primary action because that is where a thumb rests on every pad.
+#: Every button a pad reports, each to its own control.
+#:
+#: These used to collapse onto the module's five: Start, Guide and the left
+#: stick click all became OK, Select doubled as Y, and the bumpers and
+#: triggers were absent entirely, so a controller was strictly a worse
+#: mini-joystick. South stays the primary action because that is where a
+#: thumb rests on every pad.
 BUTTON_MAP = {
     BTN_SOUTH: Button.A,
     BTN_EAST: Button.B,
     BTN_WEST: Button.C,
     BTN_NORTH: Button.D,
-    BTN_START: Button.OK,
-    BTN_MODE: Button.OK,
-    BTN_THUMBL: Button.OK,
-    BTN_SELECT: Button.D,
     BTN_C: Button.C,
+    BTN_TL: Button.LB,
+    BTN_TR: Button.RB,
+    BTN_TL2: Button.LT,
+    BTN_TR2: Button.RT,
+    BTN_START: Button.START,
+    BTN_MODE: Button.START,
+    BTN_SELECT: Button.SELECT,
+    BTN_THUMBL: Button.L3,
+    BTN_THUMBR: Button.R3,
 }
 
 #: Fraction of an analog axis before it counts as a push.

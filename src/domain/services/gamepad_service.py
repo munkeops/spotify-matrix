@@ -220,7 +220,9 @@ class GamepadService:
         # Shared with the mini-joystick so both controllers behave identically.
         from src.domain.services.joystick_service import joystick_service
 
-        joystick_service.dispatch_event(event)
+        from mini_joystick.bindings import GAMEPAD
+
+        joystick_service.dispatch_event(event, device=GAMEPAD)
 
 
 gamepad_service = GamepadService()

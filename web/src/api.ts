@@ -23,6 +23,10 @@ export async function apiPost<T>(path: string, body: unknown = {}): Promise<T> {
   );
 }
 
+export async function apiDelete<T>(path: string): Promise<T> {
+  return handle<T>(await fetch(path, { method: "DELETE" }));
+}
+
 export interface RuntimeState {
   running: boolean;
   pid?: number | null;
@@ -340,3 +344,42 @@ export const saveAudioConfig = (config: Record<string, unknown>) =>
   apiPost<AudioState>("/api/audio/config", { config });
 export const testAudio = (sound: string) =>
   apiPost<{ ok: boolean; message: string }>("/api/audio/test", { sound });
+
+
+export interface BindingProfile {
+  id: string;
+  name: string;
+  controls: string[];
+  labels: Record<string, string>;
+  /** Whether a device of this kind is connected right now. */
+  present: boolean;
+}
+
+export interface GameBindings {
+  gameId: string;
+  widgetId: string;
+  /** The device these bindings are for. */
+  profile: string;
+  profiles: BindingProfile[];
+  controls: string[];
+  actions: string[];
+  bindings: Record<string, string>;
+  defaults: Record<string, string>;
+  customised: string[];
+  /** Convenience: the chosen profile's labels, filled in by getGameBindings. */
+  labels?: Record<string, string>;
+}
+
+function withLabels(state: GameBindings): GameBindings {
+  const chosen = state.profiles.find((p) => p.id === state.profile);
+  return { ...state, labels: chosen?.labels ?? {} };
+}
+
+export const getGameBindings = (gameId: string, device = "") =>
+  apiGet<GameBindings>(`/api/games/${gameId}/bindings${device ? `?device=${encodeURIComponent(device)}` : ""}`).then(withLabels);
+
+export const saveGameBindings = (gameId: string, profile: string, bindings: Record<string, string>) =>
+  apiPost<GameBindings>(`/api/games/${gameId}/bindings`, { profile, bindings }).then(withLabels);
+
+export const resetGameBindings = (gameId: string, device: string) =>
+  apiDelete<GameBindings>(`/api/games/${gameId}/bindings?device=${encodeURIComponent(device)}`).then(withLabels);

@@ -57,6 +57,91 @@ class ShellAction:
 #: The controls a player can rebind, in the order a settings screen shows them.
 CONTROLS = ("up", "down", "left", "right", "a", "b", "c", "d", "ok")
 
+#: Everything a gamepad can offer, on top of what the module has.
+PAD_CONTROLS = CONTROLS + ("lb", "rb", "lt", "rt", "start", "select", "l3", "r3")
+
+MODULE, GAMEPAD = "module", "gamepad"
+
+
+@dataclass(frozen=True)
+class Profile:
+    """One kind of input device, and what its controls are called.
+
+    A control id like "c" is the same idea on both devices, but it is
+    silkscreened C on the module and printed X on an Xbox pad. Sharing the id
+    keeps one binding vocabulary; the labels stop the settings screen lying
+    about which button you are about to press.
+    """
+
+    id: str
+    name: str
+    controls: tuple[str, ...]
+    labels: dict[str, str]
+
+    def label(self, control: str) -> str:
+        return self.labels.get(control, control.upper())
+
+
+ARROWS = {"up": "Up", "down": "Down", "left": "Left", "right": "Right"}
+
+PROFILES: dict[str, Profile] = {
+    MODULE: Profile(
+        id=MODULE,
+        name="Mini-joystick module",
+        controls=CONTROLS,
+        labels={
+            **ARROWS,
+            "a": "A",
+            "b": "B",
+            "c": "C",
+            "d": "D",
+            "ok": "Stick press",
+        },
+    ),
+    GAMEPAD: Profile(
+        id=GAMEPAD,
+        name="Gamepad",
+        controls=PAD_CONTROLS,
+        labels={
+            **ARROWS,
+            "a": "A",
+            "b": "B",
+            "c": "X",
+            "d": "Y",
+            "ok": "Stick click",
+            "lb": "LB",
+            "rb": "RB",
+            "lt": "LT",
+            "rt": "RT",
+            "start": "Start",
+            "select": "Select",
+            "l3": "L3",
+            "r3": "R3",
+        },
+    ),
+}
+
+DEFAULT_PROFILE = MODULE
+
+
+def profile(name: str) -> Profile:
+    return PROFILES.get(name, PROFILES[DEFAULT_PROFILE])
+
+
+# What the extra gamepad controls reach for, tried in order. The shoulders get
+# the secondary actions that would otherwise need a spare face button, and
+# Start pauses because that is what Start has always done.
+PAD_FALLBACKS: dict[Button, tuple[str, ...]] = {
+    Button.LB: ("rotateCcw", "hold", "left"),
+    Button.RB: ("rotateCw", "hold", "right"),
+    Button.LT: ("softDrop", "down"),
+    Button.RT: ("fire", "flap", "hardDrop", "drop"),
+    Button.START: ("togglePause",),
+    Button.SELECT: ("restart",),
+    Button.L3: ("togglePause",),
+    Button.R3: ("fire", "flap"),
+}
+
 
 def control_name(event: JoystickEvent) -> str:
     """Which rebindable control an event came from, if any."""
@@ -67,8 +152,9 @@ def control_name(event: JoystickEvent) -> str:
     return ""
 
 
-def default_bindings(actions: set[str]) -> dict[str, str]:
-    """What each control does before anything is rebound."""
+def default_bindings(actions: set[str], device: str = DEFAULT_PROFILE) -> dict[str, str]:
+    """What each control does on ``device`` before anything is rebound."""
+    chosen = profile(device)
     resolved: dict[str, str] = {}
     for direction in (Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT):
         direct = DIRECTION_ACTIONS.get(direction, "")
@@ -76,7 +162,13 @@ def default_bindings(actions: set[str]) -> dict[str, str]:
             if candidate in actions:
                 resolved[direction.value] = candidate
                 break
-    for button, candidates in BUTTON_FALLBACKS.items():
+
+    fallbacks = dict(BUTTON_FALLBACKS)
+    if chosen.id == GAMEPAD:
+        fallbacks.update(PAD_FALLBACKS)
+    for button, candidates in fallbacks.items():
+        if button.value not in chosen.controls:
+            continue
         for candidate in candidates:
             if candidate in actions:
                 resolved[button.value] = candidate
@@ -128,7 +220,8 @@ def game_action(event: JoystickEvent, actions: set[str], overrides: dict[str, st
     if event.button == Button.OK and event.event == ButtonEvent.LONG_PRESS_START:
         return "restart" if "restart" in actions else ""
 
-    for candidate in BUTTON_FALLBACKS.get(event.button, ()):
+    # A shoulder or Start can only have come from a pad, so both tables apply.
+    for candidate in BUTTON_FALLBACKS.get(event.button, ()) or PAD_FALLBACKS.get(event.button, ()):
         if candidate in actions:
             return candidate
     return ""
@@ -170,13 +263,15 @@ def shell_action(event: JoystickEvent, menu_open: bool = False) -> ShellAction |
         return ShellAction(kind="power")
 
     if menu_open:
-        if event.button in (Button.OK, Button.A):
+        if event.button in (Button.OK, Button.A, Button.START):
             return ShellAction(kind="select")
-        if event.button in (Button.B, Button.D):
+        if event.button in (Button.B, Button.D, Button.SELECT):
             return ShellAction(kind="closeMenu")
         return None
 
-    if event.button == Button.OK:
+    # Start now has its own control rather than collapsing onto the stick
+    # press, so the way into the menu has to name both.
+    if event.button in (Button.OK, Button.START):
         return ShellAction(kind="openMenu")
     if event.button == Button.A:
         return ShellAction(kind="brightnessUp")
@@ -188,6 +283,13 @@ def shell_action(event: JoystickEvent, menu_open: bool = False) -> ShellAction |
 
 
 __all__ = [
+    "PROFILES",
+    "PAD_CONTROLS",
+    "Profile",
+    "profile",
+    "MODULE",
+    "GAMEPAD",
+    "DEFAULT_PROFILE",
     "game_action",
     "shell_action",
     "ShellAction",

@@ -154,9 +154,15 @@ class AudioConfig(BaseModel):
 
 
 class ControllerConfig(BaseModel):
-    """Per-game controller bindings, keyed by widget id then control."""
+    """Controller bindings, keyed by device profile, widget id, then control.
 
-    bindings: dict[str, dict[str, str]] = Field(default_factory=dict)
+    The profile comes first because the mini-joystick module and a gamepad
+    are not the same shape: the module has five buttons, a pad has thirteen.
+    One mapping shared between them meant rebinding for one silently rebound
+    the other, and the pad's spare buttons had nowhere to go.
+    """
+
+    profiles: dict[str, dict[str, dict[str, str]]] = Field(default_factory=dict)
 
 
 class StoreConfig(BaseModel):
@@ -490,16 +496,33 @@ class GamepadConfigRequest(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
 
 
+class BindingProfile(BaseModel):
+    """One input device, and what its controls should be called on screen."""
+
+    id: str
+    name: str
+    controls: list[str] = Field(default_factory=list)
+    labels: dict[str, str] = Field(default_factory=dict)
+    #: Whether a device of this kind is plugged in or paired right now.
+    present: bool = False
+
+
 class GameBindingsResponse(BaseModel):
     gameId: str
     widgetId: str
+    #: The profile these bindings are for.
+    profile: str = ""
+    profiles: list[BindingProfile] = Field(default_factory=list)
     controls: list[str] = Field(default_factory=list)
     actions: list[str] = Field(default_factory=list)
     bindings: dict[str, str] = Field(default_factory=dict)
     defaults: dict[str, str] = Field(default_factory=dict)
+    #: Which controls the player has changed from the default.
+    customised: list[str] = Field(default_factory=list)
 
 
 class GameBindingsRequest(BaseModel):
+    profile: str = ""
     bindings: dict[str, str] = Field(default_factory=dict)
 
 

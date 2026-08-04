@@ -36,13 +36,29 @@ INVALID = 0xFF
 
 
 class Button(str, Enum):
-    """Buttons as named on the silkscreen."""
+    """Every button any supported input can report.
+
+    The first five are the mini-joystick module's silkscreen, and they are
+    all it ever sends. A gamepad reports those plus the shoulders, triggers
+    and the rest; keeping one enum means one binding vocabulary, and a
+    profile decides which of these a given device actually offers.
+    """
 
     A = "a"
     B = "b"
     C = "c"
     D = "d"
     OK = "ok"
+
+    # Gamepad only. The module has no register for any of these.
+    LB = "lb"
+    RB = "rb"
+    LT = "lt"
+    RT = "rt"
+    START = "start"
+    SELECT = "select"
+    L3 = "l3"
+    R3 = "r3"
 
 
 BUTTON_REGISTERS: dict[Button, int] = {

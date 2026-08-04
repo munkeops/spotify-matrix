@@ -6,8 +6,10 @@ import {
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import {
   LocalWidget, getWidgetConfig, saveWidgetConfig, applyWidget, previewWidget, canPreview, createPairing,
+  gameIdOf, isGame,
 } from "../api";
 import Gallery from "./Gallery";
+import GameControls from "./GameControls";
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
@@ -34,6 +36,8 @@ export default function WidgetConfigDrawer({
   const timer = useRef<number | undefined>(undefined);
 
   const id = widget?.manifest.id ?? "";
+  // Games get a Controls section; nothing else takes controller input.
+  const gameId = isGame(widget) ? gameIdOf(widget) : "";
   const fields = widget?.manifest.config ?? [];
   const previewable = canPreview(widget);
 
@@ -202,6 +206,13 @@ export default function WidgetConfigDrawer({
         })}
           </>
         )}
+
+        {gameId ? (
+          <>
+            <Divider />
+            <GameControls gameId={gameId} />
+          </>
+        ) : null}
       </Stack>
 
       <Divider sx={{ my: 2 }} />

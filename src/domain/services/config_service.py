@@ -25,9 +25,24 @@ def migrate_config(payload: Any) -> tuple[dict[str, Any], bool]:
     """Bring an older config file up to date. Returns the payload and whether it changed."""
     if not isinstance(payload, dict):
         return {}, False
+
+    changed = False
+    controller = payload.get("controller")
+    if isinstance(controller, dict) and isinstance(controller.get("bindings"), dict):
+        # Bindings used to be one mapping per game, shared by every device.
+        # It applied to both, so both profiles inherit it and can diverge from
+        # there rather than everyone losing what they had set.
+        legacy = controller.pop("bindings")
+        profiles = controller.setdefault("profiles", {})
+        if legacy and not profiles:
+            from mini_joystick.bindings import GAMEPAD, MODULE
+
+            for name in (MODULE, GAMEPAD):
+                profiles[name] = {game: dict(controls) for game, controls in legacy.items()}
+        changed = True
     display = payload.get("display")
     if not isinstance(display, dict):
-        return payload, False
+        return payload, changed
 
     mode = display.get("mode")
     if mode in LEGACY_GAME_MODES:
@@ -40,7 +55,7 @@ def migrate_config(payload: Any) -> tuple[dict[str, Any], bool]:
         logger.warning("[spotify-matrix] unknown display mode {}, falling back to spotify", mode)
         display["mode"] = "spotify"
         return payload, True
-    return payload, False
+    return payload, changed
 
 
 class ConfigService:

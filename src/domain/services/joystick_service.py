@@ -24,7 +24,7 @@ from mini_joystick import (
     Transport,
     TransportError,
 )
-from mini_joystick.bindings import ShellAction, game_action, shell_action
+from mini_joystick.bindings import DEFAULT_PROFILE, GAMEPAD, MODULE, ShellAction, game_action, shell_action
 from mini_joystick.transport import available_buses, scan_bus, smbus_available
 from src.domain.services.config_service import config_service
 from src.domain.services.game_service import game_service
@@ -82,6 +82,7 @@ class JoystickService:
         self._menu_open = False
         self._shell_seq = 0
         self._wheel_open = False
+        self._device = DEFAULT_PROFILE
         self._wheel_items: list = []
         self._wheel_selected = None
         self._last_non_game = ""
@@ -253,8 +254,14 @@ class JoystickService:
             if not self._stop.is_set():
                 self._stop.wait(RECONNECT_SECONDS)
 
-    def dispatch_event(self, event) -> None:
-        """Route one controller event. Shared by the joystick and any gamepad."""
+    def dispatch_event(self, event, device: str = MODULE) -> None:
+        """Route one controller event, from ``device``.
+
+        The device decides which binding profile applies, so the module's
+        five buttons and a pad's thirteen can mean different things in the
+        same game.
+        """
+        self._device = device
         self._dispatch(event)
 
     def _dispatch(self, event) -> None:
@@ -287,7 +294,7 @@ class JoystickService:
         """Holding OK is the way in, from a game or the shell alike."""
         return (
             event.kind == "button"
-            and event.button == Button.OK
+            and event.button in (Button.OK, Button.START)
             and event.event == ButtonEvent.LONG_PRESS_START
         )
 
@@ -320,7 +327,7 @@ class JoystickService:
         if event.button in (Button.B, Button.D):
             self._close_wheel()
             return
-        if event.button not in (Button.OK, Button.A):
+        if event.button not in (Button.OK, Button.A, Button.START):
             return
         # Releasing the hold, or clicking, takes whatever is pointed at.
         chosen = self._wheel_selected
@@ -368,7 +375,8 @@ class JoystickService:
         self._record("power")
 
     def _game_bindings(self, widget_id: str) -> dict:
-        saved = config_service.get_config().controller.bindings
+        device = getattr(self, "_device", DEFAULT_PROFILE)
+        saved = config_service.get_config().controller.profiles.get(device, {})
         return dict(saved.get(widget_id, {}))
 
     def _dispatch_game(self, game_id: str, event) -> None:
