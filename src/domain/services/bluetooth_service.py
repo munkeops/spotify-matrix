@@ -47,7 +47,31 @@ class BluetoothService:
         return candidate
 
     def blocked(self) -> bool:
-        """True when rfkill has Bluetooth soft or hard blocked."""
+        """True when rfkill has Bluetooth soft or hard blocked.
+
+        Read from sysfs rather than the rfkill binary, so this works on a bare
+        install and inside a container without the tool present.
+        """
+        from pathlib import Path
+
+        root = Path("/sys/class/rfkill")
+        try:
+            entries = list(root.iterdir()) if root.is_dir() else []
+        except OSError:
+            entries = []
+        for entry in entries:
+            try:
+                if (entry / "type").read_text(encoding="utf-8").strip() != "bluetooth":
+                    continue
+                for name in ("soft", "hard"):
+                    if (entry / name).read_text(encoding="utf-8").strip() == "1":
+                        return True
+            except OSError:
+                continue
+        if entries:
+            return False
+
+        # No sysfs view, so fall back to the tool if it happens to be there.
         binary = shutil.which("rfkill")
         if binary is None:
             return False

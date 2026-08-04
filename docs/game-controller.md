@@ -11,11 +11,28 @@ Pairing needs three things on the Pi. The Bluetooth panel checks all of them and
 says which one is missing.
 
 ```bash
-sudo systemctl status bluetooth     # the daemon must be running
+systemctl is-active bluetooth       # want: active
 rfkill list bluetooth               # "Soft blocked: yes" means it is disabled
 sudo rfkill unblock bluetooth       # ...so unblock it
 bluetoothctl show                   # expect a controller, and Powered: yes
 ```
+
+`systemctl status` pipes into a pager, which both truncates the log lines and
+swallows anything you typed after it on the same line. To read what bluetoothd
+is actually complaining about:
+
+```bash
+sudo journalctl -u bluetooth -n 30 --no-pager
+```
+
+Common lines and what they mean:
+
+| Log line | Meaning |
+|---|---|
+| `Failed to set mode: Blocked through rfkill` | The adapter is blocked; `sudo rfkill unblock bluetooth` |
+| `Failed to start discovery: ... NotReady` | The adapter is off; `bluetoothctl power on` |
+| `Failed to connect: ... br-connection-profile-unavailable` | Paired, but nothing on the host can use it — for a speaker that means no A2DP sink |
+| `Failed to add UUID` / `Failed to set privacy` | Harmless startup noise |
 
 Nothing needs enabling in `config.txt` and no reboot is required — unlike I2C,
 Bluetooth is on by default on a Pi with onboard radio. If `bluetoothctl show`
