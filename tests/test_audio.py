@@ -584,3 +584,89 @@ def test_the_daemon_is_found_under_either_debian_name(monkeypatch):
 
     monkeypatch.setattr(bluealsa.shutil, "which", lambda n: None)
     assert not bluealsa.installed()
+
+
+BLUEALSA_L = """bluealsa:DEV=E8:07:BF:12:34:56,PROFILE=a2dp,SRV=org.bluealsa
+    Anker SoundCore 2, trusted
+    A2DP (SBC): S16_LE 2 channels 44100 Hz
+bluealsa:DEV=F4:6A:D7:6E:8C:90,PROFILE=sco,SRV=org.bluealsa
+    Some Headset
+    HFP (CVSD): S16_LE 1 channel 8000 Hz
+"""
+
+
+def _fake_daemon(monkeypatch, listing=BLUEALSA_L, alive=True):
+    from matrix_audio import bluealsa
+
+    monkeypatch.setattr(bluealsa.shutil, "which", lambda n: "/usr/bin/bluealsa-aplay")
+    monkeypatch.setattr(
+        bluealsa.subprocess,
+        "run",
+        lambda *a, **k: types.SimpleNamespace(stdout=listing, returncode=0 if alive else 1),
+    )
+    return bluealsa
+
+
+def test_the_daemon_is_detected_wherever_it_runs(monkeypatch):
+    """It is meant to run on the Pi, and a container cannot see the host's
+    processes, so scanning /proc called a working daemon "not running"."""
+    bluealsa = _fake_daemon(monkeypatch)
+    assert bluealsa.running()
+
+    _fake_daemon(monkeypatch, alive=False)
+    assert not bluealsa.running()
+
+
+def test_a_live_daemon_with_nothing_paired_still_counts(monkeypatch):
+    bluealsa = _fake_daemon(monkeypatch, listing="")
+    assert bluealsa.running(), "no speakers connected is not the same as no daemon"
+
+
+def test_speakers_are_listed_by_the_daemon_not_by_aplay(monkeypatch):
+    """`aplay -L` only offers the bare alias; the daemon knows the real ones."""
+    bluealsa = _fake_daemon(monkeypatch)
+
+    names = [pcm["name"] for pcm in bluealsa.pcms()]
+
+    assert any("DEV=E8:07:BF:12:34:56" in name for name in names)
+
+
+def test_the_bare_alias_resolves_to_a_connected_speaker(monkeypatch):
+    """It means 00:00:00:00:00:00, which is not a speaker - the failure was
+    "PCM not found" with exactly that address."""
+    _fake_daemon(monkeypatch)
+    from matrix_audio.output import resolve_device
+
+    resolved = resolve_device("bluealsa")
+
+    assert "DEV=E8:07:BF:12:34:56" in resolved
+    assert "PROFILE=a2dp" in resolved, "music, not the headset telephony profile"
+
+
+def test_a_speaker_that_is_no_longer_around_falls_back(monkeypatch):
+    _fake_daemon(monkeypatch)
+    from matrix_audio.output import resolve_device
+
+    resolved = resolve_device("bluealsa:DEV=00:00:00:00:00:01,PROFILE=a2dp")
+
+    assert "DEV=E8:07:BF:12:34:56" in resolved
+
+
+def test_resolution_leaves_wired_outputs_alone(monkeypatch):
+    _fake_daemon(monkeypatch)
+    from matrix_audio.output import resolve_device
+
+    assert resolve_device("hw:CARD=vc4hdmi0,DEV=0") == "hw:CARD=vc4hdmi0,DEV=0"
+    assert resolve_device("") == ""
+
+
+def test_the_speaker_reaches_aplay_by_address(monkeypatch):
+    _fake_daemon(monkeypatch)
+    from matrix_audio.mixer import Mixer
+    from matrix_audio.output import AlsaOutput
+
+    command = AlsaOutput(Mixer(), device="bluealsa")._command()
+
+    device = command[command.index("-D") + 1]
+    assert "DEV=E8:07:BF:12:34:56" in device
+    assert device.startswith('plug:{SLAVE="'), "still converted for A2DP"

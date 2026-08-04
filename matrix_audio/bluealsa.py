@@ -41,11 +41,16 @@ def installed() -> bool:
 
 
 def running() -> bool:
-    """Is a bluealsa daemon already up, ours or the host's?
+    """Is a bluealsa daemon up and answering, wherever it lives?
 
-    Reading /proc avoids depending on pgrep, which the image does not have.
+    Asking the daemon is the only reliable test. The recommended setup runs
+    it on the Pi rather than in here, and a container cannot see the host's
+    processes, so scanning /proc reported "not running" for a daemon that
+    was working perfectly well.
     """
     if _process is not None and _process.poll() is None:
+        return True
+    if _ask_daemon() is not None:
         return True
     try:
         entries = os.listdir("/proc")
@@ -61,6 +66,47 @@ def running() -> bool:
         except OSError:
             continue
     return False
+
+
+def _ask_daemon(timeout: float = 4.0) -> str | None:
+    """`bluealsa-aplay -L` output, or None if no daemon answered."""
+    binary = shutil.which("bluealsa-aplay")
+    if binary is None:
+        return None
+    try:
+        result = subprocess.run([binary, "-L"], capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    # It exits non-zero when it cannot reach the service; an empty list from a
+    # live daemon just means no speaker is connected, which is still running.
+    return result.stdout or "" if result.returncode == 0 else None
+
+
+def pcms() -> list[dict[str, str]]:
+    """Connected speakers, as PCM names ALSA can actually open.
+
+    The bare `bluealsa` PCM resolves to 00:00:00:00:00:00, which is not a
+    speaker and fails with "PCM not found". These are the real ones.
+    """
+    listing = _ask_daemon()
+    if not listing:
+        return []
+
+    found: list[dict[str, str]] = []
+    name = ""
+    for line in listing.splitlines():
+        if not line.strip():
+            continue
+        if not line.startswith(" "):
+            name = line.strip()
+            if name.startswith("bluealsa:"):
+                found.append({"name": name, "description": ""})
+            else:
+                name = ""
+        elif found and name:
+            found[-1]["description"] = (found[-1]["description"] + chr(10) + line.strip()).strip()
+    # Playback only: a headset also publishes a capture PCM.
+    return [pcm for pcm in found if "SOURCE" not in pcm["name"].upper()]
 
 
 #: What the host needs, when the bus refuses to let the container own the name.
@@ -92,6 +138,8 @@ def start() -> tuple[bool, str]:
     global _process, _last_error
 
     _last_error = ""
+    if running():
+        return True, ""
     if not installed():
         _last_error = (
             "bluealsa is not installed, so Bluetooth speakers cannot appear as "
@@ -157,4 +205,15 @@ def stop() -> None:
             pass
 
 
-__all__ = ["installed", "running", "start", "stop", "status", "binary", "PROFILES", "BINARIES", "DBUS_ADVICE"]
+__all__ = [
+    "installed",
+    "running",
+    "start",
+    "stop",
+    "status",
+    "binary",
+    "pcms",
+    "PROFILES",
+    "BINARIES",
+    "DBUS_ADVICE",
+]

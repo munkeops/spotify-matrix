@@ -301,4 +301,8 @@ in the place the bus looks:
     sudo systemctl enable --now bluealsa
 
 The container's ALSA plugin then talks to that daemon over the same socket, and
-the speaker appears in Settings under Game sound.
+the speaker appears in Settings under Game sound, by name.
+
+Do not select the bare `bluealsa` PCM by hand if you see it: it means device
+`00:00:00:00:00:00` and fails with "PCM not found". The panel lists speakers by
+address instead, and resolves an old saved setting to whichever is connected.

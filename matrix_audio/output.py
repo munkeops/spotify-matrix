@@ -115,7 +115,7 @@ def list_output_devices(include_plumbing: bool = False) -> list[dict[str, Any]]:
     given a readable label. Pass ``include_plumbing`` to get the raw list
     back for the cases where someone really does want ``dmix``.
     """
-    raw = _raw_output_devices()
+    raw = _raw_output_devices() + _bluetooth_pcms()
     if not raw:
         return []
 
@@ -188,6 +188,44 @@ def plug_device(device: str) -> str:
     return 'plug:{SLAVE="' + device + '"}'
 
 
+def _bluetooth_pcms() -> list[dict[str, Any]]:
+    """Speakers the bluealsa daemon knows about.
+
+    `aplay -L` only lists the bare `bluealsa` alias, which resolves to
+    00:00:00:00:00:00 and fails with "PCM not found". The daemon is the only
+    thing that knows which speakers are actually connected.
+    """
+    try:
+        from matrix_audio import bluealsa
+
+        return [dict(pcm) for pcm in bluealsa.pcms()]
+    except Exception:
+        return []
+
+
+def resolve_device(device: str) -> str:
+    """Turn a saved choice into a PCM that can be opened right now.
+
+    A speaker's PCM name contains its address, so it changes with the
+    hardware. Someone who picked the bare `bluealsa` alias - or picked a
+    speaker that has since been swapped - gets whichever one is connected
+    rather than the all-zeros address that alias means.
+    """
+    if not device.startswith("bluealsa"):
+        return device
+    try:
+        from matrix_audio import bluealsa
+
+        available = [pcm["name"] for pcm in bluealsa.pcms()]
+    except Exception:
+        return device
+    if not available or device in available:
+        return device
+    # Prefer music over a headset's telephony profile.
+    music = [name for name in available if "PROFILE=a2dp" in name]
+    return (music or available)[0]
+
+
 def _raw_output_devices() -> list[dict[str, Any]]:
     """ALSA playback devices, exactly as ``aplay -L`` reports them."""
     binary = shutil.which("aplay")
@@ -249,7 +287,7 @@ class AlsaOutput:
     def _command(self) -> list[str]:
         command = ["aplay", "-q", "-t", "raw", "-f", "S16_LE", "-r", str(SAMPLE_RATE), "-c", "1"]
         if self.device:
-            command += ["-D", plug_device(self.device)]
+            command += ["-D", plug_device(resolve_device(self.device))]
         return command + ["-"]
 
     def start(self) -> None:
