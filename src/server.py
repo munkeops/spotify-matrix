@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from configs import base_config
-from src.api.http.rest import assets, auth, bluetooth, commands, config, display, games, joystick, runtime, scores, status, tetris, widgets
+from src.api.http.rest import assets, auth, bluetooth, commands, config, display, gamepad, games, joystick, runtime, scores, status, tetris, widgets
 from src.domain.models.response import ErrorResponse, SuccessResponse
 from src.utils.logging_setup import initialize_logging
 
@@ -68,6 +68,11 @@ def create_app() -> FastAPI:
 
             if joystick_service.enabled():
                 joystick_service.start()
+
+            from src.domain.services.gamepad_service import gamepad_service
+
+            if gamepad_service.enabled():
+                gamepad_service.start()
         except Exception:
             logger.exception("[spotify-matrix] joystick startup failed, continuing without it")
 
@@ -77,8 +82,12 @@ def create_app() -> FastAPI:
             from src.domain.services.joystick_service import joystick_service
 
             joystick_service.stop()
+
+            from src.domain.services.gamepad_service import gamepad_service
+
+            gamepad_service.stop()
         except Exception:
-            logger.exception("[spotify-matrix] joystick shutdown failed")
+            logger.exception("[spotify-matrix] controller shutdown failed")
 
     @app.get("/healthz", response_model=SuccessResponse)
     async def healthz() -> dict[str, object]:
@@ -97,6 +106,7 @@ def create_app() -> FastAPI:
     app.include_router(games.router)
     app.include_router(scores.router)
     app.include_router(joystick.router)
+    app.include_router(gamepad.router)
 
     public_dir = str(base_config["paths"]["public_dir"])
     web_dist = Path("web-dist")

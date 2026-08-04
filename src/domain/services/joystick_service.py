@@ -202,6 +202,10 @@ class JoystickService:
             if not self._stop.is_set():
                 self._stop.wait(RECONNECT_SECONDS)
 
+    def dispatch_event(self, event) -> None:
+        """Route one controller event. Shared by the joystick and any gamepad."""
+        self._dispatch(event)
+
     def _dispatch(self, event) -> None:
         if event.kind == "disconnected":
             self.connected = False

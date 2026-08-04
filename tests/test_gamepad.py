@@ -1,0 +1,227 @@
+from __future__ import annotations
+
+import importlib
+import sys
+from pathlib import Path
+
+import pytest
+
+import matrix_games as mg
+from matrix_input.gamepad import (
+    ABS_HAT0X,
+    ABS_HAT0Y,
+    ABS_X,
+    ABS_Y,
+    BTN_EAST,
+    BTN_NORTH,
+    BTN_SOUTH,
+    BTN_START,
+    BTN_WEST,
+    EV_ABS,
+    EV_KEY,
+    FakeGamepad,
+    GamepadMapper,
+)
+from mini_joystick.bindings import game_action, shell_action
+from mini_joystick.protocol import Button, ButtonEvent, Direction
+
+GAMES = mg.discover()
+
+
+def mapper() -> GamepadMapper:
+    pad = GamepadMapper(deadzone=0.5)
+    pad.configure_axis(ABS_X, -32768, 32767)
+    pad.configure_axis(ABS_Y, -32768, 32767)
+    return pad
+
+
+# --- button mapping ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "code,button",
+    [(BTN_SOUTH, Button.A), (BTN_EAST, Button.B), (BTN_WEST, Button.C), (BTN_NORTH, Button.D), (BTN_START, Button.OK)],
+)
+def test_face_buttons_map_to_the_shared_set(code, button):
+    events = mapper().feed(EV_KEY, code, 1)
+    assert [(e.button, e.event) for e in events] == [(button, ButtonEvent.PRESS_DOWN)]
+
+
+def test_release_and_kernel_repeat():
+    pad = mapper()
+    assert pad.feed(EV_KEY, BTN_SOUTH, 0)[0].event == ButtonEvent.PRESS_UP
+    # Value 2 is the kernel auto-repeating; the binding does its own repeat.
+    assert pad.feed(EV_KEY, BTN_SOUTH, 2) == []
+
+
+def test_unknown_buttons_are_ignored():
+    assert mapper().feed(EV_KEY, 0x2FF, 1) == []
+    assert mapper().feed(0x04, BTN_SOUTH, 1) == [], "only key and abs events matter"
+
+
+# --- directions ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "code,value,expected",
+    [
+        (ABS_HAT0X, 1, Direction.RIGHT),
+        (ABS_HAT0X, -1, Direction.LEFT),
+        (ABS_HAT0Y, 1, Direction.DOWN),
+        (ABS_HAT0Y, -1, Direction.UP),
+    ],
+)
+def test_the_dpad_gives_directions(code, value, expected):
+    events = mapper().feed(EV_ABS, code, value)
+    assert [e.direction for e in events] == [expected]
+
+
+def test_the_stick_uses_its_reported_range():
+    pad = mapper()
+    assert pad.feed(EV_ABS, ABS_X, 32767)[0].direction == Direction.RIGHT
+    assert pad.feed(EV_ABS, ABS_X, 0) == [], "returning to centre is not a new direction event"
+    assert pad.feed(EV_ABS, ABS_X, -32768)[0].direction == Direction.LEFT
+
+
+def test_a_resting_stick_is_neutral():
+    pad = mapper()
+    # Well inside the deadzone.
+    assert pad.feed(EV_ABS, ABS_X, 2000) == []
+    assert pad.held_direction() == Direction.NEUTRAL
+
+
+def test_a_direction_fires_once_while_held():
+    pad = mapper()
+    assert len(pad.feed(EV_ABS, ABS_HAT0X, 1)) == 1
+    # The kernel repeats the same value; auto-repeat is the binding's job.
+    assert pad.feed(EV_ABS, ABS_HAT0X, 1) == []
+
+
+def test_the_dpad_wins_over_a_drifting_stick():
+    pad = mapper()
+    pad.feed(EV_ABS, ABS_X, 32767)
+    events = pad.feed(EV_ABS, ABS_HAT0Y, -1)
+    assert [e.direction for e in events] == [Direction.UP]
+
+
+def test_a_diagonal_picks_the_dominant_axis():
+    pad = mapper()
+    pad.feed(EV_ABS, ABS_Y, 20000)
+    events = pad.feed(EV_ABS, ABS_X, 32767)
+    assert [e.direction for e in events] == [Direction.RIGHT]
+
+
+# --- the pad drives games through the shared binding ---------------------
+
+
+def test_a_pad_press_becomes_a_game_action():
+    pad = mapper()
+    fire = pad.feed(EV_KEY, BTN_SOUTH, 1)[0]
+    left = pad.feed(EV_ABS, ABS_HAT0X, -1)[0]
+
+    assert game_action(fire, set(GAMES["invaders"].actions)) == "fire"
+    assert game_action(fire, set(GAMES["tetris"].actions)) == "hardDrop"
+    assert game_action(fire, set(GAMES["flappy"].actions)) == "flap"
+    assert game_action(left, set(GAMES["pacman"].actions)) == "left"
+
+
+def test_start_pauses_and_the_pad_walks_plugins():
+    pad = mapper()
+    start = pad.feed(EV_KEY, BTN_START, 1)[0]
+    right = pad.feed(EV_ABS, ABS_HAT0X, 1)[0]
+
+    assert game_action(start, set(GAMES["snake"].actions)) == "togglePause"
+    assert shell_action(right).kind == "next"
+
+
+def test_fake_pad_replays_a_script():
+    pad = FakeGamepad([(EV_KEY, BTN_SOUTH, 1), (EV_ABS, ABS_HAT0X, 1)])
+    events = list(pad.poll())
+    assert [event.kind for event in events] == ["button", "direction"]
+    assert list(pad.poll()) == [], "events are drained once"
+
+
+# --- service -------------------------------------------------------------
+
+
+SERVICE_MODULES = [
+    "src.domain.services.config_service",
+    "src.domain.services.game_service",
+    "src.domain.services.runtime_service",
+    "src.domain.services.widget_registry_service",
+    "src.domain.services.joystick_service",
+    "src.domain.services.gamepad_service",
+]
+
+
+def reload_stack(monkeypatch, data_dir: Path):
+    monkeypatch.setenv("SPOTIFY_MATRIX_DATA_DIR", str(data_dir))
+    for name in SERVICE_MODULES:
+        sys.modules.pop(name, None)
+    config_module = importlib.import_module("src.domain.services.config_service")
+    game_module = importlib.import_module("src.domain.services.game_service")
+    importlib.import_module("src.domain.services.joystick_service")
+    gamepad_module = importlib.import_module("src.domain.services.gamepad_service")
+    return config_module, game_module, gamepad_module
+
+
+def test_the_pad_drives_the_running_game(tmp_path, monkeypatch):
+    config_module, game_module, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "widget"
+    config.display.widgetId = "core.invaders"
+    config_module.config_service.save_config(config)
+
+    pad = FakeGamepad([(EV_ABS, ABS_HAT0X, -1), (EV_KEY, BTN_SOUTH, 1)])
+    for event in pad.poll():
+        gamepad_module.gamepad_service._dispatch(event)
+
+    actions, _ = mg.read_commands(game_module.game_service.input_path("invaders"), 0)
+    assert actions == ["left", "fire"]
+
+
+def test_the_service_reports_what_to_do(tmp_path, monkeypatch):
+    _, _, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
+    state = gamepad_module.gamepad_service.state()
+
+    assert state["enabled"] is False
+    assert state["running"] is False
+    assert isinstance(state["devices"], list)
+    assert state["advice"], "there is always a next step to suggest"
+
+
+def test_the_thread_starts_and_stops_against_a_fake_pad(tmp_path, monkeypatch):
+    config_module, _, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.gamepad.enabled = True
+    config_module.config_service.save_config(config)
+
+    service = gamepad_module.gamepad_service
+    service.reader_factory = lambda: FakeGamepad(name="Test Pad")
+    try:
+        assert service.start()["running"] is True
+        deadline = __import__("time").monotonic() + 2.0
+        while not service.connected and __import__("time").monotonic() < deadline:
+            __import__("time").sleep(0.02)
+        assert service.connected is True
+        assert service.device_name == "Test Pad"
+    finally:
+        state = service.stop()
+    assert state["running"] is False
+
+
+def test_no_controller_is_not_an_error(tmp_path, monkeypatch):
+    config_module, _, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.gamepad.enabled = True
+    config_module.config_service.save_config(config)
+
+    service = gamepad_module.gamepad_service
+    service.reader_factory = lambda: None
+    try:
+        service.start()
+        __import__("time").sleep(0.2)
+        assert service.connected is False
+        assert service.running() is True, "it should keep waiting for a pad, not die"
+    finally:
+        service.stop()

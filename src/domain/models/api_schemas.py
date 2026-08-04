@@ -135,6 +135,15 @@ class JoystickConfig(BaseModel):
     combinedRead: bool = False
 
 
+class GamepadConfig(BaseModel):
+    """Bluetooth or USB game controller, read through evdev."""
+
+    enabled: bool = False
+    #: Empty means take the first controller found.
+    device: str = ""
+    deadzone: float = 0.5
+
+
 class StoreConfig(BaseModel):
     indexUrl: str = "configs/widget_store_index.json"
 
@@ -211,6 +220,7 @@ class AppConfig(BaseModel):
     draw: DrawConfig = Field(default_factory=DrawConfig)
     slideshow: SlideshowConfig = Field(default_factory=SlideshowConfig)
     joystick: JoystickConfig = Field(default_factory=JoystickConfig)
+    gamepad: GamepadConfig = Field(default_factory=GamepadConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 
 
@@ -427,3 +437,25 @@ class GameScoresResponse(BaseModel):
     plays: int = 0
     scores: list[GameScoreEntry] = Field(default_factory=list)
     values: dict[str, Any] = Field(default_factory=dict)
+
+
+class GamepadDevice(BaseModel):
+    path: str
+    name: str
+    wireless: bool = False
+
+
+class GamepadStateResponse(BaseModel):
+    enabled: bool
+    running: bool
+    connected: bool
+    libraryInstalled: bool
+    device: str = ""
+    deviceName: str = ""
+    devices: list[GamepadDevice] = Field(default_factory=list)
+    lastError: str = ""
+    advice: str = ""
+
+
+class GamepadConfigRequest(BaseModel):
+    config: dict[str, Any] = Field(default_factory=dict)

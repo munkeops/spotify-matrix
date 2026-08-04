@@ -7,6 +7,7 @@ so the module's MCU sees the transaction shape it was written for.
 
 from __future__ import annotations
 
+import errno
 import threading
 from typing import Protocol
 
@@ -15,6 +16,23 @@ from mini_joystick.protocol import I2C_ADDRESS
 
 class TransportError(RuntimeError):
     """Raised when the bus is unusable, as opposed to a single bad read."""
+
+
+def _open_error(bus: int, exc: OSError) -> str:
+    """Say what actually went wrong, because the fixes are entirely different."""
+    if exc.errno == errno.ENOENT:
+        return (
+            f"I2C bus {bus} does not exist (/dev/i2c-{bus} is missing). Enable I2C with "
+            "'sudo raspi-config' (Interface Options -> I2C), make sure 'dtparam=i2c_arm=on' is in "
+            "/boot/firmware/config.txt, then REBOOT - the device node only appears after a reboot. "
+            "Verify with 'ls /dev/i2c-*' on the host."
+        )
+    if exc.errno in (errno.EACCES, errno.EPERM):
+        return (
+            f"Permission denied opening I2C bus {bus}. Add the user to the i2c group "
+            "('sudo usermod -aG i2c $USER' then log out and back in), or run the container privileged."
+        )
+    return f"Could not open I2C bus {bus}: {exc}"
 
 
 class Transport(Protocol):
@@ -57,9 +75,7 @@ class SMBusTransport:
         try:
             self._bus = SMBus(bus)
         except OSError as exc:  # pragma: no cover - depends on the host
-            raise TransportError(
-                f"Could not open I2C bus {bus}: {exc}. Check that I2C is enabled and the user is in the i2c group."
-            ) from exc
+            raise TransportError(_open_error(bus, exc)) from exc
 
     def read_register(self, register: int) -> int | None:
         with self._lock:

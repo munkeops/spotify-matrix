@@ -3,6 +3,7 @@ import { Card, CardContent, Typography, Stack, TextField, MenuItem, Switch, Form
 import { getConfig, saveConfig } from "../api";
 import BluetoothPanel from "../components/BluetoothPanel";
 import JoystickPanel from "../components/JoystickPanel";
+import GamepadPanel from "../components/GamepadPanel";
 
 const MATRIX_NUMBERS: { key: string; label: string }[] = [
   { key: "rows", label: "Rows" },
@@ -83,6 +84,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      <GamepadPanel />
       <JoystickPanel />
       <BluetoothPanel />
 

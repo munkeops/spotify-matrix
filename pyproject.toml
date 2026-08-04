@@ -9,6 +9,7 @@ packages = [
     { include = "assistant_matrix_sdk" },
     { include = "matrix_games" },
     { include = "mini_joystick" },
+    { include = "matrix_input" },
 ]
 
 [tool.poetry.dependencies]
@@ -24,6 +25,8 @@ loguru = "^0.7.3"
 # I2C for the mini-joystick. Linux only, and imported lazily, so a dev install
 # on another platform is unaffected.
 smbus2 = { version = ">=0.4.3", markers = "sys_platform == 'linux'" }
+# Bluetooth and USB gamepads. Linux only, imported lazily.
+evdev = { version = ">=1.6", markers = "sys_platform == 'linux'" }
 
 [tool.poetry.scripts]
 assistant-matrix-widget = "assistant_matrix_sdk.cli:main"

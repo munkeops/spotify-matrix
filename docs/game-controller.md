@@ -1,0 +1,88 @@
+# Bluetooth Game Controller
+
+Any standard gamepad — Xbox, PlayStation, 8BitDo, a cheap USB pad — can drive
+the matrix games. BlueZ pairs it, the kernel exposes it as an input device, and
+Assistant Matrix reads it and feeds the same command queue the on-screen pad
+and the mini-joystick use.
+
+## Pairing
+
+1. Put the controller in pairing mode.
+   - Xbox: hold the small **pair** button on the top until the Xbox light
+     flashes quickly.
+   - PlayStation: hold **PS + Share** until the light bar flashes.
+   - 8BitDo: hold **Start**, then the pair button.
+2. Open **Settings → Bluetooth** in the app, press **Scan**, and connect to the
+   controller when it appears.
+3. Once connected, open **Settings → Game controller** and turn on
+   **Use a game controller**.
+
+The panel lists every controller the kernel can see and says what to do if the
+list is empty. Pairing survives a reboot, so this is a one-off.
+
+Prefer the command line, or the pad will not pair from the UI:
+
+```bash
+bluetoothctl
+> power on
+> agent on
+> scan on          # wait for the controller's MAC to appear
+> pair AA:BB:CC:DD:EE:FF
+> trust AA:BB:CC:DD:EE:FF     # trust makes it reconnect by itself
+> connect AA:BB:CC:DD:EE:FF
+> quit
+```
+
+Confirm the kernel picked it up:
+
+```bash
+ls -l /dev/input/event*
+cat /proc/bus/input/devices | grep -A 4 Name
+```
+
+## Controls
+
+The binding adapts to whatever the running game declares, exactly like the
+mini-joystick, so one pad works everywhere without per-game setup.
+
+| Pad | Action |
+|---|---|
+| D-pad or left stick | Move, or aim the cursor |
+| **A** (cross) | The game's main action — fire, flap, drop, hard drop |
+| **B** (circle) | Rotate the other way, or the secondary action |
+| **X** (square) | Hold piece, where a game has one |
+| **Y** (triangle) | Secondary |
+| **Start** | Pause and resume |
+| **Select** | Restart |
+
+When no game is on the panel, the pad walks the plugin list: left and right
+change plugin, **A** or **Start** applies the highlighted one.
+
+Only movement auto-repeats when a direction is held, so holding the stick never
+spins a Tetris piece or machine-guns a drop.
+
+## Docker
+
+The service runs `privileged` and shares the host `/dev`, so `/dev/input/*` is
+already visible. Nothing to map.
+
+BlueZ itself runs on the host; the container talks to it over the system D-Bus
+socket, which the compose file already mounts:
+
+```yaml
+volumes:
+  - /var/run/dbus:/var/run/dbus
+```
+
+## If it does not work
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| "evdev library is missing" | Gamepad support not installed | Rebuild the container |
+| "No controller found" | Not paired, or not connected | Pair under Settings → Bluetooth; check `ls /dev/input/event*` |
+| Pairs then drops immediately | Not trusted | `bluetoothctl` → `trust <MAC>` |
+| Connected but nothing happens | Reading is switched off | Turn on **Use a game controller** |
+| Wrong pad is being read | More than one connected | Pick it in the **Controller** dropdown |
+
+A controller that goes out of range or switches off is noticed, and the service
+reconnects on its own when it comes back.

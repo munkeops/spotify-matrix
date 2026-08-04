@@ -287,3 +287,25 @@ export interface GameScores {
 
 export const getGameScores = (id: string) =>
   apiGet<GameScores>(`/api/games/${encodeURIComponent(id)}/scores`);
+
+export interface GamepadDevice {
+  path: string;
+  name: string;
+  wireless: boolean;
+}
+
+export interface GamepadState {
+  enabled: boolean;
+  running: boolean;
+  connected: boolean;
+  libraryInstalled: boolean;
+  device: string;
+  deviceName: string;
+  devices: GamepadDevice[];
+  lastError: string;
+  advice: string;
+}
+
+export const getGamepad = () => apiGet<GamepadState>("/api/gamepad");
+export const saveGamepadConfig = (config: Record<string, unknown>) =>
+  apiPost<GamepadState>("/api/gamepad/config", { config });

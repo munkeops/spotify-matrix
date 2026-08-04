@@ -20,6 +20,7 @@ Widget platform docs:
 - [Widget store index schema](docs/schemas/widget-store-index.schema.json)
 - [Game plugins](docs/game-plugins.md)
 - [Mini-joystick module](docs/mini-joystick.md)
+- [Bluetooth game controller](docs/game-controller.md)
 
 ## Layout
 
@@ -233,6 +234,14 @@ rebooting.
 Each game is also a plugin, so difficulty and rules are editable from its config
 drawer: Pac-Man speed and lives, Snake walls, Breakout paddle width, Pong
 opponent, and so on.
+
+## Game controller
+
+Pair a Bluetooth gamepad under **Settings → Bluetooth**, then turn it on under
+**Settings → Game controller**. D-pad moves, **A** is the action button, **Start**
+pauses, and the pad walks the plugin list when no game is running. It adapts to
+whatever the running game declares, so one pad works everywhere. See
+[docs/game-controller.md](docs/game-controller.md).
 
 ## Mini-joystick
 
