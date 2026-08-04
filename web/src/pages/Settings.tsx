@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, Typography, Stack, TextField, MenuItem, Switch, FormControlLabel, Button, Box, Alert, Snackbar, CircularProgress } from "@mui/material";
 import { getConfig, saveConfig } from "../api";
 import BluetoothPanel from "../components/BluetoothPanel";
+import JoystickPanel from "../components/JoystickPanel";
 
 const MATRIX_NUMBERS: { key: string; label: string }[] = [
   { key: "rows", label: "Rows" },
@@ -82,6 +83,7 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      <JoystickPanel />
       <BluetoothPanel />
 
       <Button variant="contained" onClick={save} disabled={busy} sx={{ alignSelf: "flex-start" }}>

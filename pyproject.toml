@@ -4,7 +4,12 @@ version = "0.2.0"
 description = "Spotify album art matrix display with FastAPI setup UI"
 readme = "README.md"
 authors = ["rohanyf <rohan@yummyfuture.wiki>"]
-packages = [{ include = "src" }, { include = "assistant_matrix_sdk" }]
+packages = [
+    { include = "src" },
+    { include = "assistant_matrix_sdk" },
+    { include = "matrix_games" },
+    { include = "mini_joystick" },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"

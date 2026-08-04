@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from configs import base_config
-from src.api.http.rest import assets, auth, bluetooth, commands, config, display, games, runtime, status, tetris, widgets
+from src.api.http.rest import assets, auth, bluetooth, commands, config, display, games, joystick, runtime, status, tetris, widgets
 from src.domain.models.response import ErrorResponse, SuccessResponse
 from src.utils.logging_setup import initialize_logging
 
@@ -60,6 +60,19 @@ def create_app() -> FastAPI:
         logger.exception("[spotify-matrix] {} {} 500", request.method, request.url.path)
         return JSONResponse(status_code=500, content=ErrorResponse(message="internal server error", detail="internal server error").model_dump())
 
+    @app.on_event("startup")
+    async def _start_joystick() -> None:
+        from src.domain.services.joystick_service import joystick_service
+
+        if joystick_service.enabled():
+            joystick_service.start()
+
+    @app.on_event("shutdown")
+    async def _stop_joystick() -> None:
+        from src.domain.services.joystick_service import joystick_service
+
+        joystick_service.stop()
+
     @app.get("/healthz", response_model=SuccessResponse)
     async def healthz() -> dict[str, object]:
         return SuccessResponse(data={"status": "ok"}).model_dump()
@@ -75,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(bluetooth.router)
     app.include_router(tetris.router)
     app.include_router(games.router)
+    app.include_router(joystick.router)
 
     public_dir = str(base_config["paths"]["public_dir"])
     web_dist = Path("web-dist")

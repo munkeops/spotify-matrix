@@ -18,6 +18,7 @@ Widget platform docs:
 - [Widget API reference](docs/widget-api-reference.md)
 - [Widget manifest schema](docs/schemas/widget-manifest.schema.json)
 - [Widget store index schema](docs/schemas/widget-store-index.schema.json)
+- [Mini-joystick module](docs/mini-joystick.md)
 
 ## Layout
 
@@ -220,6 +221,20 @@ python spotify_matrix.py --display-mode pacman --mock-output data/frame.png   --
 Each game is also a plugin, so difficulty and rules are editable from its config
 drawer: Pac-Man speed and lives, Snake walls, Breakout paddle width, Pong
 opponent, and so on.
+
+## Mini-joystick
+
+A NULLLAB mini-joystick module (I2C 0x5A, one stick plus A/B/C/D/OK) can drive
+the panel directly: it plays whichever game is running, and flicks through
+plugins when none is. Enable it with:
+
+```bash
+curl -X POST http://<pi-host>:3000/api/joystick/config   -H "Content-Type: application/json" -d '{"config":{"enabled":true}}'
+```
+
+**The module is 5V and the Pi's GPIO is 3.3V — put a bidirectional level
+shifter on SDA and SCL.** Wiring, the register map, the SDK and the full button
+mapping are in [docs/mini-joystick.md](docs/mini-joystick.md).
 
 ## Legacy env support
 

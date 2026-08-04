@@ -231,3 +231,19 @@ export const getGameState = (id: string) =>
   apiGet<GameStateResponse>(`/api/games/${encodeURIComponent(id)}/state`);
 export const sendGameInput = (id: string, action: string) =>
   apiPost<{ ok: boolean; seq: number }>(`/api/games/${encodeURIComponent(id)}/input`, { action });
+
+export interface JoystickState {
+  enabled: boolean;
+  running: boolean;
+  connected: boolean;
+  bus: number;
+  address: number;
+  lastError: string;
+  lastAction: string;
+  lastActionAt: number;
+  eventsSeen: number;
+}
+
+export const getJoystick = () => apiGet<JoystickState>("/api/joystick");
+export const saveJoystickConfig = (config: Record<string, unknown>) =>
+  apiPost<JoystickState>("/api/joystick/config", { config });

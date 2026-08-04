@@ -1,0 +1,231 @@
+"""Background joystick controller for the matrix.
+
+Polls the mini-joystick on its own thread. While a game is on the panel the
+stick and buttons drive that game through the same command queue the web pad
+uses; otherwise they shuffle through the installed plugins.
+"""
+
+from __future__ import annotations
+
+import os
+import threading
+import time
+from typing import Any
+
+from loguru import logger
+
+from matrix_games import GAMES
+from mini_joystick import (
+    Button,
+    FakeTransport,
+    JoystickReader,
+    MiniJoystick,
+    SMBusTransport,
+    Transport,
+    TransportError,
+)
+from mini_joystick.bindings import ShellAction, game_action, shell_action
+from src.domain.services.config_service import config_service
+from src.domain.services.game_service import game_service
+
+POLL_HZ = float(os.environ.get("ASSISTANT_MATRIX_JOYSTICK_POLL_HZ", "30"))
+RECONNECT_SECONDS = 5.0
+
+
+class JoystickService:
+    def __init__(self) -> None:
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+        self._lock = threading.Lock()
+        self.connected = False
+        self.last_error = ""
+        self.last_action = ""
+        self.last_action_at = 0.0
+        self.events_seen = 0
+        self._cursor = 0
+        self._last_active = ""
+        # Injected by the tests; production builds one from config.
+        self.transport_factory = None
+
+    # --- lifecycle -------------------------------------------------------
+
+    def settings(self) -> Any:
+        return config_service.get_config().joystick
+
+    def enabled(self) -> bool:
+        return bool(self.settings().enabled)
+
+    def state(self) -> dict[str, Any]:
+        settings = self.settings()
+        return {
+            "enabled": bool(settings.enabled),
+            "running": self.running(),
+            "connected": self.connected,
+            "bus": settings.bus,
+            "address": settings.address,
+            "lastError": self.last_error,
+            "lastAction": self.last_action,
+            "lastActionAt": self.last_action_at,
+            "eventsSeen": self.events_seen,
+        }
+
+    def running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self) -> dict[str, Any]:
+        with self._lock:
+            if self.running():
+                return self.state()
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._run, name="mini-joystick", daemon=True)
+            self._thread.start()
+        return self.state()
+
+    def stop(self) -> dict[str, Any]:
+        with self._lock:
+            self._stop.set()
+            thread = self._thread
+        if thread is not None:
+            thread.join(timeout=2.0)
+        self._thread = None
+        self.connected = False
+        return self.state()
+
+    def apply(self) -> dict[str, Any]:
+        """Start or stop to match the saved config."""
+        if self.enabled():
+            if self.running():
+                self.stop()
+            return self.start()
+        return self.stop()
+
+    # --- polling ---------------------------------------------------------
+
+    def _build_transport(self) -> Transport:
+        if self.transport_factory is not None:
+            return self.transport_factory()
+        settings = self.settings()
+        return SMBusTransport(bus=int(settings.bus), address=int(settings.address), combined=bool(settings.combinedRead))
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                transport = self._build_transport()
+            except TransportError as exc:
+                self.last_error = str(exc)
+                self.connected = False
+                logger.warning("[joystick] {}", exc)
+                if self._stop.wait(RECONNECT_SECONDS):
+                    return
+                continue
+
+            settings = self.settings()
+            joystick = MiniJoystick(
+                transport,
+                deadzone=float(settings.deadzone),
+                invert_x=bool(settings.invertX),
+                invert_y=bool(settings.invertY),
+            )
+            reader = JoystickReader(joystick, repeat_delay=float(settings.repeatDelay), repeat_interval=float(settings.repeatInterval))
+            self.last_error = ""
+            interval = 1.0 / max(1.0, POLL_HZ)
+            try:
+                while not self._stop.is_set():
+                    started = time.monotonic()
+                    for event in reader.poll(started):
+                        self._dispatch(event)
+                    self._stop.wait(max(0.0, interval - (time.monotonic() - started)))
+            except Exception as exc:  # keep the thread alive across bus glitches
+                self.last_error = str(exc)
+                logger.exception("[joystick] polling failed")
+            finally:
+                joystick.close()
+                self.connected = False
+            if not self._stop.is_set():
+                self._stop.wait(RECONNECT_SECONDS)
+
+    def _dispatch(self, event) -> None:
+        if event.kind == "disconnected":
+            self.connected = False
+            logger.info("[joystick] module not responding")
+            return
+        if event.kind == "reconnected":
+            self.connected = True
+            logger.info("[joystick] module connected")
+            return
+
+        self.connected = True
+        self.events_seen += 1
+        active = game_service.active_game_id()
+        if active:
+            self._dispatch_game(active, event)
+        else:
+            self._dispatch_shell(event)
+
+    def _dispatch_game(self, game_id: str, event) -> None:
+        spec = GAMES.get(game_id)
+        if spec is None:
+            return
+        action = game_action(event, set(spec.actions))
+        if not action:
+            return
+        game_service.queue_command(game_id, action)
+        self._record(f"{game_id}:{action}")
+
+    def _dispatch_shell(self, event) -> None:
+        action = shell_action(event)
+        if action is None:
+            return
+        # Imported lazily: the registry imports the runtime supervisor, and this
+        # service is constructed before the app finishes wiring itself up.
+        from src.domain.services.widget_registry_service import widget_registry_service
+
+        widgets = [widget for widget in widget_registry_service.list_local_widgets() if widget.enabled]
+        if not widgets:
+            return
+        ids = [widget.manifest.id for widget in widgets]
+        active_id = next((widget.manifest.id for widget in widgets if widget.active), "")
+        # Resync only when something else moved the panel, so repeated pushes
+        # keep walking the list instead of bouncing off the active widget.
+        if active_id and active_id != self._last_active:
+            self._last_active = active_id
+            if active_id in ids:
+                self._cursor = ids.index(active_id)
+        self._cursor %= len(ids)
+
+        if action.kind in ("next", "previous"):
+            step = 1 if action.kind == "next" else -1
+            self._cursor = (self._cursor + step) % len(ids)
+            self._apply_widget(ids[self._cursor])
+        elif action.kind == "apply":
+            self._apply_widget(ids[self._cursor % len(ids)])
+        elif action.kind == "open" and action.value in ids:
+            self._cursor = ids.index(action.value)
+            self._apply_widget(action.value)
+        elif action.kind == "power":
+            from src.domain.services.runtime_service import runtime_service
+
+            if runtime_service.state().running:
+                runtime_service.stop()
+            else:
+                runtime_service.start()
+            self._record("power")
+
+    def _apply_widget(self, widget_id: str) -> None:
+        from src.domain.services.widget_registry_service import widget_registry_service
+
+        try:
+            widget_registry_service.apply_widget(widget_id)
+            self._record(f"apply:{widget_id}")
+        except Exception as exc:
+            self.last_error = str(exc)
+            logger.warning("[joystick] could not apply {}: {}", widget_id, exc)
+
+    def _record(self, action: str) -> None:
+        self.last_action = action
+        self.last_action_at = time.time()
+
+
+joystick_service = JoystickService()
+
+__all__ = ["JoystickService", "joystick_service", "FakeTransport", "Button", "ShellAction"]

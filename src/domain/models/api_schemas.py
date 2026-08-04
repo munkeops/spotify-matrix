@@ -168,6 +168,21 @@ class ConnectFourConfig(BaseModel):
     opponent: Literal["ai", "human"] = "human"
 
 
+class JoystickConfig(BaseModel):
+    """Mini-joystick module (I2C 0x5A). See docs/mini-joystick.md for wiring."""
+
+    enabled: bool = False
+    bus: int = 1
+    address: int = 0x5A
+    deadzone: float = 0.35
+    invertX: bool = False
+    invertY: bool = False
+    repeatDelay: float = 0.28
+    repeatInterval: float = 0.09
+    #: Use a repeated START instead of the vendor's write-STOP-read pair.
+    combinedRead: bool = False
+
+
 class StoreConfig(BaseModel):
     indexUrl: str = "configs/widget_store_index.json"
 
@@ -251,6 +266,7 @@ class AppConfig(BaseModel):
     flappy: FlappyConfig = Field(default_factory=FlappyConfig)
     pong: PongConfig = Field(default_factory=PongConfig)
     connect4: ConnectFourConfig = Field(default_factory=ConnectFourConfig)
+    joystick: JoystickConfig = Field(default_factory=JoystickConfig)
     store: StoreConfig = Field(default_factory=StoreConfig)
 
 
@@ -419,3 +435,19 @@ class CommandResponse(BaseModel):
     runtime: Any = None
     matched: bool | None = None
     widgetId: str | None = None
+
+
+class JoystickStateResponse(BaseModel):
+    enabled: bool
+    running: bool
+    connected: bool
+    bus: int = 1
+    address: int = 0x5A
+    lastError: str = ""
+    lastAction: str = ""
+    lastActionAt: float = 0.0
+    eventsSeen: int = 0
+
+
+class JoystickConfigRequest(BaseModel):
+    config: dict[str, Any] = Field(default_factory=dict)
