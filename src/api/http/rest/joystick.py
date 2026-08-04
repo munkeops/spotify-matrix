@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.domain.models.api_schemas import JoystickConfigRequest, JoystickStateResponse
+from src.domain.models.api_schemas import JoystickConfigRequest, JoystickDiagnostics, JoystickStateResponse
 from src.domain.services.config_service import config_service
 from src.domain.services.joystick_service import joystick_service
 
@@ -36,3 +36,9 @@ async def start_joystick() -> JoystickStateResponse:
 @router.post("/api/joystick/stop", response_model=JoystickStateResponse)
 async def stop_joystick() -> JoystickStateResponse:
     return JoystickStateResponse(**joystick_service.stop())
+
+
+@router.get("/api/joystick/diagnostics", response_model=JoystickDiagnostics)
+async def get_joystick_diagnostics() -> JoystickDiagnostics:
+    """Scan every I2C bus and say what to do about what it finds."""
+    return JoystickDiagnostics(**joystick_service.diagnostics())

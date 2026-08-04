@@ -38,7 +38,15 @@ from mini_joystick.protocol import (
     ButtonEvent,
     Direction,
 )
-from mini_joystick.transport import FakeTransport, SMBusTransport, Transport, TransportError
+from mini_joystick.transport import (
+    FakeTransport,
+    SMBusTransport,
+    Transport,
+    TransportError,
+    available_buses,
+    scan_bus,
+    smbus_available,
+)
 
 __version__ = "1.0.0"
 
@@ -55,6 +63,9 @@ __all__ = [
     "SMBusTransport",
     "FakeTransport",
     "TransportError",
+    "available_buses",
+    "scan_bus",
+    "smbus_available",
     "I2C_ADDRESS",
     "AXIS_MIN",
     "AXIS_CENTER",

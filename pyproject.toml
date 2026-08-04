@@ -21,6 +21,9 @@ uvicorn = ">=0.30.0"
 pydantic = "^2.10.0"
 toml = "^0.10.2"
 loguru = "^0.7.3"
+# I2C for the mini-joystick. Linux only, and imported lazily, so a dev install
+# on another platform is unaffected.
+smbus2 = { version = ">=0.4.3", markers = "sys_platform == 'linux'" }
 
 [tool.poetry.scripts]
 assistant-matrix-widget = "assistant_matrix_sdk.cli:main"

@@ -395,3 +395,22 @@ class JoystickStateResponse(BaseModel):
 
 class JoystickConfigRequest(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
+
+
+class I2CBusInfo(BaseModel):
+    bus: int
+    addresses: list[str] = Field(default_factory=list)
+    joystickFound: bool = False
+    error: str = ""
+
+
+class JoystickDiagnostics(BaseModel):
+    """Everything needed to work out why the module is not responding."""
+
+    libraryInstalled: bool
+    buses: list[I2CBusInfo] = Field(default_factory=list)
+    configuredBus: int = 1
+    configuredAddress: str = "0x5a"
+    detected: bool = False
+    #: Plain-language next step when the module is not detected.
+    advice: str = ""

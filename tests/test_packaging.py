@@ -154,3 +154,10 @@ def test_a_current_config_is_left_alone():
     payload, changed = migrate_config({"display": {"mode": "widget", "widgetId": "core.snake"}})
     assert changed is False
     assert payload["display"]["widgetId"] == "core.snake"
+
+
+def test_runtime_dependencies_are_declared():
+    """A silent edit once dropped smbus2, so the joystick could never open the bus."""
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    for dependency in ("pillow", "fastapi", "pydantic", "loguru", "smbus2"):
+        assert f"\n{dependency} = " in pyproject.lower(), f"pyproject must declare {dependency}"

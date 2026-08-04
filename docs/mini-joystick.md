@@ -22,13 +22,59 @@ over I²C.
 | `SDA` | HV1 → LV1 | GPIO 2 / SDA1 (pin 3) |
 | `SCL` | HV2 → LV2 | GPIO 3 / SCL1 (pin 5) |
 
-Enable I²C once with `sudo raspi-config` (Interface Options → I2C), then
-confirm the module answers at `0x5a`:
+### Which pins? You mostly do not get to choose
+
+Hardware I²C on a Pi is wired to fixed pins. You pick a **bus**, and the bus
+determines the pins — you cannot point bus 1 at arbitrary GPIOs.
+
+| Bus | SDA | SCL | Notes |
+|---|---|---|---|
+| `i2c-1` | GPIO 2 — physical pin **3** | GPIO 3 — physical pin **5** | The default, and what to use |
+| `i2c-0` | GPIO 0 — pin 27 | GPIO 1 — pin 28 | Reserved for HAT ID EEPROMs, do not use |
+| `i2c-3`…`i2c-6` | various | various | Pi 4/5 only, each needs its own overlay |
+
+**So: SDA to physical pin 3, SCL to physical pin 5, and set `bus` to 1.** If you
+wired to different pins, move the wires — that is much the easiest fix.
+
+If you cannot move them (the matrix HAT is using pin 3 or 5, say), add a
+*software* I²C bus on whatever pins you do have free. Put this in
+`/boot/firmware/config.txt` (`/boot/config.txt` on older releases), substituting
+your GPIO numbers, then reboot:
+
+```text
+dtoverlay=i2c-gpio,bus=3,i2c_gpio_sda=23,i2c_gpio_scl=24
+```
+
+That creates `/dev/i2c-3`; set `bus` to `3` in the joystick settings. Software
+I²C is slower, which does not matter for a joystick polled 30 times a second.
+
+Note the RGB matrix HAT already claims a lot of the header. Check its pinout
+before choosing, and avoid anything it drives.
+
+### Enable and check the bus
 
 ```bash
-sudo apt install -y i2c-tools python3-smbus
-i2cdetect -y 1
+sudo raspi-config          # Interface Options -> I2C -> Yes, then reboot
+sudo apt install -y i2c-tools
+i2cdetect -y 1             # the module should appear at 5a
 ```
+
+### If it still does not work
+
+Open **Settings → Mini-joystick → Detect module** in the app. It scans every
+bus, lists what answered, and tells you the next step. What it is checking, in
+the order things usually go wrong:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| "smbus2 library is missing" | The I²C library is not installed | Rebuild the container, or `pip install smbus2` |
+| "No I2C bus exists" | I²C not enabled, or not mapped into Docker | `raspi-config`, reboot, and confirm `devices: - /dev/i2c-1:/dev/i2c-1` in `docker-compose.yml` |
+| Bus present but empty | Wrong pins, no power, or SDA/SCL swapped | SDA to pin 3, SCL to pin 5, V to 5V, G to ground |
+| Other addresses but not `0x5a` | Wiring is fine, the module is not answering | Check the module's power LED is solid red; check the level shifter |
+| Answers on a different bus | The app is set to the wrong bus | Change **I²C bus** in the same panel |
+
+Docker note: the container needs the bus mapped. This repo's `docker-compose.yml`
+already does it, but a hand-rolled `docker run` needs `--device /dev/i2c-1`.
 
 ## Protocol
 

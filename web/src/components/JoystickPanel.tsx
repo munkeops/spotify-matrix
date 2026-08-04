@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Card, CardContent, Chip, FormControlLabel, Stack, Switch, TextField, Typography } from "@mui/material";
-import { JoystickState, getJoystick, saveJoystickConfig } from "../api";
+import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, Stack, Switch, TextField, Typography } from "@mui/material";
+import { JoystickDiagnostics, JoystickState, getJoystick, getJoystickDiagnostics, saveJoystickConfig } from "../api";
 
 export default function JoystickPanel() {
   const [state, setState] = useState<JoystickState | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<JoystickDiagnostics | null>(null);
+  const [scanning, setScanning] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -32,6 +34,18 @@ export default function JoystickPanel() {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const detect = async () => {
+    setScanning(true);
+    try {
+      setDiagnostics(await getJoystickDiagnostics());
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -84,6 +98,26 @@ export default function JoystickPanel() {
                 Drives whichever game is on the panel, and flicks through plugins when none is.
                 The module is 5V — use a level shifter on SDA and SCL.
               </Typography>
+              <Box>
+                <Button size="small" variant="outlined" onClick={detect} disabled={scanning}>
+                  {scanning ? "Scanning…" : "Detect module"}
+                </Button>
+              </Box>
+
+              {diagnostics ? (
+                <Alert severity={diagnostics.detected ? "success" : "warning"}>
+                  <Typography variant="body2" sx={{ mb: diagnostics.buses.length ? 1 : 0 }}>
+                    {diagnostics.advice}
+                  </Typography>
+                  {diagnostics.buses.map((bus) => (
+                    <Typography key={bus.bus} variant="caption" sx={{ display: "block", fontFamily: "monospace" }}>
+                      bus {bus.bus}: {bus.error || (bus.addresses.length ? bus.addresses.join(" ") : "nothing found")}
+                      {bus.joystickFound ? "  <- joystick" : ""}
+                    </Typography>
+                  ))}
+                </Alert>
+              ) : null}
+
               {state.lastAction ? (
                 <Box>
                   <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>Last input</Typography>

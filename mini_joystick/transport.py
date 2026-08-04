@@ -103,4 +103,62 @@ class FakeTransport:
         self.closed = True
 
 
-__all__ = ["Transport", "TransportError", "SMBusTransport", "FakeTransport"]
+__all__ = [
+    "Transport",
+    "TransportError",
+    "SMBusTransport",
+    "FakeTransport",
+    "smbus_available",
+    "available_buses",
+    "scan_bus",
+]
+
+
+def smbus_available() -> bool:
+    """Whether the I2C library is installed at all."""
+    try:
+        import smbus2  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def available_buses() -> list[int]:
+    """Bus numbers the kernel is exposing, from /dev/i2c-*."""
+    from pathlib import Path
+
+    buses: list[int] = []
+    for node in Path("/dev").glob("i2c-*"):
+        suffix = node.name.split("-", 1)[-1]
+        if suffix.isdigit():
+            buses.append(int(suffix))
+    return sorted(buses)
+
+
+def scan_bus(bus: int) -> list[int]:
+    """Addresses that answer on a bus, like ``i2cdetect -y <bus>``.
+
+    Raises :class:`TransportError` when the bus cannot be opened at all, which
+    is a different problem from an empty bus.
+    """
+    try:
+        from smbus2 import SMBus
+    except ImportError as exc:
+        raise TransportError("smbus2 is not installed, so the I2C bus cannot be scanned.") from exc
+
+    try:
+        handle = SMBus(bus)
+    except OSError as exc:
+        raise TransportError(f"Could not open I2C bus {bus}: {exc}") from exc
+
+    found: list[int] = []
+    try:
+        for address in range(0x03, 0x78):
+            try:
+                handle.read_byte(address)
+            except OSError:
+                continue
+            found.append(address)
+    finally:
+        handle.close()
+    return found

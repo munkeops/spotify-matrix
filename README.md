@@ -197,6 +197,7 @@ to put it on the matrix, and its gamepad opens with a live mirror of the panel.
 | Flappy | one button | tap to fly, tracks your best |
 | Pong | up/down | versus the computer, or a second phone on the P2 buttons |
 | Connect Four | left/right, drop | hot seat or versus the computer |
+| Battleship | d-pad, fire | two 10x10 grids; the computer hunts around its hits |
 
 Every game shares one contract: the runtime steps it, renders a 64x64 frame, and
 publishes that frame as a palette plus one row string per line. The app decodes
@@ -233,9 +234,14 @@ plugins when none is. Enable it with:
 curl -X POST http://<pi-host>:3000/api/joystick/config   -H "Content-Type: application/json" -d '{"config":{"enabled":true}}'
 ```
 
-**The module is 5V and the Pi's GPIO is 3.3V — put a bidirectional level
-shifter on SDA and SCL.** Wiring, the register map, the SDK and the full button
-mapping are in [docs/mini-joystick.md](docs/mini-joystick.md).
+Wiring: **SDA to physical pin 3, SCL to physical pin 5**, V to 5V, G to ground.
+Hardware I²C pins are fixed, so if you wired elsewhere either move the wires or
+add a software bus with `dtoverlay=i2c-gpio`. **The module is 5V and the Pi's
+GPIO is 3.3V — put a bidirectional level shifter on SDA and SCL.**
+
+Stuck? **Settings → Mini-joystick → Detect module** scans every I²C bus and
+tells you what is wrong. Full pin table, register map and button mapping in
+[docs/mini-joystick.md](docs/mini-joystick.md).
 
 ## Legacy env support
 

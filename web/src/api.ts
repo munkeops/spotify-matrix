@@ -256,3 +256,21 @@ export interface JoystickState {
 export const getJoystick = () => apiGet<JoystickState>("/api/joystick");
 export const saveJoystickConfig = (config: Record<string, unknown>) =>
   apiPost<JoystickState>("/api/joystick/config", { config });
+
+export interface I2CBusInfo {
+  bus: number;
+  addresses: string[];
+  joystickFound: boolean;
+  error: string;
+}
+
+export interface JoystickDiagnostics {
+  libraryInstalled: boolean;
+  buses: I2CBusInfo[];
+  configuredBus: number;
+  configuredAddress: string;
+  detected: boolean;
+  advice: string;
+}
+
+export const getJoystickDiagnostics = () => apiGet<JoystickDiagnostics>("/api/joystick/diagnostics");

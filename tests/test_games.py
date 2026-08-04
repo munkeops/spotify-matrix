@@ -4,6 +4,7 @@ import importlib
 import json
 import shutil
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -827,3 +828,157 @@ def test_launch_args_prefer_an_installed_build(tmp_path, monkeypatch):
     widget_dir = Path(args[args.index("--widget-dir") + 1])
 
     assert widget_dir == packages / "core.snake"
+
+
+# --- Battleship ---------------------------------------------------------
+
+
+battleship = mg.plugin_module("battleship")
+BattleshipGame = battleship.BattleshipGame
+BS_GRID = battleship.GRID
+
+
+def test_battleship_places_a_full_fleet_without_overlaps():
+    game = BattleshipGame(seed=1)
+    for fleet in (game.enemy, game.player):
+        cells = [cell for ship in fleet.ships for cell in ship.cells]
+        assert len(cells) == sum(size for size, _ in battleship.FLEET)
+        assert len(set(cells)) == len(cells), "ships must not overlap"
+        assert all(0 <= x < BS_GRID and 0 <= y < BS_GRID for x, y in cells)
+        assert all(len(ship.cells) == ship.size for ship in fleet.ships)
+
+
+def test_battleship_ships_never_touch():
+    game = BattleshipGame(seed=2)
+    for ship in game.enemy.ships:
+        halo = {(x + dx, y + dy) for x, y in ship.cells for dx in (-1, 0, 1) for dy in (-1, 0, 1)}
+        for other in game.enemy.ships:
+            if other is ship:
+                continue
+            assert not (halo & set(other.cells)), "a one cell gap keeps hunting fair"
+
+
+def test_battleship_firing_reports_miss_hit_and_sunk():
+    game = BattleshipGame(seed=3)
+    target = game.enemy.ships[-1]
+
+    empty = next(
+        (x, y)
+        for x in range(BS_GRID)
+        for y in range(BS_GRID)
+        if game.enemy.ship_at((x, y)) is None
+    )
+    assert game.enemy.fire(empty) == "miss"
+    assert game.enemy.fire(empty) == "repeat", "firing twice must not count"
+
+    results = [game.enemy.fire(cell) for cell in target.cells]
+    assert results[:-1] == ["hit"] * (len(target.cells) - 1)
+    assert results[-1] == "sunk"
+    assert target.sunk is True
+
+
+def test_battleship_sinking_every_ship_wins():
+    game = BattleshipGame(seed=4)
+    for ship in game.enemy.ships:
+        for cell in ship.cells:
+            if game.finished():
+                break
+            game.cursor = [cell[0], cell[1]]
+            game.command("fire")
+            # Let the computer answer, otherwise it is never the player's turn again.
+            game.step(1.0)
+    assert game.won is True, "perfect shooting should win before the computer does"
+    assert game.status() == "won"
+
+
+def test_battleship_turn_passes_to_the_computer_after_a_shot():
+    game = BattleshipGame(seed=5)
+    empty = next(
+        (x, y)
+        for x in range(BS_GRID)
+        for y in range(BS_GRID)
+        if game.enemy.ship_at((x, y)) is None
+    )
+    game.cursor = list(empty)
+    game.command("fire")
+    assert game.turn == "enemy"
+
+    # Input is ignored while the computer is thinking.
+    before = list(game.cursor)
+    game.command("right")
+    assert game.cursor == before
+
+    game.step(1.0)
+    assert game.turn == "player"
+    assert len(game.player.shots) == 1
+
+
+def test_battleship_computer_hunts_around_its_hits():
+    game = BattleshipGame({"difficulty": "hunt"}, seed=6)
+    ship = game.player.ships[0]
+    hit = ship.cells[0]
+
+    game.player.fire(hit)
+    ship.hits.add(hit)
+    x, y = hit
+    for step_x, step_y in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        neighbour = (x + step_x, y + step_y)
+        if 0 <= neighbour[0] < BS_GRID and 0 <= neighbour[1] < BS_GRID and neighbour not in game.player.shots:
+            game.hunt.append(neighbour)
+
+    target = game._enemy_target()
+    assert abs(target[0] - x) + abs(target[1] - y) == 1, "the computer should probe next to its hit"
+
+
+def test_battleship_never_repeats_a_shot():
+    game = BattleshipGame(seed=7)
+    for _ in range(BS_GRID * BS_GRID):
+        target = game._enemy_target()
+        assert target is not None
+        assert target not in game.player.shots
+        game.player.fire(target)
+
+    # Board exhausted: the computer must hand the turn back, not raise.
+    assert game._enemy_target() is None
+    game.turn = "enemy"
+    game._enemy_fire()
+    assert game.turn == "player"
+
+
+def test_battleship_cursor_wraps_around_the_grid():
+    game = BattleshipGame(seed=8)
+    game.cursor = [0, 0]
+    game.command("left")
+    assert game.cursor[0] == BS_GRID - 1
+    game.command("up")
+    assert game.cursor[1] == BS_GRID - 1
+
+
+def test_battleship_practice_mode_reveals_the_enemy():
+    hidden = BattleshipGame({"revealEnemy": False}, seed=9)
+    shown = BattleshipGame({"revealEnemy": True}, seed=9)
+    assert hidden.render(PANEL).tobytes() != shown.render(PANEL).tobytes()
+
+
+def test_an_idle_game_keeps_publishing(tmp_path):
+    """A turn based game can sit unchanged; watchers must still see it as live."""
+    import spotify_matrix as runtime
+
+    state_path = tmp_path / "idle-state.json"
+    frame_path = tmp_path / "idle.png"
+    args = runtime.build_parser().parse_args(
+        ["--display-mode", "widget", "--mock-output", str(frame_path),
+         "--game-state", str(state_path), "--config-path", str(tmp_path / "config.json"), "--once"]
+    )
+
+    game = mg.create_game("battleship", {}, seed=1)
+    runtime.run_game(args, runtime.MockDisplay(frame_path), 64, game)
+    first = json.loads(state_path.read_text(encoding="utf-8"))["updatedAt"]
+
+    # Nothing about the board changes, but the timestamp must still move on.
+    time.sleep(0.01)
+    runtime.run_game(args, runtime.MockDisplay(frame_path), 64, game)
+    second = json.loads(state_path.read_text(encoding="utf-8"))["updatedAt"]
+
+    assert second > first
+    assert runtime.GAME_HEARTBEAT_SECONDS <= 2.0, "must be well inside the staleness window"

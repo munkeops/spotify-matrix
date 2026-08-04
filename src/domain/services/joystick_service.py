@@ -24,6 +24,7 @@ from mini_joystick import (
     TransportError,
 )
 from mini_joystick.bindings import ShellAction, game_action, shell_action
+from mini_joystick.transport import available_buses, scan_bus, smbus_available
 from src.domain.services.config_service import config_service
 from src.domain.services.game_service import game_service
 
@@ -67,6 +68,61 @@ class JoystickService:
             "lastActionAt": self.last_action_at,
             "eventsSeen": self.events_seen,
         }
+
+    def diagnostics(self) -> dict[str, Any]:
+        """Probe every I2C bus so a wiring problem is visible, not guesswork."""
+        settings = self.settings()
+        address = int(settings.address)
+        installed = smbus_available()
+        buses: list[dict[str, Any]] = []
+        detected = False
+
+        for bus in available_buses():
+            entry: dict[str, Any] = {"bus": bus, "addresses": [], "joystickFound": False, "error": ""}
+            try:
+                found = scan_bus(bus)
+                entry["addresses"] = [f"0x{value:02x}" for value in found]
+                entry["joystickFound"] = address in found
+                detected = detected or entry["joystickFound"]
+            except Exception as exc:
+                entry["error"] = str(exc)
+            buses.append(entry)
+
+        return {
+            "libraryInstalled": installed,
+            "buses": buses,
+            "configuredBus": int(settings.bus),
+            "configuredAddress": f"0x{address:02x}",
+            "detected": detected,
+            "advice": self._advice(installed, buses, detected, int(settings.bus), address),
+        }
+
+    def _advice(self, installed: bool, buses: list[dict[str, Any]], detected: bool, bus: int, address: int) -> str:
+        if not installed:
+            return (
+                "The smbus2 library is missing. Rebuild the container, or install it with "
+                "'pip install smbus2'."
+            )
+        if not buses:
+            return (
+                "No I2C bus exists yet. Enable it with 'sudo raspi-config' (Interface Options -> I2C) "
+                "and reboot. In Docker, the bus also has to be mapped into the container."
+            )
+        if detected:
+            found_on = [entry["bus"] for entry in buses if entry["joystickFound"]]
+            if bus in found_on:
+                return "The module is responding. If input still does nothing, enable the joystick above."
+            return f"The module answered on bus {found_on[0]}, but the app is set to bus {bus}. Change the bus here."
+        seen = sorted({addr for entry in buses for addr in entry["addresses"]})
+        if seen:
+            return (
+                f"The bus works and sees {', '.join(seen)}, but nothing at 0x{address:02x}. "
+                "Check the module has 5V power and that SDA and SCL are not swapped."
+            )
+        return (
+            "The bus is present but empty. Wire SDA to GPIO 2 (physical pin 3) and SCL to GPIO 3 "
+            "(physical pin 5), power the module from 5V, and use a level shifter on both lines."
+        )
 
     def running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()

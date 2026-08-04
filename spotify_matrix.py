@@ -1944,6 +1944,10 @@ def run_draw(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
         display.clear()
 
 
+# Republish at least this often so an idle game still reads as live.
+GAME_HEARTBEAT_SECONDS = 1.5
+
+
 def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int, game: GameWidget | str) -> None:
     """Drive one game: drain queued input, step, draw, publish state."""
     if isinstance(game, str):
@@ -1957,6 +1961,9 @@ def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
     previous = time.monotonic()
     next_state_write = 0.0
     last_written = ""
+    # A turn based game can sit unchanged for a long time, so refresh the
+    # timestamp periodically or watchers would think the game had stopped.
+    last_write_at = 0.0
     try:
         while True:
             started = time.monotonic()
@@ -1976,9 +1983,10 @@ def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
             if state_path is not None and started >= next_state_write:
                 snapshot = game.snapshot(frame, size)
                 serialized = json.dumps(snapshot, sort_keys=True)
-                if serialized != last_written:
+                if serialized != last_written or started - last_write_at >= GAME_HEARTBEAT_SECONDS:
                     write_game_state(state_path, snapshot)
                     last_written = serialized
+                    last_write_at = started
                 next_state_write = started + 0.2
 
             if args.once:
