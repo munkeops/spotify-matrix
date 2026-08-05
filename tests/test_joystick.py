@@ -809,3 +809,46 @@ def test_brightness_goes_back_up_after_coming_down(tmp_path, monkeypatch):
     assert config_module.config_service.get_config().matrix.brightness == 50
     service._adjust_brightness(joystick_module.BRIGHTNESS_STEP)
     assert config_module.config_service.get_config().matrix.brightness == 60
+
+
+def test_both_brightness_buttons_work_end_to_end(tmp_path, monkeypatch):
+    """Through the whole dispatch path, not just the setter: A is brighter,
+    B is dimmer, and each must move the saved level."""
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+    config = config_module.config_service.get_config()
+    config.matrix.brightness = 50
+    config_module.config_service.save_config(config)
+
+    service._dispatch(button_event(Button.A, ButtonEvent.PRESS_DOWN))
+    assert config_module.config_service.get_config().matrix.brightness == 60, "A did not brighten"
+
+    service._dispatch(button_event(Button.B, ButtonEvent.PRESS_DOWN))
+    assert config_module.config_service.get_config().matrix.brightness == 50, "B did not dim"
+
+
+def test_brightness_climbs_all_the_way_from_the_floor(tmp_path, monkeypatch):
+    """Repeated dimming persists to config, so getting back up has to work."""
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+    config = config_module.config_service.get_config()
+    config.matrix.brightness = joystick_module.BRIGHTNESS_MIN
+    config_module.config_service.save_config(config)
+
+    for _ in range(20):
+        service._dispatch(button_event(Button.A, ButtonEvent.PRESS_DOWN))
+
+    assert config_module.config_service.get_config().matrix.brightness == joystick_module.BRIGHTNESS_MAX
+
+
+def test_the_panel_cannot_be_dimmed_into_darkness(tmp_path, monkeypatch):
+    """The floor was 5, which looks broken. Settings can still set any value
+    deliberately; this only bounds what the dimmer button can reach."""
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+
+    for _ in range(30):
+        service._dispatch(button_event(Button.B, ButtonEvent.PRESS_DOWN))
+
+    level = config_module.config_service.get_config().matrix.brightness
+    assert level == joystick_module.BRIGHTNESS_MIN >= 20, f"dimmed to {level}"

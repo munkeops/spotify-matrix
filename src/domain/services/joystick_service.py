@@ -34,7 +34,13 @@ RECONNECT_SECONDS = 5.0
 
 # Percentage points per button press.
 BRIGHTNESS_STEP = 10
-BRIGHTNESS_MIN = 5
+#: Never dim below something you can still read the panel by.
+#:
+#: The floor was 5, which is close enough to off that the matrix looks
+#: broken - and since the level persists, a few too many presses on dimmer
+#: left the panel dark through a reboot, with the way back up being a button
+#: you cannot see to find.
+BRIGHTNESS_MIN = 20
 BRIGHTNESS_MAX = 100
 
 # Wheel entries. `action` is handled below; `short` is what fits a wedge.
