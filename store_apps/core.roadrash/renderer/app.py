@@ -27,6 +27,8 @@ PLAYER_Y = PANEL - 10
 ROAD_HALF_WIDTH = 23
 #: How far ahead a rival can be and still be drawn, in metres.
 DRAW_DISTANCE = 90.0
+#: Lateral room to leave around the player when putting a rival back on.
+LANE = 0.35
 
 SKY = (12, 14, 34)
 GROUND = (26, 44, 30)
@@ -86,11 +88,13 @@ class RoadRashGame(GameApp):
         self.swing_for = 0.0
         self.finished_at = 0.0
 
+        # Spread through the visible road rather than strung out beyond it,
+        # so there is traffic on screen from the first frame.
         self.rivals = [
             Rival(
-                distance=30.0 + index * 26.0,
+                distance=16.0 + index * (DRAW_DISTANCE * 0.8 / max(1, rivals)),
                 offset=self.random.uniform(-0.6, 0.6),
-                speed=self.top_speed * self.random.uniform(0.62, 0.84),
+                speed=self.top_speed * self.random.uniform(0.5, 0.75),
             )
             for index in range(rivals)
         ]
@@ -193,9 +197,34 @@ class RoadRashGame(GameApp):
             rival.distance += (rival.speed - self.speed_now) * elapsed
             rival.offset += math.sin((self.position + rival.distance) * 0.02) * elapsed * 0.25
             rival.offset = max(-0.9, min(0.9, rival.offset))
+            # Keep the pack around you. Only the rivals that dropped behind
+            # used to be recycled, so anything that pulled ahead of the draw
+            # distance was gone for the rest of the race - and since they all
+            # start faster than a standing player, that was all of them, and
+            # the road stayed empty however long you rode.
             if rival.distance < -40.0:
-                # Dropped well behind: bring them back up the road.
-                rival.distance = self.random.uniform(60.0, 100.0)
+                self._recycle(rival, ahead=True)
+            elif rival.distance > DRAW_DISTANCE + 25.0:
+                self._recycle(rival, ahead=False)
+
+    def _recycle(self, rival: Rival, *, ahead: bool) -> None:
+        """Bring a rival back into play at the other end of the road."""
+        rival.distance = (
+            self.random.uniform(DRAW_DISTANCE * 0.7, DRAW_DISTANCE)
+            if ahead
+            else self.random.uniform(-35.0, -15.0)
+        )
+        rival.offset = self.random.uniform(-0.75, 0.75)
+        # Never drop one straight into the lane you are riding in. Shoving it
+        # by a fixed amount can land it the same distance off on the other
+        # side, so place it clear of your lane outright, on whichever side of
+        # you has the most road.
+        if abs(rival.offset - self.offset) < LANE:
+            side = 1.0 if self.offset <= 0 else -1.0
+            rival.offset = self.offset + side * (LANE + self.random.uniform(0.05, 0.3))
+        rival.offset = max(-0.9, min(0.9, rival.offset))
+        rival.speed = self.top_speed * self.random.uniform(0.5, 0.75)
+        rival.down_for = 0.0
 
     def _check_verge(self, elapsed: float) -> None:
         if abs(self.offset) <= 1.0 or self.crash_for > 0:
@@ -206,14 +235,29 @@ class RoadRashGame(GameApp):
             self._crash()
 
     def _check_contact(self) -> None:
+        """What happens when you and a rival occupy the same bit of road.
+
+        Being alongside used to crash you, at a lateral gap of 0.24 - while
+        landing a swing needs you within 0.42. Riding alongside is the whole
+        point, so it costs a rub of paint now, and only actually running into
+        the back of someone puts you down.
+        """
         if self.crash_for > 0:
             return
         for rival in self.rivals:
-            if rival.down or abs(rival.distance) > 3.0:
+            if rival.down or abs(rival.distance) > 2.5:
                 continue
-            if abs(rival.offset - self.offset) < 0.24:
+            gap = self.offset - rival.offset
+            if abs(gap) >= 0.2:
+                continue
+            if self.speed_now - rival.speed > self.top_speed * 0.3:
                 self._crash()
                 return
+            # Shoulder to shoulder: both get shoved apart and slowed.
+            push = 0.05 if gap >= 0 else -0.05
+            self.offset = max(-1.4, min(1.4, self.offset + push))
+            rival.offset = max(-0.9, min(0.9, rival.offset - push))
+            self.speed_now *= 0.985
 
     def _crash(self) -> None:
         self.crash_for = 1.1

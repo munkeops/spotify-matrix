@@ -1597,3 +1597,63 @@ def test_breakout_hitting_two_bricks_at_once_turns_each_axis_once():
     game._hit_bricks()
 
     assert game.ball_vy > 0, "turned away from the row, not flipped twice"
+
+
+def _roadrash():
+    return importlib.import_module(mg.game_class("roadrash").__module__)
+
+
+@pytest.mark.parametrize("throttle", [False, True])
+def test_roadrash_always_has_riders_on_the_road(throttle):
+    """Rivals start faster than a standing player and only the ones that
+    dropped behind were recycled, so they all pulled past the draw distance
+    and the road stayed empty for the rest of the race."""
+    roadrash = _roadrash()
+    game = mg.create_game("roadrash", {}, seed=1)
+
+    empty = 0
+    for tick in range(400):
+        if throttle and tick % 3 == 0:
+            game.command("up")
+        game.step(0.05)
+        if not [r for r in game.rivals if -10 < r.distance < roadrash.DRAW_DISTANCE]:
+            empty += 1
+
+    assert empty == 0, f"{empty} frames with nothing on the road"
+
+
+def test_roadrash_riding_alongside_is_racing_not_crashing():
+    """Landing a swing needs a lateral gap under 0.42, but anything under
+    0.24 used to crash you, so the fight was unreachable."""
+    game = mg.create_game("roadrash", {}, seed=1)
+    rival = game.rivals[0]
+    game.speed_now = 40.0
+    rival.speed = 40.0
+    rival.distance, rival.offset, game.offset = 1.0, 0.0, 0.1
+
+    game._check_contact()
+
+    assert game.crash_for == 0 and game.crashes == 0
+    assert abs(game.offset - rival.offset) > 0.1, "they shove each other apart"
+
+
+def test_roadrash_running_into_the_back_of_someone_still_hurts():
+    game = mg.create_game("roadrash", {}, seed=1)
+    rival = game.rivals[0]
+    game.speed_now = game.top_speed
+    rival.speed = 5.0
+    rival.distance, rival.offset, game.offset = 1.0, 0.0, 0.0
+
+    game._check_contact()
+
+    assert game.crashes == 1
+
+
+def test_roadrash_never_drops_a_rider_into_your_lane():
+    game = mg.create_game("roadrash", {}, seed=2)
+    game.offset = 0.0
+    rival = game.rivals[0]
+
+    for _ in range(30):
+        game._recycle(rival, ahead=False)
+        assert abs(rival.offset - game.offset) >= 0.35
