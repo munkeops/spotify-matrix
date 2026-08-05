@@ -7,6 +7,7 @@ own, so you can confirm the sound card works before starting a game.
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -15,9 +16,18 @@ from matrix_audio import AudioEngine, aplay_available, bluealsa, list_output_dev
 from matrix_audio.output import BLUETOOTH
 
 
+#: How long a test engine may hold the sound card after playing.
+#:
+#: It has to outlast the effect, and it has to end. Holding aplay open
+#: indefinitely means the runtime cannot open the device when a game starts,
+#: so one press of Test left every game silent until the API restarted.
+TEST_RELEASE_SECONDS = 3.0
+
+
 class AudioService:
     def __init__(self) -> None:
         self._test_engine: AudioEngine | None = None
+        self._release: threading.Timer | None = None
 
     def settings(self) -> Any:
         from src.domain.services.config_service import config_service
@@ -146,9 +156,11 @@ class AudioService:
         deadline = time.monotonic() + 0.6
         while time.monotonic() < deadline and not engine.error:
             time.sleep(0.05)
-        # Replace whatever the last test left running.
+        # Replace whatever the last test left running, and make sure this one
+        # lets go of the sound card too.
         self._stop_previous()
         self._test_engine = engine
+        self._release_later(engine)
         if not played:
             available = ", ".join(self.sounds()[:6]) or "none"
             return {
@@ -159,7 +171,7 @@ class AudioService:
             where = settings.device or "the default output"
             return {
                 "ok": False,
-                "message": f"Could not play through {where}: {engine.error}",
+                "message": f"Could not play through {where}. {self._explain(engine.error)}",
                 "error": engine.error,
             }
         return {"ok": True, "message": f"Playing {sound}.", "error": ""}
@@ -178,7 +190,44 @@ class AudioService:
             return bluealsa.why_no_speaker()
         return ""
 
+    @staticmethod
+    def _explain(error: str) -> str:
+        """Say what an ALSA failure means, rather than quoting it.
+
+        aplay reports a page of hardware parameters and a D: trace, and the
+        one useful word is buried in it.
+        """
+        lowered = error.lower()
+        if "busy" in lowered:
+            return (
+                "Something else is using it. A Bluetooth speaker only takes one "
+                "stream at a time, so stop the game on the matrix, or wait a "
+                "moment if you just pressed Test."
+            )
+        if "no such device" in lowered or "pcm not found" in lowered:
+            return "The output has gone away. Reconnect the speaker and refresh."
+        if "channels" in lowered or "sample" in lowered or "rate" in lowered:
+            return "The output refused the audio format."
+        # Unknown: the last line is usually the actual error.
+        lines = [line.strip() for line in error.splitlines() if line.strip()]
+        return lines[-1] if lines else error
+
+    def _release_later(self, engine: AudioEngine) -> None:
+        """Give the device back once the effect has had time to play."""
+        def release() -> None:
+            if self._test_engine is engine:
+                self._test_engine = None
+            engine.stop()
+
+        timer = threading.Timer(TEST_RELEASE_SECONDS, release)
+        timer.daemon = True
+        self._release = timer
+        timer.start()
+
     def _stop_previous(self) -> None:
+        timer, self._release = self._release, None
+        if timer is not None:
+            timer.cancel()
         previous, self._test_engine = self._test_engine, None
         if previous is not None:
             previous.stop()

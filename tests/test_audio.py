@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import struct
+import time
 import types
 import wave
 from array import array
@@ -535,7 +536,8 @@ def test_the_test_button_admits_when_nothing_came_out(monkeypatch):
     result = module.audio_service.play_test("death")
 
     assert result["ok"] is False
-    assert "Channels count non available" in result["message"]
+    assert "refused the audio format" in result["message"], "said plainly"
+    assert "Channels count non available" in result["error"], "raw error kept for debugging"
 
 
 def test_the_bridge_state_reaches_the_panel():
@@ -800,3 +802,52 @@ def test_a_soundcore_is_recognised_as_a_speaker():
     assert classify("", "SoundCore 2") == "audio"
     assert classify("", "Anker SoundCore") == "audio"
     assert classify("", "Xbox Wireless Controller") == "controller"
+
+
+def test_the_test_sound_lets_go_of_the_speaker(monkeypatch):
+    """It held aplay open forever, so a second Test - and any game - got
+    "Couldn't open PCM: Device or resource busy" from a Bluetooth speaker,
+    which only takes one stream at a time."""
+    from src.domain.services import audio_service as module
+
+    stopped: list[bool] = []
+
+    class Engine:
+        error = ""
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def load_directory(self, *args, **kwargs):
+            return []
+
+        def start(self):
+            return None
+
+        def play(self, name):
+            return True
+
+        def stop(self):
+            stopped.append(True)
+
+    monkeypatch.setattr(module, "AudioEngine", Engine)
+    monkeypatch.setattr(module, "TEST_RELEASE_SECONDS", 0.05)
+    module.audio_service.play_test("start")
+
+    assert module.audio_service._release is not None, "a release was scheduled"
+    time.sleep(0.3)
+    assert stopped, "the engine let go of the device"
+
+
+def test_a_busy_device_is_explained_not_quoted():
+    from src.domain.services.audio_service import audio_service
+
+    raw = (
+        "D: bluealsa-pcm.c:551: Couldn't open PCM: Device or resource busy\n"
+        "aplay: set_params:1416: Unable to install hw params: ACCESS: RW_INTERLEAVED"
+    )
+
+    explained = audio_service._explain(raw)
+
+    assert "busy" not in explained.lower() or "Something else" in explained
+    assert "RW_INTERLEAVED" not in explained
