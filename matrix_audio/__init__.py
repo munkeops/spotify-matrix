@@ -12,17 +12,26 @@ from typing import Any
 
 from matrix_audio.mixer import MAX_VOICES, Mixer
 from matrix_audio import bluealsa
-from matrix_audio.output import plug_device, resolve_device, AlsaOutput, NullOutput, aplay_available, list_output_devices
+from matrix_audio.output import DEFAULT_BUFFER_MS, plug_device, resolve_device, AlsaOutput, NullOutput, aplay_available, list_output_devices
 from matrix_audio.synth import SAMPLE_RATE, read_wav, write_wav
 
 
 class AudioEngine:
     """A mixer plus an output, with a safe do-nothing mode."""
 
-    def __init__(self, *, enabled: bool = True, device: str = "", volume: float = 0.8) -> None:
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+        device: str = "",
+        volume: float = 0.8,
+        buffer_ms: int = 0,
+    ) -> None:
         self.mixer = Mixer(volume=volume)
         self.enabled = bool(enabled)
         self.device = device
+        #: How much the sound card may hold. Bounds how late an effect can be.
+        self.buffer_ms = int(buffer_ms) or DEFAULT_BUFFER_MS
         self._output: Any = NullOutput()
 
     # --- lifecycle -------------------------------------------------------
@@ -30,7 +39,7 @@ class AudioEngine:
     def start(self) -> None:
         if not self.enabled:
             return
-        self._output = AlsaOutput(self.mixer, self.device)
+        self._output = AlsaOutput(self.mixer, self.device, self.buffer_ms)
         self._output.start()
 
     def stop(self) -> None:

@@ -355,6 +355,8 @@ export interface AudioState {
   devices: AudioDevice[];
   sounds: string[];
   advice: string;
+  /** Sound card buffer in ms: the ceiling on how late an effect can be. */
+  bufferMs?: number;
   /** The Bluetooth-to-ALSA daemon; without it a speaker cannot be an output. */
   bridge?: AudioBridge;
 }

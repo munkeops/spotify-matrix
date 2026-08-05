@@ -975,3 +975,35 @@ def test_a_namespace_remap_is_named_as_such(monkeypatch):
 
     assert "userns_mode" in explained
     assert "uid 1" in explained and "runs as root" in explained
+
+
+def test_the_sound_card_buffer_is_bounded():
+    """Left to itself ALSA chose half a second, and since the mixer feeds
+    silence continuously an effect queued behind all of it."""
+    from matrix_audio.mixer import Mixer
+    from matrix_audio.output import AlsaOutput
+
+    command = AlsaOutput(Mixer(), device="bluealsa", buffer_ms=120)._command()
+
+    assert "--buffer-time" in command
+    assert command[command.index("--buffer-time") + 1] == "120000"
+    # Four periods to a buffer keeps the feeder ahead without adding latency.
+    assert command[command.index("--period-time") + 1] == "30000"
+
+
+def test_a_silly_buffer_is_clamped():
+    from matrix_audio.mixer import Mixer
+    from matrix_audio.output import AlsaOutput
+
+    assert AlsaOutput(Mixer(), buffer_ms=1).buffer_ms >= 30, "too small only crackles"
+
+
+def test_the_buffer_reaches_the_runtime():
+    """It is the runtime's engine that plays game effects, so the setting has
+    to survive the trip into its arguments."""
+    import inspect
+
+    from src.domain.services import runtime_service as module
+
+    source = inspect.getsource(module.RuntimeService._args)
+    assert "--audio-buffer-ms" in source

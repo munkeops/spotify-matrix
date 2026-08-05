@@ -2187,6 +2187,7 @@ def game_audio(args: argparse.Namespace, sounds_dir: Path | None):
         enabled=True,
         device=str(getattr(args, "audio_device", "") or ""),
         volume=float(getattr(args, "audio_volume", 80) or 80) / 100.0,
+        buffer_ms=int(getattr(args, "audio_buffer_ms", 0) or 0),
     )
     if sounds_dir is not None:
         engine.load_directory(sounds_dir)
@@ -2500,6 +2501,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--audio", action="store_true", help="Play game sound effects through the sound card.")
     parser.add_argument("--audio-device", dest="audio_device", default="", help="ALSA device for sound effects; empty means the default.")
     parser.add_argument("--audio-volume", dest="audio_volume", type=int, default=80, help="Sound effect volume, 0-100.")
+    parser.add_argument("--audio-buffer-ms", dest="audio_buffer_ms", type=int, default=120, help="Sound card buffer in ms; bounds how late an effect can be.")
     parser.add_argument("--app-id", default="", help="Installed app id for external app mode.")
     parser.add_argument("--app-dir", type=Path, help="Installed app package directory for external app mode.")
     parser.add_argument("--app-config", type=Path, help="Saved app config JSON for external app mode.")

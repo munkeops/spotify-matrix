@@ -164,6 +164,12 @@ class AudioConfig(BaseModel):
     #: Empty means the ALSA default device.
     device: str = ""
     volume: int = 80
+    #: How much audio the sound card may hold, in milliseconds.
+    #:
+    #: The ceiling on how late an effect can be. Lower is tighter to the
+    #: picture; too low and the output crackles. Bluetooth needs more slack
+    #: than HDMI, and adds 100ms or so of its own on top whatever this says.
+    bufferMs: int = 120
 
 
 class ControllerConfig(BaseModel):
@@ -610,6 +616,7 @@ class AudioStateResponse(BaseModel):
     devices: list[AudioDevice] = Field(default_factory=list)
     sounds: list[str] = Field(default_factory=list)
     advice: str = ""
+    bufferMs: int = 120
     bridge: AudioBridge = Field(default_factory=AudioBridge)
 
 

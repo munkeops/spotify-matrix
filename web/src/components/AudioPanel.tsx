@@ -117,6 +117,20 @@ export default function AudioPanel() {
             </TextField>
           ) : null}
 
+          <TextField
+            select
+            size="small"
+            label="Audio delay"
+            value={String(state.bufferMs ?? 120)}
+            disabled={busy}
+            onChange={(e) => update({ bufferMs: Number(e.target.value) })}
+            helperText="How much the sound card may hold. Lower is tighter to the picture; too low and it crackles."
+          >
+            <MenuItem value="60">Tight (60ms)</MenuItem>
+            <MenuItem value="120">Balanced (120ms)</MenuItem>
+            <MenuItem value="250">Safe (250ms)</MenuItem>
+          </TextField>
+
           <Box>
             <Typography variant="caption" color="text.secondary">Volume</Typography>
             <Slider

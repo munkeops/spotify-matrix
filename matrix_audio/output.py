@@ -25,6 +25,15 @@ from matrix_audio.synth import SAMPLE_RATE
 #: promptly, large enough that the feeder thread is not frantic.
 BUFFER_FRAMES = 512
 
+#: How much audio the sound card may hold, in milliseconds.
+#:
+#: Left to itself ALSA picked half a second, and since the mixer feeds
+#: silence continuously, a new effect queued behind all of it - a game sound
+#: arriving up to 500ms after the frame that caused it. This is the ceiling
+#: on how late an effect can be, so it wants to be small; too small and the
+#: feeder cannot keep up and the output crackles.
+DEFAULT_BUFFER_MS = 120
+
 
 def aplay_available() -> bool:
     return shutil.which("aplay") is not None
@@ -267,9 +276,10 @@ class NullOutput:
 class AlsaOutput:
     """Feeds a mixer's output into a persistent ``aplay`` process."""
 
-    def __init__(self, mixer: Mixer, device: str = "") -> None:
+    def __init__(self, mixer: Mixer, device: str = "", buffer_ms: int = DEFAULT_BUFFER_MS) -> None:
         self.mixer = mixer
         self.device = device
+        self.buffer_ms = max(30, int(buffer_ms))
         self._process: subprocess.Popen | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -280,7 +290,25 @@ class AlsaOutput:
         return self._thread is not None and self._thread.is_alive()
 
     def _command(self) -> list[str]:
-        command = ["aplay", "-q", "-t", "raw", "-f", "S16_LE", "-r", str(SAMPLE_RATE), "-c", "1"]
+        buffer_us = self.buffer_ms * 1000
+        command = [
+            "aplay",
+            "-q",
+            "-t",
+            "raw",
+            "-f",
+            "S16_LE",
+            "-r",
+            str(SAMPLE_RATE),
+            "-c",
+            "1",
+            "--buffer-time",
+            str(buffer_us),
+            # Four periods to a buffer: enough for the feeder to stay ahead
+            # without adding latency of its own.
+            "--period-time",
+            str(max(5000, buffer_us // 4)),
+        ]
         # Always name a device, so the default gets converted too. Leaving it
         # off sent 22050Hz mono straight at whatever `default` is, and HDMI
         # refuses that with "Unknown error 524".

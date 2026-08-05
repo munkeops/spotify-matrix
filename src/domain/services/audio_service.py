@@ -84,6 +84,7 @@ class AudioService:
             "devices": devices,
             "sounds": self.sounds(),
             "advice": self._advice(devices),
+            "bufferMs": int(getattr(settings, "bufferMs", 0) or 0),
             "bridge": bluealsa.status(),
         }
 
@@ -159,7 +160,12 @@ class AudioService:
         if blocked:
             return {"ok": False, "message": blocked}
 
-        engine = AudioEngine(enabled=True, device=settings.device, volume=int(settings.volume) / 100.0)
+        engine = AudioEngine(
+            enabled=True,
+            device=settings.device,
+            volume=int(settings.volume) / 100.0,
+            buffer_ms=int(getattr(settings, "bufferMs", 0) or 0),
+        )
         spec = self._test_spec()
         if spec is not None:
             engine.load_directory(spec.sounds_dir)
