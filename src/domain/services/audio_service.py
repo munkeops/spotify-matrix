@@ -204,6 +204,13 @@ class AudioService:
                 "stream at a time, so stop the game on the matrix, or wait a "
                 "moment if you just pressed Test."
             )
+        if "rejected send message" in lowered or "org.freedesktop.dbus.error.accessdenied" in lowered:
+            return (
+                "The Pi's D-Bus refused the connection to bluealsa, which only "
+                "accepts root or the audio group. Run the container as root - "
+                'docker-compose sets user: "0:0" for this - or add a policy on '
+                "the Pi permitting the user it runs as."
+            )
         if "no such device" in lowered or "pcm not found" in lowered:
             return "The output has gone away. Reconnect the speaker and refresh."
         if "channels" in lowered or "sample" in lowered or "rate" in lowered:

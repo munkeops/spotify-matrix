@@ -324,3 +324,14 @@ PipeWire by default, so on a desktop image it usually wins:
 then reconnect the speaker. Check what bluealsa has from the Pi with:
 
     bluealsa-aplay -L
+
+A rejection rather than silence:
+
+    Couldn't get BlueALSA PCM: Rejected send message ... destination="org.bluealsa"
+
+is D-Bus policy again, from the other side. bluealsa accepts root and the
+audio group, and the bus judges by the uid it sees, so a container running as
+anything else is refused - which ALSA then reports as "No such device".
+docker-compose runs the service as `user: "0:0"` for exactly this. If you run
+it some other way, either match that or drop a policy on the Pi permitting
+whichever user it runs as.

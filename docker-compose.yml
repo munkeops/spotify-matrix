@@ -4,6 +4,11 @@ services:
     image: spotify-matrix:local
     container_name: spotify-matrix
     privileged: true
+    # Run as root, explicitly. bluealsa's D-Bus policy only lets root or the
+    # audio group talk to org.bluealsa, and the host bus judges by the uid it
+    # sees. Anything else is refused with "Rejected send message", which
+    # surfaces as "audio open error: No such device" and a silent game.
+    user: "0:0"
     network_mode: host
     restart: unless-stopped
     environment:

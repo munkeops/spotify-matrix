@@ -875,3 +875,20 @@ def test_a_frame_without_audio_still_validates():
     from src.domain.models.api_schemas import GameFrame
 
     assert GameFrame.model_validate({"game": "tetris"}).audio is None
+
+
+def test_a_dbus_rejection_is_explained():
+    """It surfaces as "No such device", which sounds like missing hardware
+    and is actually a permission refusal."""
+    from src.domain.services.audio_service import audio_service
+
+    raw = (
+        'Couldn\'t get BlueALSA PCM: Rejected send message, 1 matched rules; '
+        'type="method_call", sender=":1.929" (uid=1 pid=6921 comm="aplay") '
+        'destination="org.bluealsa"\naplay: main:831: audio open error: No such device'
+    )
+
+    explained = audio_service._explain(raw)
+
+    assert "root" in explained and "audio group" in explained
+    assert "matched rules" not in explained
