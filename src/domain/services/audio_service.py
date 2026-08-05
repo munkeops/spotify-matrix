@@ -140,6 +140,13 @@ class AudioService:
         if not specs:
             return {"ok": False, "message": "No games installed, so there are no sounds to play."}
 
+        # Ask a running app first. It holds the sound card - a Bluetooth
+        # speaker carries one stream - so whether this process could open the
+        # device is beside the point when something else already has it.
+        through = self._play_through_runtime(sound)
+        if through is not None:
+            return through
+
         blocked = self._unusable(settings.device)
         if blocked:
             return {"ok": False, "message": blocked}
@@ -189,6 +196,28 @@ class AudioService:
         if not bluealsa.pcms():
             return bluealsa.why_no_speaker()
         return ""
+
+    def _play_through_runtime(self, sound: str) -> dict[str, Any] | None:
+        """Hand the test to the running app, if one is playing."""
+        from src.domain.services.runtime_service import runtime_service
+
+        try:
+            if not runtime_service.state().running:
+                return None
+        except Exception:
+            return None
+        if not self.settings().enabled:
+            # Sound is off in the runtime, so it has nothing to play through.
+            return None
+
+        from src.domain.services.joystick_service import joystick_service
+
+        joystick_service.publish_test_sound(sound)
+        return {
+            "ok": True,
+            "message": f"Playing {sound} through the app on the matrix.",
+            "error": "",
+        }
 
     @staticmethod
     def _explain(error: str) -> str:

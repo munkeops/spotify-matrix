@@ -1669,6 +1669,7 @@ class OverlayDisplay:
         self._brightness_level = 0
         self._brightness_nonce = 0
         self._volume_nonce = 0
+        self._test_nonce = 0
         # Set once a game builds its engine, so a bound button can change the
         # volume of whatever is playing without restarting it.
         self._audio = None
@@ -1711,6 +1712,25 @@ class OverlayDisplay:
         except Exception:  # pragma: no cover - depends on the engine
             pass
 
+    def _play_test(self, state: dict) -> None:
+        """Play a test effect through the running app's own engine.
+
+        A Bluetooth speaker carries one stream, so the API cannot open the
+        device while a game holds it. Asking the game to make the noise tests
+        the path that actually matters anyway.
+        """
+        nonce = int(state.get("testSoundSeq", 0) or 0)
+        if nonce == self._test_nonce:
+            return
+        self._test_nonce = nonce
+        name = str(state.get("testSound", "") or "")
+        player = getattr(self._audio, "play", None)
+        if name and player is not None:
+            try:
+                player(name)
+            except Exception:  # pragma: no cover - depends on the engine
+                pass
+
     def _apply_brightness(self, level: int) -> None:
         if level <= 0 or level == self._applied_brightness:
             return
@@ -1727,6 +1747,7 @@ class OverlayDisplay:
                 continue
             self._apply_brightness(int(state.get("brightness", 0) or 0))
             self._apply_volume(state)
+            self._play_test(state)
 
             menu = state.get("menu", {})
             level = int(state.get("brightness", 0) or 0)

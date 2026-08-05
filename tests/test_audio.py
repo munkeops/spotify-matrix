@@ -892,3 +892,40 @@ def test_a_dbus_rejection_is_explained():
 
     assert "root" in explained and "audio group" in explained
     assert "matched rules" not in explained
+
+
+def test_the_test_sound_goes_through_a_running_app(monkeypatch):
+    """A Bluetooth speaker carries one stream, so a game holding it made the
+    test fail with "Device or resource busy" - which is not a fault, it is
+    the game working."""
+    from src.domain.services import audio_service as module
+    from src.domain.services import runtime_service as runtime_module
+    from src.domain.services import joystick_service as joystick_module
+
+    monkeypatch.setattr(
+        module.audio_service, "settings",
+        lambda: types.SimpleNamespace(enabled=True, device="bluealsa", volume=60),
+    )
+    monkeypatch.setattr(
+        runtime_module.runtime_service, "state",
+        lambda: types.SimpleNamespace(running=True),
+    )
+    asked: list[str] = []
+    monkeypatch.setattr(joystick_module.joystick_service, "publish_test_sound", asked.append)
+
+    result = module.audio_service.play_test("brick")
+
+    assert result["ok"] is True
+    assert asked == ["brick"], "the running app was asked to play it"
+
+
+def test_the_test_sound_opens_its_own_device_when_nothing_is_running(monkeypatch):
+    from src.domain.services import audio_service as module
+    from src.domain.services import runtime_service as runtime_module
+
+    monkeypatch.setattr(
+        runtime_module.runtime_service, "state",
+        lambda: types.SimpleNamespace(running=False),
+    )
+
+    assert module.audio_service._play_through_runtime("start") is None

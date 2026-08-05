@@ -103,6 +103,8 @@ class JoystickService:
         self._device = DEFAULT_PROFILE
         self._brightness_nonce = 0
         self._volume_nonce = 0
+        self._test_nonce = 0
+        self._test_sound = ""
         self._wheel_items: list = []
         self._wheel_selected = None
         self._last_non_game = ""
@@ -447,6 +449,8 @@ class JoystickService:
                 "brightnessSeq": self._brightness_nonce,
                 "volume": int(config.audio.volume),
                 "volumeSeq": self._volume_nonce,
+                "testSound": self._test_sound,
+                "testSoundSeq": self._test_nonce,
                 "menu": {"open": self._menu_open, "cursor": self._cursor, "items": items},
                 "wheel": {
                     "open": self._wheel_open,
@@ -455,6 +459,12 @@ class JoystickService:
                 },
             },
         )
+
+    def publish_test_sound(self, name: str) -> None:
+        """Ask the running app to play an effect, since it holds the device."""
+        self._test_sound = name
+        self._test_nonce += 1
+        self._publish_shell()
 
     def publish_brightness(self, level: int) -> None:
         """Push a level at the running panel without restarting it.
