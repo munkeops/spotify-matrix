@@ -83,6 +83,7 @@ class JoystickService:
         self._shell_seq = 0
         self._wheel_open = False
         self._device = DEFAULT_PROFILE
+        self._brightness_nonce = 0
         self._wheel_items: list = []
         self._wheel_selected = None
         self._last_non_game = ""
@@ -422,6 +423,9 @@ class JoystickService:
             {
                 "seq": self._shell_seq,
                 "brightness": int(brightness if brightness is not None else config.matrix.brightness),
+                # Changes on every brightness press, including one that is
+                # already at the limit, so the runtime can show the bar.
+                "brightnessSeq": self._brightness_nonce,
                 "menu": {"open": self._menu_open, "cursor": self._cursor, "items": items},
                 "wheel": {
                     "open": self._wheel_open,
@@ -434,10 +438,13 @@ class JoystickService:
     def _adjust_brightness(self, delta: int) -> None:
         config = config_service.get_config()
         level = max(BRIGHTNESS_MIN, min(BRIGHTNESS_MAX, int(config.matrix.brightness) + delta))
-        if level == config.matrix.brightness:
-            return
-        config.matrix.brightness = level
-        config_service.save_config(config)
+        # Bump on every press, not only on a change, so the bar still appears
+        # at the ends of the range. Without it, pressing brighter at full
+        # brightness did nothing whatsoever and read as a broken button.
+        self._brightness_nonce += 1
+        if level != config.matrix.brightness:
+            config.matrix.brightness = level
+            config_service.save_config(config)
         # Published, not restarted: the panel picks it up live.
         self._publish_shell(level)
         self._record(f"brightness:{level}")

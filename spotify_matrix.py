@@ -1667,6 +1667,7 @@ class OverlayDisplay:
         self._overlay_active = False
         self._brightness_until = 0.0
         self._brightness_level = 0
+        self._brightness_nonce = 0
         self._applied_brightness: int | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -1708,11 +1709,14 @@ class OverlayDisplay:
 
             menu = state.get("menu", {})
             level = int(state.get("brightness", 0) or 0)
-            if level != self._brightness_level:
-                # Show a bar briefly whenever the level changes.
+            nonce = int(state.get("brightnessSeq", 0) or 0)
+            if level != self._brightness_level or nonce != self._brightness_nonce:
+                # Show the bar on every press, so holding brighter at full
+                # brightness confirms the level rather than looking dead.
                 if self._brightness_level:
                     self._brightness_until = time.monotonic() + BRIGHTNESS_HINT_SECONDS
                 self._brightness_level = level
+                self._brightness_nonce = nonce
 
             wheel = state.get("wheel", {})
             menu_open = bool(menu.get("open"))

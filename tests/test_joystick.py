@@ -779,3 +779,33 @@ def test_old_configs_keep_their_bindings_on_both_devices():
     assert "bindings" not in payload["controller"]
     assert payload["controller"]["profiles"]["module"]["core.tetris"] == {"a": "hold"}
     assert payload["controller"]["profiles"]["gamepad"]["core.tetris"] == {"a": "hold"}
+
+
+def test_brightness_gives_feedback_at_the_top_of_the_range(tmp_path, monkeypatch):
+    """Pressing brighter at full brightness published nothing, and the
+    runtime only draws the bar when something changes, so the button looked
+    broken rather than already at the limit."""
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+    config = config_module.config_service.get_config()
+    config.matrix.brightness = joystick_module.BRIGHTNESS_MAX
+    config_module.config_service.save_config(config)
+
+    before = service._brightness_nonce
+    service._adjust_brightness(joystick_module.BRIGHTNESS_STEP)
+
+    assert service._brightness_nonce > before, "the press is published even when clamped"
+    assert config_module.config_service.get_config().matrix.brightness == joystick_module.BRIGHTNESS_MAX
+
+
+def test_brightness_goes_back_up_after_coming_down(tmp_path, monkeypatch):
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+    config = config_module.config_service.get_config()
+    config.matrix.brightness = 60
+    config_module.config_service.save_config(config)
+
+    service._adjust_brightness(-joystick_module.BRIGHTNESS_STEP)
+    assert config_module.config_service.get_config().matrix.brightness == 50
+    service._adjust_brightness(joystick_module.BRIGHTNESS_STEP)
+    assert config_module.config_service.get_config().matrix.brightness == 60
