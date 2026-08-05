@@ -242,12 +242,26 @@ class AudioService:
                 "moment if you just pressed Test."
             )
         if "rejected send message" in lowered or "org.freedesktop.dbus.error.accessdenied" in lowered:
+            import re
+
             from matrix_audio import bluealsa
 
             who = bluealsa.identity()
+            seen = re.search(r"sender=[^)]*\(uid=(\d+)", error)
+            bus_uid = int(seen.group(1)) if seen else who["uid"]
+
+            if bus_uid != who["uid"] and who["uid"] == 0:
+                # Root in here, somebody else out there: a user namespace.
+                return (
+                    f"The Pi's D-Bus refused the connection to bluealsa. This runs "
+                    f"as root, but the bus sees uid {bus_uid} - Docker is remapping "
+                    "user namespaces, so root in the container is unprivileged on "
+                    'the Pi. Set userns_mode: "host" in docker-compose and recreate '
+                    "the container."
+                )
             return (
-                f"The Pi's D-Bus refused the connection to bluealsa. This runs as "
-                f"uid {who['uid']}"
+                f"The Pi's D-Bus refused the connection to bluealsa. The bus sees "
+                f"uid {bus_uid}"
                 + ("" if who["inAudioGroup"] else ", not in the audio group")
                 + ", and bluealsa accepts only root or the audio group. In "
                 'docker-compose set user: "0:0" and group_add: [audio]; under '

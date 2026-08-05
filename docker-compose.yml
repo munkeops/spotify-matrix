@@ -8,6 +8,10 @@ services:
     # audio group talk to org.bluealsa, and the host bus judges by the uid it
     # sees. Anything else is refused with "Rejected send message", which
     # surfaces as "audio open error: No such device" and a silent game.
+    # Opt out of user namespace remapping. With it on, root in here is an
+    # unprivileged uid on the Pi, and the system bus judges by the uid it
+    # sees - so `id` says root while bluealsa is told uid 1 and refuses.
+    userns_mode: "host"
     user: "0:0"
     # bluealsa's D-Bus policy allows root *or* the audio group. Being in the
     # group as well means this still works if something else decides what uid

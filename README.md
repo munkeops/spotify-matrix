@@ -332,6 +332,12 @@ A rejection rather than silence:
 is D-Bus policy again, from the other side. bluealsa accepts root and the
 audio group, and the bus judges by the uid it sees, so a container running as
 anything else is refused - which ALSA then reports as "No such device".
-docker-compose runs the service as `user: "0:0"` for exactly this. If you run
+docker-compose runs the service as `user: "0:0"` with `group_add: [audio]` for
+exactly this, and `userns_mode: "host"`.
+
+That last one matters if Docker has user namespace remapping enabled. With it
+on, root inside the container is an unprivileged uid on the Pi, so `docker
+compose exec ... id` reports root while the bus is told something else and
+refuses. The symptom is a rejection naming a uid you never configured. If you run
 it some other way, either match that or drop a policy on the Pi permitting
 whichever user it runs as.

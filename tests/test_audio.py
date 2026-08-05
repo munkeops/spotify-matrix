@@ -957,3 +957,21 @@ def test_a_refusal_names_the_uid_it_was_refused_as(monkeypatch):
     assert "uid 1" in explained
     assert "audio group" in explained
     assert "recreate" in explained, "a restart does not change the user"
+
+
+def test_a_namespace_remap_is_named_as_such(monkeypatch):
+    """`id` says root while the bus is told uid 1, which is not a
+    contradiction - it is Docker remapping user namespaces."""
+    from matrix_audio import bluealsa
+    from src.domain.services.audio_service import audio_service
+
+    monkeypatch.setattr(
+        bluealsa, "identity",
+        lambda: {"uid": 0, "groups": [0], "inAudioGroup": False, "permitted": True},
+    )
+    raw = 'Rejected send message, 1 matched rules; sender=":1.929" (uid=1 pid=6921 comm="aplay")'
+
+    explained = audio_service._explain(raw)
+
+    assert "userns_mode" in explained
+    assert "uid 1" in explained and "runs as root" in explained
