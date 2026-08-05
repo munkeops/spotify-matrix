@@ -80,7 +80,7 @@ export default function Settings() {
 
       <Card>
         <CardContent>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Widget Store</Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>App Store</Typography>
           <TextField fullWidth size="small" label="Store index URL" value={config.store?.indexUrl ?? ""} onChange={(e) => setStore(e.target.value)} />
         </CardContent>
       </Card>

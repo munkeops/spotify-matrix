@@ -8,15 +8,15 @@ import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import { Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
-import Plugins from "./pages/Plugins";
+import Apps from "./pages/Apps";
 import Store from "./pages/Store";
 import Settings from "./pages/Settings";
 import GamePad from "./pages/GamePad";
 
 const NAV = [
   { label: "Home", value: "/", icon: <HomeRoundedIcon /> },
-  { label: "Plugins", value: "/plugins", icon: <ExtensionRoundedIcon /> },
-  { label: "Store", value: "/store", icon: <StorefrontRoundedIcon /> },
+  { label: "Apps", value: "/apps", icon: <ExtensionRoundedIcon /> },
+  { label: "App Store", value: "/store", icon: <StorefrontRoundedIcon /> },
   { label: "Settings", value: "/settings", icon: <SettingsRoundedIcon /> },
 ];
 
@@ -46,7 +46,10 @@ export default function App() {
     <Container maxWidth={desktop ? "md" : "sm"} sx={{ flex: 1, py: 2, pb: desktop ? 4 : 12 }}>
       <Routes>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/plugins" element={<Plugins />} />
+        <Route path="/apps" element={<Apps />} />
+        {/* Apps were called plugins; old links and bookmarks still work. */}
+        <Route path="/plugins" element={<Navigate to="/apps" replace />} />
+        <Route path="/widgets" element={<Navigate to="/apps" replace />} />
         {/* Browsing games lives in the Store now; this keeps old links working. */}
         <Route path="/play" element={<Navigate to="/store?tab=play" replace />} />
         <Route path="/play/:gameId" element={<GamePad />} />

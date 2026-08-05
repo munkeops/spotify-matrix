@@ -1,8 +1,8 @@
-"""The sound interface a game plugin sees.
+"""The sound interface a game app sees.
 
 A game just calls ``self.audio.play("blip")``. Whether a sound card exists,
 whether audio is switched on, and how mixing works are all the host's problem,
-so a plugin never has to check.
+so a app never has to check.
 """
 
 from __future__ import annotations

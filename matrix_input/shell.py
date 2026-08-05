@@ -1,4 +1,4 @@
-"""The on-panel shell: a plugin menu and live brightness, driven by a controller.
+"""The on-panel shell: a app menu and live brightness, driven by a controller.
 
 The controller is read in the API process but the panel is drawn by the runtime
 process, so the two talk through one small JSON file. The API owns the menu
@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw
 
 from assistant_matrix_sdk.pixels import PANEL, draw_centered_text, draw_pixel_text, pixel_text_width
 
-# How many plugin rows fit under the title.
+# How many app rows fit under the title.
 VISIBLE_ROWS = 5
 ROW_HEIGHT = 8
 TITLE_Y = 2
@@ -110,7 +110,7 @@ def visible_window(cursor: int, total: int, rows: int = VISIBLE_ROWS) -> tuple[i
 
 
 def render_menu(base: Image.Image, menu: dict[str, Any]) -> Image.Image:
-    """Draw the plugin menu over ``base``, dimmed so the panel stays visible."""
+    """Draw the app menu over ``base``, dimmed so the panel stays visible."""
     frame = base.convert("RGB").copy()
     if frame.size != (PANEL, PANEL):
         frame = frame.resize((PANEL, PANEL), Image.NEAREST)
@@ -121,7 +121,7 @@ def render_menu(base: Image.Image, menu: dict[str, Any]) -> Image.Image:
     cursor = max(0, min(int(menu.get("cursor", 0)), max(0, len(items) - 1)))
 
     draw.rectangle((0, 0, PANEL - 1, PANEL - 1), outline=FRAME)
-    draw_centered_text(draw, TITLE_Y, "PLUGINS", TITLE, 1)
+    draw_centered_text(draw, TITLE_Y, "APPS", TITLE, 1)
     draw.line((3, TITLE_Y + 7, PANEL - 4, TITLE_Y + 7), fill=FRAME)
     # Rows run 13..50, leaving the bottom strip for the hint.
 

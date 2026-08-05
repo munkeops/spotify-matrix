@@ -2,7 +2,7 @@
 
 BlueZ pairs the pad and the kernel exposes it as an input device; this polls it
 and pushes the resulting actions through the same binding the mini-joystick
-uses, so a controller drives the games and the plugin list identically.
+uses, so a controller drives the games and the app list identically.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Widget configuration field helpers."""
+"""App configuration field helpers."""
 
 from __future__ import annotations
 

@@ -247,7 +247,7 @@ def test_release_events_do_nothing():
     assert game_action(button_event(Button.A, ButtonEvent.PRESS_UP), actions) == ""
 
 
-def test_shell_stick_walks_the_plugin_list():
+def test_shell_stick_walks_the_app_list():
     assert shell_action(direction_event(Direction.RIGHT)) == ShellAction(kind="next")
     assert shell_action(direction_event(Direction.DOWN)) == ShellAction(kind="next")
     assert shell_action(direction_event(Direction.LEFT)) == ShellAction(kind="previous")
@@ -279,7 +279,7 @@ SERVICE_MODULES = [
     "src.domain.services.config_service",
     "src.domain.services.game_service",
     "src.domain.services.runtime_service",
-    "src.domain.services.widget_registry_service",
+    "src.domain.services.app_registry_service",
     "src.domain.services.joystick_service",
 ]
 
@@ -291,15 +291,15 @@ def reload_joystick_stack(monkeypatch, data_dir: Path):
     config_module = importlib.import_module("src.domain.services.config_service")
     game_module = importlib.import_module("src.domain.services.game_service")
     joystick_module = importlib.import_module("src.domain.services.joystick_service")
-    registry_module = importlib.import_module("src.domain.services.widget_registry_service")
+    registry_module = importlib.import_module("src.domain.services.app_registry_service")
     return config_module, game_module, joystick_module, registry_module
 
 
 def test_service_drives_the_active_game(tmp_path, monkeypatch):
     config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.snake"
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
     config_module.config_service.save_config(config)
 
     service = joystick_module.joystick_service
@@ -313,17 +313,17 @@ def test_service_drives_the_active_game(tmp_path, monkeypatch):
     assert service.last_action == "snake:togglePause"
 
 
-def test_service_switches_plugins_when_no_game_runs(tmp_path, monkeypatch):
+def test_service_switches_apps_when_no_game_runs(tmp_path, monkeypatch):
     config_module, _, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
     applied: list[str] = []
-    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+    registry_module.app_registry_service.apply_app = lambda app_id, values=None: (applied.append(app_id), (None, None))[1]
 
     service = joystick_module.joystick_service
     service._dispatch(direction_event(Direction.RIGHT))
     service._dispatch(direction_event(Direction.RIGHT))
 
     assert len(applied) == 2
-    assert applied[0] != applied[1], "each push moves to a different plugin"
+    assert applied[0] != applied[1], "each push moves to a different app"
     assert config_module.config_service.get_config().display.mode == "spotify"
 
 
@@ -372,7 +372,7 @@ def test_the_menu_opens_moves_and_selects(tmp_path, monkeypatch):
 
     config_module, game_module, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
     applied: list[str] = []
-    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+    registry_module.app_registry_service.apply_app = lambda app_id, values=None: (applied.append(app_id), (None, None))[1]
 
     service = joystick_module.joystick_service
     shell_path = game_module.game_service.state_dir / "shell.json"
@@ -381,7 +381,7 @@ def test_the_menu_opens_moves_and_selects(tmp_path, monkeypatch):
     service._dispatch(button_event(Button.OK, ButtonEvent.SINGLE_CLICK))
     state = read_shell_state(shell_path)
     assert state["menu"]["open"] is True
-    assert state["menu"]["items"], "the menu lists the installed plugins"
+    assert state["menu"]["items"], "the menu lists the installed apps"
     assert applied == [], "opening the menu must not change the panel"
 
     # The stick moves a highlight, still without applying.
@@ -405,7 +405,7 @@ def test_the_menu_can_be_cancelled(tmp_path, monkeypatch):
 
     _, game_module, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
     applied: list[str] = []
-    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+    registry_module.app_registry_service.apply_app = lambda app_id, values=None: (applied.append(app_id), (None, None))[1]
 
     service = joystick_module.joystick_service
     service._dispatch(button_event(Button.OK, ButtonEvent.SINGLE_CLICK))
@@ -451,8 +451,8 @@ def test_brightness_stops_at_the_limits(tmp_path, monkeypatch):
 def test_the_menu_is_not_reachable_while_a_game_runs(tmp_path, monkeypatch):
     config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.snake"
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
     config_module.config_service.save_config(config)
 
     service = joystick_module.joystick_service
@@ -506,8 +506,8 @@ def test_holding_ok_opens_the_wheel_over_a_game(tmp_path, monkeypatch):
 
     config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.snake"
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
     config_module.config_service.save_config(config)
 
     service = joystick_module.joystick_service
@@ -530,8 +530,8 @@ def test_the_wheel_sends_the_chosen_action(tmp_path, monkeypatch):
 
     config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.snake"
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
     config_module.config_service.save_config(config)
 
     service = joystick_module.joystick_service
@@ -560,7 +560,7 @@ def test_the_wheel_can_be_cancelled(tmp_path, monkeypatch):
 def test_releasing_on_nothing_does_nothing(tmp_path, monkeypatch):
     _, game_module, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
     applied: list[str] = []
-    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+    registry_module.app_registry_service.apply_app = lambda app_id, values=None: (applied.append(app_id), (None, None))[1]
 
     service = joystick_module.joystick_service
     service._dispatch(long_press())
@@ -570,17 +570,17 @@ def test_releasing_on_nothing_does_nothing(tmp_path, monkeypatch):
     assert applied == []
 
 
-def test_exit_game_returns_to_the_previous_plugin(tmp_path, monkeypatch):
+def test_exit_game_returns_to_the_previous_app(tmp_path, monkeypatch):
     config_module, _, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
     applied: list[str] = []
-    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+    registry_module.app_registry_service.apply_app = lambda app_id, values=None: (applied.append(app_id), (None, None))[1]
 
     service = joystick_module.joystick_service
     # Arrive at a game from the clock.
-    service._apply_widget("core.clock")
+    service._apply_app("core.clock")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.snake"
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
     config_module.config_service.save_config(config)
 
     service._run_wheel_action("exitGame")
@@ -591,11 +591,11 @@ def test_exit_game_returns_to_the_previous_plugin(tmp_path, monkeypatch):
 def test_exit_falls_back_to_a_non_game(tmp_path, monkeypatch):
     config_module, _, joystick_module, registry_module = reload_joystick_stack(monkeypatch, tmp_path / "data")
     applied: list[str] = []
-    registry_module.widget_registry_service.apply_widget = lambda widget_id, values=None: (applied.append(widget_id), (None, None))[1]
+    registry_module.app_registry_service.apply_app = lambda app_id, values=None: (applied.append(app_id), (None, None))[1]
 
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.snake"
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
     config_module.config_service.save_config(config)
 
     joystick_module.joystick_service._run_wheel_action("exitGame")
@@ -648,8 +648,8 @@ def test_overrides_still_respect_auto_repeat():
 def test_the_service_uses_saved_bindings(tmp_path, monkeypatch):
     config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.tetris"
+    config.display.mode = "app"
+    config.display.appId = "core.tetris"
     config.controller.profiles = {"module": {"core.tetris": {"a": "hold"}}}
     config_module.config_service.save_config(config)
 
@@ -663,8 +663,8 @@ def test_each_device_keeps_its_own_bindings(tmp_path, monkeypatch):
     """Rebinding A on the pad must not rebind A on the module."""
     config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.tetris"
+    config.display.mode = "app"
+    config.display.appId = "core.tetris"
     config.controller.profiles = {
         "module": {"core.tetris": {"a": "hold"}},
         "gamepad": {"core.tetris": {"a": "rotateCcw"}},

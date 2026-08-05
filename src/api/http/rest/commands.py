@@ -8,7 +8,7 @@ from src.domain.models.api_schemas import CommandRequest, CommandResponse
 from src.domain.services.config_service import config_service
 from src.domain.services.display_policy_runner_service import display_policy_runner_service
 from src.domain.services.runtime_service import runtime_service
-from src.domain.services.widget_registry_service import widget_registry_service
+from src.domain.services.app_registry_service import app_registry_service
 
 router = APIRouter(tags=["assistant-matrix-commands"])
 
@@ -25,12 +25,12 @@ async def run_command(body: CommandRequest) -> CommandResponse:
         config_service.save_config(config)
         runtime = runtime_service.apply()
         matched = None
-        widget_id = None
-    elif body.command == "set_widget":
-        widget_id = str(body.value or "")
-        if not widget_id:
-            raise ValueError("set_widget needs a widget id value.")
-        _, runtime = widget_registry_service.apply_widget(widget_id)
+        app_id = None
+    elif body.command == "set_app":
+        app_id = str(body.value or "")
+        if not app_id:
+            raise ValueError("set_app needs a app id value.")
+        _, runtime = app_registry_service.apply_app(app_id)
         matched = True
     elif body.command == "set_clock_face":
         if body.value not in {"analog", "digital", "minimal"}:
@@ -39,7 +39,7 @@ async def run_command(body: CommandRequest) -> CommandResponse:
         config_service.save_config(config)
         runtime = runtime_service.apply()
         matched = None
-        widget_id = None
+        app_id = None
     elif body.command == "set_brightness":
         value = int(body.value or 0)
         if value < 1 or value > 100:
@@ -48,22 +48,22 @@ async def run_command(body: CommandRequest) -> CommandResponse:
         config_service.save_config(config)
         runtime = runtime_service.apply()
         matched = None
-        widget_id = None
+        app_id = None
     elif body.command == "trigger_event":
         event = str(body.value or "")
         if not event:
             raise ValueError("trigger_event needs an event name value.")
-        _, runtime, widget_id = display_policy_runner_service.trigger_event(event)
-        matched = widget_id is not None
+        _, runtime, app_id = display_policy_runner_service.trigger_event(event)
+        matched = app_id is not None
     elif body.command == "start_runtime":
         runtime = runtime_service.start()
         matched = None
-        widget_id = None
+        app_id = None
     elif body.command == "stop_runtime":
         runtime = runtime_service.stop()
         matched = None
-        widget_id = None
+        app_id = None
     else:
         raise ValueError("Unsupported command.")
 
-    return CommandResponse(ok=True, config=config_service.get_public_config(), runtime=runtime, matched=matched, widgetId=widget_id)
+    return CommandResponse(ok=True, config=config_service.get_public_config(), runtime=runtime, matched=matched, appId=app_id)

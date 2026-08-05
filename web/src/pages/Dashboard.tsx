@@ -4,33 +4,33 @@ import { useNavigate } from "react-router-dom";
 import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
-import { canPreview, gameIdOf, isGame, apiGet, apiPost, StatusResponse, listLocalWidgets, getWidgetConfig, previewWidget, applyWidget, LocalWidget } from "../api";
-import WidgetConfigDrawer from "../components/WidgetConfigDrawer";
+import { canPreview, gameIdOf, isGame, apiGet, apiPost, StatusResponse, listLocalApps, getAppConfig, previewApp, applyApp, LocalApp } from "../api";
+import AppConfigDrawer from "../components/AppConfigDrawer";
 
 const CATEGORY_COLOR: Record<string, string> = {
   media: "#4be0c0", time: "#8ea2ff", assistant: "#ffb86b", information: "#7ee0a0",
   custom: "#c58cff", diagnostics: "#ff8c8c", weather: "#66d0ff", games: "#ff7ab8",
 };
-const color = (w?: LocalWidget | null) => (w ? CATEGORY_COLOR[w.manifest.category] || "#4be0c0" : "#4be0c0");
+const color = (w?: LocalApp | null) => (w ? CATEGORY_COLOR[w.manifest.category] || "#4be0c0" : "#4be0c0");
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [status, setStatus] = useState<StatusResponse | null>(null);
-  const [widgets, setWidgets] = useState<LocalWidget[]>([]);
+  const [apps, setApps] = useState<LocalApp[]>([]);
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [switching, setSwitching] = useState("");
-  const [configure, setConfigure] = useState<LocalWidget | null>(null);
+  const [configure, setConfigure] = useState<LocalApp | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const openConfig = (w: LocalWidget) => { setConfigure(w); setDrawerOpen(true); };
+  const openConfig = (w: LocalApp) => { setConfigure(w); setDrawerOpen(true); };
 
-  const loadPreviews = useCallback(async (list: LocalWidget[]) => {
+  const loadPreviews = useCallback(async (list: LocalApp[]) => {
     await Promise.all(list.filter((w) => canPreview(w)).map(async (w) => {
       try {
-        const cfg = await getWidgetConfig(w.manifest.id);
-        const p = await previewWidget(w.manifest.id, cfg.config);
+        const cfg = await getAppConfig(w.manifest.id);
+        const p = await previewApp(w.manifest.id, cfg.config);
         setPreviews((prev) => ({ ...prev, [w.manifest.id]: p.dataUrl }));
       } catch { /* ignore */ }
     }));
@@ -38,11 +38,11 @@ export default function Dashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const [st, w] = await Promise.all([apiGet<StatusResponse>("/api/status"), listLocalWidgets()]);
+      const [st, w] = await Promise.all([apiGet<StatusResponse>("/api/status"), listLocalApps()]);
       setStatus(st);
-      setWidgets(w.widgets || []);
+      setApps(w.apps || []);
       setError("");
-      loadPreviews(w.widgets || []);
+      loadPreviews(w.apps || []);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -61,9 +61,9 @@ export default function Dashboard() {
     finally { setBusy(false); }
   };
 
-  const runWidget = async (w: LocalWidget) => {
+  const runApp = async (w: LocalApp) => {
     setSwitching(w.manifest.id);
-    try { await applyWidget(w.manifest.id, null); await refresh(); }
+    try { await applyApp(w.manifest.id, null); await refresh(); }
     catch (e) { setError((e as Error).message); }
     finally { setSwitching(""); }
   };
@@ -73,7 +73,7 @@ export default function Dashboard() {
   }
 
   const running = status?.runtime.running ?? false;
-  const active = widgets.find((w) => w.active) || null;
+  const active = apps.find((w) => w.active) || null;
   const accent = color(active);
 
   return (
@@ -127,16 +127,16 @@ export default function Dashboard() {
       </Card>
 
       {/* Quick switch */}
-      {widgets.length > 0 ? (
+      {apps.length > 0 ? (
         <Card>
           <CardContent>
             <Typography variant="overline" color="text.secondary">Quick switch</Typography>
             <Box sx={{ display: "flex", gap: 1.5, overflowX: "auto", pb: 1, mt: 1 }}>
-              {widgets.map((w) => {
+              {apps.map((w) => {
                 const c = color(w);
                 return (
                   <Box key={w.manifest.id} sx={{ flex: "0 0 auto", width: 84, opacity: switching === w.manifest.id ? 0.5 : 1 }}>
-                    <Box sx={{ position: "relative", width: 84, height: 84, borderRadius: 2, overflow: "hidden", bgcolor: "#050607", border: "2px solid", borderColor: w.active ? "primary.main" : "transparent", display: "grid", placeItems: "center", cursor: "pointer" }} onClick={() => runWidget(w)}>
+                    <Box sx={{ position: "relative", width: 84, height: 84, borderRadius: 2, overflow: "hidden", bgcolor: "#050607", border: "2px solid", borderColor: w.active ? "primary.main" : "transparent", display: "grid", placeItems: "center", cursor: "pointer" }} onClick={() => runApp(w)}>
                       {previews[w.manifest.id] ? (
                         <img src={previews[w.manifest.id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", imageRendering: "pixelated" }} />
                       ) : (
@@ -161,7 +161,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       ) : (
-        <Alert severity="info">No plugins installed yet — head to the Store to add some.</Alert>
+        <Alert severity="info">No apps installed yet — head to the Store to add some.</Alert>
       )}
 
       {/* Status */}
@@ -171,7 +171,7 @@ export default function Dashboard() {
             <Typography variant="overline" color="text.secondary">Status</Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Chip color={status?.configured ? "success" : "warning"} label={status?.configured ? "Configured" : "Setup needed"} size="small" />
-              <Chip variant="outlined" label={`${widgets.length} plugin${widgets.length === 1 ? "" : "s"}`} size="small" />
+              <Chip variant="outlined" label={`${apps.length} app${apps.length === 1 ? "" : "s"}`} size="small" />
             </Stack>
             {status && status.missing.length > 0 ? (
               <Typography variant="body2" color="text.secondary">Missing: {status.missing.join(", ")}</Typography>
@@ -180,7 +180,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      <WidgetConfigDrawer widget={configure} open={drawerOpen} onClose={() => setDrawerOpen(false)} onApplied={refresh} />
+      <AppConfigDrawer app={configure} open={drawerOpen} onClose={() => setDrawerOpen(false)} onApplied={refresh} />
     </Stack>
   );
 }

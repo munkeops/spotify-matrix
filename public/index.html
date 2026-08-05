@@ -25,7 +25,7 @@
         </div>
         <nav class="nav-list" aria-label="Main navigation">
           <button class="nav-item active" type="button" data-page="home"><span class="nav-icon">H</span><span class="nav-label">Home</span></button>
-          <button class="nav-item" type="button" data-page="plugins"><span class="nav-icon">P</span><span class="nav-label">Plugins</span></button>
+          <button class="nav-item" type="button" data-page="apps"><span class="nav-icon">P</span><span class="nav-label">Apps</span></button>
           <button class="nav-item" type="button" data-page="store"><span class="nav-icon">W</span><span class="nav-label">Store</span></button>
           <button class="nav-item" type="button" data-page="settings"><span class="nav-icon">S</span><span class="nav-label">Settings</span></button>
         </nav>
@@ -63,21 +63,21 @@
             </article>
 
             <aside class="live-details">
-              <p class="eyebrow">Active plugin</p>
+              <p class="eyebrow">Active app</p>
               <h2 id="activeMode">Spotify</h2>
-              <p class="home-plugin-state" id="processState">Runtime state unknown</p>
+              <p class="home-app-state" id="processState">Runtime state unknown</p>
               <div class="button-stack">
-                <button type="button" id="editActivePluginButton" class="secondary">Edit</button>
+                <button type="button" id="editActiveAppButton" class="secondary">Edit</button>
                 <button type="button" id="applyButton">Apply</button>
               </div>
             </aside>
           </section>
         </section>
 
-        <section class="page" data-page-panel="plugins">
+        <section class="page" data-page-panel="apps">
           <header class="page-heading compact">
             <div>
-              <p class="eyebrow">Plugin library</p>
+              <p class="eyebrow">App library</p>
               <h1>Choose what runs</h1>
             </div>
           </header>
@@ -86,7 +86,7 @@
             <div class="panel-heading">
               <div>
                 <h2>Display Policy</h2>
-                <p>Choose one widget to run, or rotate through selected local widgets.</p>
+                <p>Choose one app to run, or rotate through selected local apps.</p>
               </div>
               <div class="button-row">
                 <button type="button" id="savePolicyButton" class="secondary">Save Policy</button>
@@ -97,76 +97,76 @@
               <label>
                 Mode
                 <select id="policyModeSelect">
-                  <option value="single">Single widget</option>
-                  <option value="rotation">Rotate widgets</option>
+                  <option value="single">Single app</option>
+                  <option value="rotation">Rotate apps</option>
                 </select>
               </label>
               <label>
-                Active widget
-                <select id="policyActiveWidgetSelect"></select>
+                Active app
+                <select id="policyActiveAppSelect"></select>
               </label>
             </div>
-            <div class="rotation-list" id="rotationList" aria-label="Rotation widgets"></div>
+            <div class="rotation-list" id="rotationList" aria-label="Rotation apps"></div>
             <div class="trigger-list-heading">
               <div>
                 <h3>Event Triggers</h3>
-                <p>Temporarily show a widget when an event is submitted to the display API.</p>
+                <p>Temporarily show a app when an event is submitted to the display API.</p>
               </div>
               <button type="button" id="addTriggerButton" class="secondary">Add Trigger</button>
             </div>
             <div class="trigger-list" id="triggerList" aria-label="Event trigger rules"></div>
           </section>
 
-          <section class="plugin-grid" id="pluginGrid" aria-label="Display plugins">
-            <article class="plugin-card active" data-plugin="spotify" role="button" tabindex="0">
-              <span class="plugin-meta">Music</span>
+          <section class="app-grid" id="appGrid" aria-label="Display apps">
+            <article class="app-card active" data-app="spotify" role="button" tabindex="0">
+              <span class="app-meta">Music</span>
               <strong>Spotify</strong>
               <small>Spin the current album art while music is playing.</small>
-              <span class="plugin-preview preview-spotify" aria-hidden="true"></span>
-              <button class="plugin-settings-button" type="button" data-plugin-settings="spotify">Settings</button>
+              <span class="app-preview preview-spotify" aria-hidden="true"></span>
+              <button class="app-settings-button" type="button" data-app-settings="spotify">Settings</button>
             </article>
-            <article class="plugin-card" data-plugin="clock" role="button" tabindex="0">
-              <span class="plugin-meta">Ambient</span>
+            <article class="app-card" data-app="clock" role="button" tabindex="0">
+              <span class="app-meta">Ambient</span>
               <strong>Clock</strong>
               <small>Show time with swappable matrix clock faces.</small>
-              <span class="plugin-preview preview-clock" aria-hidden="true">
-                <span class="plugin-clock-face">
-                  <span class="plugin-clock-tick tick-12"></span>
-                  <span class="plugin-clock-tick tick-3"></span>
-                  <span class="plugin-clock-tick tick-6"></span>
-                  <span class="plugin-clock-tick tick-9"></span>
-                  <span class="plugin-clock-hand plugin-hour-hand"></span>
-                  <span class="plugin-clock-hand plugin-minute-hand"></span>
-                  <span class="plugin-clock-pin"></span>
+              <span class="app-preview preview-clock" aria-hidden="true">
+                <span class="app-clock-face">
+                  <span class="app-clock-tick tick-12"></span>
+                  <span class="app-clock-tick tick-3"></span>
+                  <span class="app-clock-tick tick-6"></span>
+                  <span class="app-clock-tick tick-9"></span>
+                  <span class="app-clock-hand app-hour-hand"></span>
+                  <span class="app-clock-hand app-minute-hand"></span>
+                  <span class="app-clock-pin"></span>
                 </span>
               </span>
-              <button class="plugin-settings-button" type="button" data-plugin-settings="clock">Settings</button>
+              <button class="app-settings-button" type="button" data-app-settings="clock">Settings</button>
             </article>
-            <article class="plugin-card" data-plugin="agent" role="button" tabindex="0">
-              <span class="plugin-meta">Assistant</span>
+            <article class="app-card" data-app="agent" role="button" tabindex="0">
+              <span class="app-meta">Assistant</span>
               <strong>Agent Face</strong>
               <small>Animated idle face for future voice-agent behavior.</small>
-              <span class="plugin-preview preview-agent" aria-hidden="true"></span>
-              <button class="plugin-settings-button" type="button" data-plugin-settings="agent">Settings</button>
+              <span class="app-preview preview-agent" aria-hidden="true"></span>
+              <button class="app-settings-button" type="button" data-app-settings="agent">Settings</button>
             </article>
-            <article class="plugin-card" data-plugin="weather" role="button" tabindex="0">
-              <span class="plugin-meta">Weather</span>
+            <article class="app-card" data-app="weather" role="button" tabindex="0">
+              <span class="app-meta">Weather</span>
               <strong>Weather</strong>
               <small>Postal-code weather dashboard with playful assistant scenes.</small>
-              <span class="plugin-preview preview-weather weather-metric-preview" aria-hidden="true">
+              <span class="app-preview preview-weather weather-metric-preview" aria-hidden="true">
                 <span><strong>TEMP</strong><em>72F</em></span>
                 <span><strong>UV</strong><em>4</em></span>
                 <span><strong>AQI</strong><em>38</em></span>
                 <span><strong>WIND</strong><em>8</em></span>
               </span>
-              <button class="plugin-settings-button" type="button" data-plugin-settings="weather">Settings</button>
+              <button class="app-settings-button" type="button" data-app-settings="weather">Settings</button>
             </article>
-            <article class="plugin-card" data-plugin="testPattern" role="button" tabindex="0">
-              <span class="plugin-meta">Diagnostic</span>
+            <article class="app-card" data-app="testPattern" role="button" tabindex="0">
+              <span class="app-meta">Diagnostic</span>
               <strong>Test Pattern</strong>
               <small>Moving color bars for panel tuning.</small>
-              <span class="plugin-preview preview-test" aria-hidden="true"></span>
-              <button class="plugin-settings-button" type="button" data-plugin-settings="testPattern">Settings</button>
+              <span class="app-preview preview-test" aria-hidden="true"></span>
+              <button class="app-settings-button" type="button" data-app-settings="testPattern">Settings</button>
             </article>
           </section>
         </section>
@@ -174,22 +174,22 @@
         <section class="page" data-page-panel="store">
           <header class="page-heading compact">
             <div>
-              <p class="eyebrow">Widget store</p>
-              <h1>Discover widgets</h1>
+              <p class="eyebrow">App store</p>
+              <h1>Discover apps</h1>
             </div>
           </header>
 
           <section class="store-note">
             <strong>Catalog preview</strong>
-            <span>Install, update, and uninstall widgets from the configured store index.</span>
+            <span>Install, update, and uninstall apps from the configured store index.</span>
           </section>
 
-          <section class="plugin-grid" id="storeGrid" aria-label="Widget store">
-            <article class="plugin-card planned" aria-disabled="true">
-              <span class="plugin-meta">Loading</span>
+          <section class="app-grid" id="storeGrid" aria-label="App store">
+            <article class="app-card planned" aria-disabled="true">
+              <span class="app-meta">Loading</span>
               <strong>Store catalog</strong>
-              <small>Loading available widgets...</small>
-              <span class="plugin-preview preview-board" aria-hidden="true"></span>
+              <small>Loading available apps...</small>
+              <span class="app-preview preview-board" aria-hidden="true"></span>
             </article>
           </section>
         </section>
@@ -227,7 +227,7 @@
             </form>
             <form class="settings-panel" id="storeSettingsPanel">
               <div class="panel-heading">
-                <h2>Widget Store</h2>
+                <h2>App Store</h2>
                 <button type="submit">Save</button>
               </div>
               <div class="form-grid dense">
@@ -247,17 +247,17 @@
       </section>
     </main>
 
-    <dialog class="plugin-dialog" id="pluginDialog">
+    <dialog class="app-dialog" id="appDialog">
       <form method="dialog" class="dialog-card">
         <div class="dialog-heading">
           <div>
-            <p class="eyebrow" id="dialogKicker">Plugin setup</p>
-            <h2 id="dialogTitle">Plugin</h2>
+            <p class="eyebrow" id="dialogKicker">App setup</p>
+            <h2 id="dialogTitle">App</h2>
           </div>
           <button type="button" class="icon-button" id="closeDialogButton" aria-label="Close">x</button>
         </div>
 
-        <section class="plugin-config active" data-config-panel="spotify" id="spotifyPanel">
+        <section class="app-config active" data-config-panel="spotify" id="spotifyPanel">
           <div class="form-grid clock-settings-grid">
             <label>Client ID <input name="clientId" autocomplete="off" required></label>
             <label>Client Secret <input name="clientSecret" type="password" autocomplete="off" placeholder="Leave masked value to keep existing secret"></label>
@@ -270,7 +270,7 @@
           <pre class="command" id="pairCommand">Save an HTTPS redirect URI ending in /api/auth/callback for tunnel auth, or create a pairing token for local loopback setup.</pre>
         </section>
 
-        <section class="plugin-config" data-config-panel="clock" id="clockPanel">
+        <section class="app-config" data-config-panel="clock" id="clockPanel">
           <div class="clock-config-layout">
             <div class="clock-settings-stack">
               <label>
@@ -328,7 +328,7 @@
           </div>
         </section>
 
-        <section class="plugin-config" data-config-panel="agent" id="agentPanel">
+        <section class="app-config" data-config-panel="agent" id="agentPanel">
           <fieldset class="choice-grid agent-choice-grid">
             <label class="choice-card agent-choice">
               <input type="radio" name="agentFaceStyle" value="classic">
@@ -386,7 +386,7 @@
           </div>
         </section>
 
-        <section class="plugin-config" data-config-panel="weather" id="weatherPanel">
+        <section class="app-config" data-config-panel="weather" id="weatherPanel">
           <div class="weather-config-layout">
             <div class="form-grid weather-settings-grid">
               <label>Location label <input name="weatherLabel" placeholder="Home"></label>
@@ -412,12 +412,12 @@
           </div>
         </section>
 
-        <section class="plugin-config" data-config-panel="testPattern" id="advancedPanel">
+        <section class="app-config" data-config-panel="testPattern" id="advancedPanel">
           <label>Mock output <input name="mockOutput" placeholder="Optional PNG path"></label>
           <label class="check-row"><input name="testPattern" type="checkbox"><span>Force test pattern mode</span></label>
         </section>
 
-        <section class="plugin-config" data-config-panel="text" id="textPanel">
+        <section class="app-config" data-config-panel="text" id="textPanel">
           <div class="form-grid text-settings-grid">
             <label class="wide">Message <textarea name="text" rows="3" maxlength="600" autocomplete="off" placeholder="HELLO 🎵 — emoji and ASCII art welcome"></textarea></label>
             <label>Font <select name="fontFamily"><option value="pixel">Pixel</option><option value="sans">Sans (Latin)</option><option value="mono">Mono (ASCII art)</option><option value="devanagari">Devanagari</option></select></label>
@@ -434,7 +434,7 @@
           </div>
         </section>
 
-        <section class="plugin-config" data-config-panel="image" id="imagePanel">
+        <section class="app-config" data-config-panel="image" id="imagePanel">
           <div class="image-config-layout">
             <div class="form-grid image-settings-grid">
               <label class="wide">Image file <input name="imageFile" id="imageFileInput" type="file" accept="image/*"></label>
@@ -452,7 +452,7 @@
           <div class="asset-gallery" id="imageGallery"></div>
         </section>
 
-        <section class="plugin-config" data-config-panel="slideshow" id="slideshowPanel">
+        <section class="app-config" data-config-panel="slideshow" id="slideshowPanel">
           <div class="form-grid">
             <label>Seconds per image <input name="intervalSeconds" type="number" min="1" max="120" step="1"></label>
             <label>Fit <select name="fit"><option value="contain">Contain</option><option value="cover">Cover</option><option value="stretch">Stretch</option></select></label>
@@ -462,7 +462,7 @@
           <div class="asset-gallery" id="slideshowGallery"></div>
         </section>
 
-        <section class="plugin-config" data-config-panel="draw" id="drawPanel">
+        <section class="app-config" data-config-panel="draw" id="drawPanel">
           <div class="form-grid draw-settings-grid">
             <label>Background <input name="background" type="color"></label>
             <button type="button" class="secondary" id="addShapeButton">Add shape</button>
@@ -470,18 +470,18 @@
           <div class="draw-shape-list" id="drawShapeList"></div>
         </section>
 
-        <section class="plugin-config" data-config-panel="external" id="externalWidgetPanel">
-          <div class="external-widget-fields" id="externalWidgetFields"></div>
+        <section class="app-config" data-config-panel="external" id="externalAppPanel">
+          <div class="external-app-fields" id="externalAppFields"></div>
         </section>
 
-        <div class="widget-live-preview" id="widgetLivePreview" hidden>
+        <div class="app-live-preview" id="appLivePreview" hidden>
           <span class="eyebrow">Matrix preview</span>
-          <img id="widgetPreviewImg" alt="Live matrix preview" width="128" height="128">
+          <img id="appPreviewImg" alt="Live matrix preview" width="128" height="128">
         </div>
 
         <footer class="dialog-actions">
-          <button type="button" id="savePluginButton" class="secondary">Save Config</button>
-          <button type="button" id="applyPluginButton">Apply Plugin</button>
+          <button type="button" id="saveAppButton" class="secondary">Save Config</button>
+          <button type="button" id="applyAppButton">Apply App</button>
         </footer>
       </form>
     </dialog>

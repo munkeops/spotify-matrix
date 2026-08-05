@@ -141,7 +141,7 @@ class RuntimeService:
             args.append("--no-hardware-pulse")
         if config.runtime.mockOutput:
             args.extend(["--mock-output", config.runtime.mockOutput])
-        # The controller shell draws over whatever widget is running.
+        # The controller shell draws over whatever app is running.
         args.extend(["--shell-state", str(game_service.state_dir / "shell.json")])
         if config.clock.use24Hour:
             args.append("--clock-24-hour")
@@ -199,20 +199,20 @@ class RuntimeService:
             )
         args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background, "--image-rotate", str(config.image.rotate)])
         if config.image.assetPath:
-            asset_file = config_service.data_dir / "widgets" / "assets" / config.image.assetPath
+            asset_file = config_service.data_dir / "apps" / "assets" / config.image.assetPath
             args.extend(["--image-asset", str(asset_file)])
         if config.runtime.testPattern:
             args.append("--test-pattern")
-        if config.display.mode == "widget" and config.display.widgetId:
-            widget_id = config.display.widgetId
+        if config.display.mode == "app" and config.display.appId:
+            app_id = config.display.appId
             args.extend(
                 [
-                    "--widget-id",
-                    widget_id,
-                    "--widget-dir",
-                    str(game_service.widget_package_dir(widget_id)),
-                    "--widget-config",
-                    str(config_service.data_dir / "widgets" / "config" / f"{widget_id}.json"),
+                    "--app-id",
+                    app_id,
+                    "--app-dir",
+                    str(game_service.app_package_dir(app_id)),
+                    "--app-config",
+                    str(config_service.data_dir / "apps" / "config" / f"{app_id}.json"),
                 ]
             )
         return args

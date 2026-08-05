@@ -171,7 +171,7 @@ def plug_device(device: str) -> str:
     The mixer renders 22050Hz mono, which a sound card is free to refuse.
     HDMI happens to accept it; the bluealsa PCM does not, because A2DP is
     44100Hz stereo - so a Bluetooth speaker connected perfectly well and
-    then played nothing. ALSA's `plug` plugin does that conversion.
+    then played nothing. ALSA's `plug` app does that conversion.
 
     The braces form is deliberate. A bluealsa name is
     `bluealsa:DEV=...,PROFILE=a2dp`, and plain `plug:` + that would have

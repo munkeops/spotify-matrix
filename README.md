@@ -10,15 +10,15 @@ The project now uses a Python-only stack:
 - Runtime display script in `spotify_matrix.py`
 - TOML service config in `configs/base_config.toml`
 
-Widget platform docs:
+App platform docs:
 
-- [Widget store roadmap](docs/widget-store-roadmap.md)
-- [Widget store quickstart](docs/widget-store-quickstart.md)
-- [Widget SDK](docs/widget-sdk.md)
-- [Widget API reference](docs/widget-api-reference.md)
-- [Widget manifest schema](docs/schemas/widget-manifest.schema.json)
-- [Widget store index schema](docs/schemas/widget-store-index.schema.json)
-- [Game plugins](docs/game-plugins.md)
+- [App store roadmap](docs/app-store-roadmap.md)
+- [App store quickstart](docs/app-store-quickstart.md)
+- [App SDK](docs/app-sdk.md)
+- [App API reference](docs/app-api-reference.md)
+- [App manifest schema](docs/schemas/app-manifest.schema.json)
+- [App store index schema](docs/schemas/app-store-index.schema.json)
+- [Game apps](docs/game-apps.md)
 - [Game audio](docs/game-audio.md)
 - [Mini-joystick module](docs/mini-joystick.md)
 - [Bluetooth game controller](docs/game-controller.md)
@@ -187,10 +187,10 @@ python spotify_matrix.py --preview-frames data/preview
 
 Nine games run on the panel and are played from the app, a phone, or the
 mini-joystick module. They live on the **Play** shelf of the Store and of your
-installed plugins; tap one to put it on the matrix and its gamepad opens with a
+installed apps; tap one to put it on the matrix and its gamepad opens with a
 live mirror of the panel.
 
-Both the Store and the Plugins page are split into the same three shelves —
+Both the Store and the Apps page are split into the same three shelves —
 **Apps**, **Play** and **Creative** — so a game is in the same place whether you
 are browsing for one or managing what you already have.
 
@@ -213,7 +213,7 @@ game needs no new UI. Games live in `matrix_games/`; adding one is a module plus
 a single entry in `matrix_games/__init__.py`.
 
 Controller input reaches the runtime through a sequenced command queue under
-`data/widgets/state/`, so presses are never dropped or replayed twice:
+`data/apps/state/`, so presses are never dropped or replayed twice:
 
 ```bash
 curl http://<pi-host>:3000/api/games
@@ -224,19 +224,19 @@ curl http://<pi-host>:3000/api/games/pacman/state
 Run a game locally without matrix hardware:
 
 ```bash
-python spotify_matrix.py --display-mode widget --widget-id core.pacman   --widget-dir store_widgets/core.pacman --mock-output data/frame.png   --game-input data/widgets/state/pacman-input.json   --game-state data/widgets/state/pacman-state.json
+python spotify_matrix.py --display-mode app --app-id core.pacman   --app-dir store_apps/core.pacman --mock-output data/frame.png   --game-input data/apps/state/pacman-input.json   --game-state data/apps/state/pacman-state.json
 ```
 
-Games have sound: generated chiptune effects bundled per plugin, mixed so they
+Games have sound: generated chiptune effects bundled per app, mixed so they
 overlap, switched on under **Settings → Game sound**. See
 [docs/game-audio.md](docs/game-audio.md).
 
 High scores are saved. Any game with a score gets a persisted best, a top ten
-and a play count with no code of its own, kept in `<data>/widgets/scores/` and
-readable at `/api/games/<id>/scores`, so a best survives switching plugins and
+and a play count with no code of its own, kept in `<data>/apps/scores/` and
+readable at `/api/games/<id>/scores`, so a best survives switching apps and
 rebooting.
 
-Each game is also a plugin, so difficulty and rules are editable from its config
+Each game is also a app, so difficulty and rules are editable from its config
 drawer: Pac-Man speed and lives, Snake walls, Breakout paddle width, Pong
 opponent, and so on.
 
@@ -244,7 +244,7 @@ opponent, and so on.
 
 Pair a Bluetooth gamepad under **Settings → Bluetooth**, then turn it on under
 **Settings → Game controller**. D-pad moves, **A** is the action button, **Start**
-pauses, and the pad walks the plugin list when no game is running. It adapts to
+pauses, and the pad walks the app list when no game is running. It adapts to
 whatever the running game declares, so one pad works everywhere. See
 [docs/game-controller.md](docs/game-controller.md).
 
@@ -252,7 +252,7 @@ whatever the running game declares, so one pad works everywhere. See
 
 A NULLLAB mini-joystick module (I2C 0x5A, one stick plus A/B/C/D/OK) can drive
 the panel directly: it plays whichever game is running, and flicks through
-plugins when none is. Enable it with:
+apps when none is. Enable it with:
 
 ```bash
 curl -X POST http://<pi-host>:3000/api/joystick/config   -H "Content-Type: application/json" -d '{"config":{"enabled":true}}'
@@ -300,7 +300,7 @@ in the place the bus looks:
     sudo apt install bluez-alsa-utils
     sudo systemctl enable --now bluealsa
 
-The container's ALSA plugin then talks to that daemon over the same socket, and
+The container's ALSA app then talks to that daemon over the same socket, and
 the speaker appears in Settings under Game sound, by name.
 
 The panel lists speakers by address, never the bare `bluealsa` PCM: that one

@@ -27,10 +27,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from PIL import Image, ImageColor, ImageDraw, ImageFont, ImageOps, ImageSequence
 
-from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
+from assistant_matrix_sdk import MatrixCanvas, App, AppContext
 from matrix_games import create_game, discover, get_spec
 from matrix_games.io import read_commands as read_game_commands, write_state as write_game_state
-from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.game import GameApp
 from matrix_input.shell import read_shell_state, render_brightness, render_menu
 from matrix_input.wheel import render_wheel
 from assistant_matrix_sdk.store import GameStore
@@ -1651,11 +1651,11 @@ BRIGHTNESS_HINT_SECONDS = 1.2
 
 
 class OverlayDisplay:
-    """Wraps a display so the controller shell can draw over any widget.
+    """Wraps a display so the controller shell can draw over any app.
 
-    Widgets have wildly different frame rates - the clock redraws once a
+    Apps have wildly different frame rates - the clock redraws once a
     second - so the menu is driven by its own thread rather than waiting for
-    the widget to produce a frame. While the menu is open the widget's frames
+    the app to produce a frame. While the menu is open the app's frames
     are recorded but not pushed, and the overlay owns the panel.
     """
 
@@ -1674,7 +1674,7 @@ class OverlayDisplay:
             self._thread = threading.Thread(target=self._run, name="shell-overlay", daemon=True)
             self._thread.start()
 
-    # The widget side of the display contract.
+    # The app side of the display contract.
 
     def show(self, image: Image.Image) -> None:
         with self._lock:
@@ -1732,7 +1732,7 @@ class OverlayDisplay:
             elif showing_bar:
                 self._display.show(render_brightness(base, self._brightness_level))
             elif was_active:
-                # Overlay just closed: put the widget's own frame back.
+                # Overlay just closed: put the app's own frame back.
                 self._display.show(base)
 
 
@@ -1896,7 +1896,7 @@ def _resolve_image_settings(args: argparse.Namespace) -> tuple[str, str, tuple[i
     if not asset:
         asset_name = image_cfg.get("assetPath", "")
         if asset_name:
-            asset = str(args.config_path.parent / "widgets" / "assets" / asset_name)
+            asset = str(args.config_path.parent / "apps" / "assets" / asset_name)
     return asset or "", fit, background, rotate
 
 
@@ -1964,7 +1964,7 @@ def run_slideshow(args: argparse.Namespace, display: MatrixDisplay | MockDisplay
     background = parse_color(cfg.get("background", "#000000"), (0, 0, 0))
     rotate = int(cfg.get("rotate", 0) or 0)
     interval = max(1, int(cfg.get("intervalSeconds", 8) or 8))
-    assets_dir = args.config_path.parent / "widgets" / "assets"
+    assets_dir = args.config_path.parent / "apps" / "assets"
     paths = [str(assets_dir / name) for name in cfg.get("items", []) if name and (assets_dir / name).exists()]
     try:
         if not paths:
@@ -2054,13 +2054,13 @@ def run_draw(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
 GAME_HEARTBEAT_SECONDS = 1.5
 
 
-def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int, game: GameWidget | str) -> None:
+def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int, game: GameApp | str) -> None:
     """Drive one game: drain queued input, step, draw, publish state."""
     if isinstance(game, str):
         spec = get_spec(game)
         game = create_game(
             game,
-            read_external_widget_config(args.widget_config),
+            read_external_app_config(args.app_config),
             store=game_store(args),
             audio=game_audio(args, spec.sounds_dir if spec else None),
         )
@@ -2134,46 +2134,46 @@ def game_audio(args: argparse.Namespace, sounds_dir: Path | None):
     return engine
 
 
-def load_game_package(widget_dir: Path, manifest: dict[str, Any], config: dict[str, Any], store: GameStore | None = None, audio: Any = None) -> GameWidget:
+def load_game_package(app_dir: Path, manifest: dict[str, Any], config: dict[str, Any], store: GameStore | None = None, audio: Any = None) -> GameApp:
     """Build the game a package declares, without importing the whole arcade."""
     from matrix_games.registry import GameSpec, load_game_class
 
-    widget_info = manifest.get("widget", {})
-    widget_id = str(widget_info.get("id", "") or widget_dir.name)
+    app_info = manifest.get("app", {})
+    app_id = str(app_info.get("id", "") or app_dir.name)
     spec = GameSpec(
-        game_id=widget_id.split(".", 1)[-1],
-        widget_id=widget_id,
-        name=str(widget_info.get("name", widget_id)),
-        summary=str(widget_info.get("summary", "")),
-        layout=str(widget_info.get("layout", "dpad") or "dpad"),
-        actions=tuple(widget_info.get("actions", []) or ()),
-        package_dir=widget_dir,
-        entrypoint=str(widget_info.get("entrypoint", "")),
+        game_id=app_id.split(".", 1)[-1],
+        app_id=app_id,
+        name=str(app_info.get("name", app_id)),
+        summary=str(app_info.get("summary", "")),
+        layout=str(app_info.get("layout", "dpad") or "dpad"),
+        actions=tuple(app_info.get("actions", []) or ()),
+        package_dir=app_dir,
+        entrypoint=str(app_info.get("entrypoint", "")),
     )
     return load_game_class(spec)(config, None, store, audio)
 
 
-def load_external_widget(widget_dir: Path, entrypoint: str) -> Any:
-    if str(widget_dir) not in sys.path:
-        sys.path.insert(0, str(widget_dir))
+def load_external_app(app_dir: Path, entrypoint: str) -> Any:
+    if str(app_dir) not in sys.path:
+        sys.path.insert(0, str(app_dir))
     if ":" not in entrypoint:
-        raise RuntimeError("Widget entrypoint must use module.path:object.")
+        raise RuntimeError("App entrypoint must use module.path:object.")
     module_name, object_name = entrypoint.split(":", 1)
     module = __import__(module_name, fromlist=[object_name])
     target = getattr(module, object_name)
-    if isinstance(target, type) and issubclass(target, Widget):
+    if isinstance(target, type) and issubclass(target, App):
         return target()
     return target
 
 
-def read_external_widget_manifest(widget_dir: Path) -> dict[str, Any]:
-    manifest_path = widget_dir / "widget.toml"
+def read_external_app_manifest(app_dir: Path) -> dict[str, Any]:
+    manifest_path = app_dir / "app.toml"
     if not manifest_path.exists():
-        raise RuntimeError(f"Missing widget manifest at {manifest_path}.")
+        raise RuntimeError(f"Missing app manifest at {manifest_path}.")
     return tomllib.loads(manifest_path.read_text(encoding="utf-8"))
 
 
-def read_external_widget_config(path: Path | None) -> dict[str, Any]:
+def read_external_app_config(path: Path | None) -> dict[str, Any]:
     if path is None or not path.exists():
         return {}
     with path.open("r", encoding="utf-8") as file:
@@ -2181,28 +2181,28 @@ def read_external_widget_config(path: Path | None) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def run_external_widget(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
-    if not args.widget_dir:
-        raise RuntimeError("Widget mode requires --widget-dir.")
+def run_external_app(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, size: int) -> None:
+    if not args.app_dir:
+        raise RuntimeError("App mode requires --app-dir.")
 
-    widget_dir = args.widget_dir.resolve()
-    manifest = read_external_widget_manifest(widget_dir)
-    widget_info = manifest.get("widget", {})
-    entrypoint = str(widget_info.get("entrypoint", ""))
+    app_dir = args.app_dir.resolve()
+    manifest = read_external_app_manifest(app_dir)
+    app_info = manifest.get("app", {})
+    entrypoint = str(app_info.get("entrypoint", ""))
     if not entrypoint:
-        raise RuntimeError("Widget manifest is missing widget.entrypoint.")
+        raise RuntimeError("App manifest is missing app.entrypoint.")
 
-    config = read_external_widget_config(args.widget_config)
-    if str(widget_info.get("kind", "widget")) == "game":
-        # A game plugin needs stepping and controller input, not a static frame.
-        run_game(args, display, size, load_game_package(widget_dir, manifest, config, game_store(args), game_audio(args, widget_dir / "sounds")))
+    config = read_external_app_config(args.app_config)
+    if str(app_info.get("kind", "app")) == "game":
+        # A game app needs stepping and controller input, not a static frame.
+        run_game(args, display, size, load_game_package(app_dir, manifest, config, game_store(args), game_audio(args, app_dir / "sounds")))
         return
 
-    renderer = load_external_widget(widget_dir, entrypoint)
+    renderer = load_external_app(app_dir, entrypoint)
     state: dict[str, Any] = {}
-    context = WidgetContext(config=config, state=state, assets_dir=widget_dir / "assets")
+    context = AppContext(config=config, state=state, assets_dir=app_dir / "assets")
 
-    if isinstance(renderer, Widget):
+    if isinstance(renderer, App):
         renderer.setup(context)
     elif hasattr(renderer, "setup"):
         renderer.setup(context)
@@ -2212,7 +2212,7 @@ def run_external_widget(args: argparse.Namespace, display: MatrixDisplay | MockD
         while True:
             context.frame_index = frame_index
             canvas = MatrixCanvas(size, size)
-            if isinstance(renderer, Widget):
+            if isinstance(renderer, App):
                 renderer.render(canvas, context)
             else:
                 renderer(canvas, context)
@@ -2224,7 +2224,7 @@ def run_external_widget(args: argparse.Namespace, display: MatrixDisplay | MockD
     except KeyboardInterrupt:
         pass
     finally:
-        if isinstance(renderer, Widget):
+        if isinstance(renderer, App):
             renderer.teardown(context)
         elif hasattr(renderer, "teardown"):
             renderer.teardown(context)
@@ -2351,8 +2351,8 @@ def run(args: argparse.Namespace) -> None:
         run_draw(args, display, size)
     elif mode == "slideshow":
         run_slideshow(args, display, size)
-    elif mode == "widget":
-        run_external_widget(args, display, size)
+    elif mode == "app":
+        run_external_app(args, display, size)
     else:
         run_spotify(args, config, display, size)
 
@@ -2373,7 +2373,7 @@ def render_preview_frames(directory: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Assistant Matrix display modes on a 64x64 RGB matrix.")
-    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"), default="spotify")
+    parser.add_argument("--display-mode", choices=("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "app"), default="spotify")
     parser.add_argument("--rows", type=int, default=64)
     parser.add_argument("--cols", type=int, default=64)
     parser.add_argument("--chain-length", type=int, default=1)
@@ -2440,9 +2440,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--audio", action="store_true", help="Play game sound effects through the sound card.")
     parser.add_argument("--audio-device", dest="audio_device", default="", help="ALSA device for sound effects; empty means the default.")
     parser.add_argument("--audio-volume", dest="audio_volume", type=int, default=80, help="Sound effect volume, 0-100.")
-    parser.add_argument("--widget-id", default="", help="Installed widget id for external widget mode.")
-    parser.add_argument("--widget-dir", type=Path, help="Installed widget package directory for external widget mode.")
-    parser.add_argument("--widget-config", type=Path, help="Saved widget config JSON for external widget mode.")
+    parser.add_argument("--app-id", default="", help="Installed app id for external app mode.")
+    parser.add_argument("--app-dir", type=Path, help="Installed app package directory for external app mode.")
+    parser.add_argument("--app-config", type=Path, help="Saved app config JSON for external app mode.")
     parser.add_argument("--event-api-url", default="", help="Optional Assistant Matrix display event endpoint URL.")
     parser.add_argument("--once", action="store_true", help="Render one frame and exit.")
     parser.add_argument("--no-browser", action="store_true", help="Print the Spotify auth URL without trying to open a browser.")

@@ -41,17 +41,17 @@ export interface StatusResponse {
   dataDir: string;
 }
 
-export interface WidgetConfigOption {
+export interface AppConfigOption {
   label: string;
   value: string | number | boolean;
 }
 
-export interface WidgetConfigField {
+export interface AppConfigField {
   key: string;
   label: string;
   type: "string" | "secret" | "number" | "boolean" | "select";
   default?: unknown;
-  options?: WidgetConfigOption[];
+  options?: AppConfigOption[];
   required?: boolean;
   placeholder?: string;
   min?: number;
@@ -60,7 +60,7 @@ export interface WidgetConfigField {
   helpText?: string;
 }
 
-export interface WidgetManifest {
+export interface AppManifest {
   id: string;
   name: string;
   version: string;
@@ -68,24 +68,24 @@ export interface WidgetManifest {
   author: string;
   category: string;
   runtime: string;
-  /** "game" widgets are driven by a controller and get a gamepad. */
-  kind?: "widget" | "game";
+  /** "game" apps are driven by a controller and get a gamepad. */
+  kind?: "app" | "game";
   layout?: string;
   actions?: string[];
-  config: WidgetConfigField[];
+  config: AppConfigField[];
 }
 
-type HasManifest = { manifest: WidgetManifest } | null | undefined;
+type HasManifest = { manifest: AppManifest } | null | undefined;
 
-/** Games are plugins, so identify them by manifest rather than a fixed list. */
-export const isGame = (widget: HasManifest) => widget?.manifest.kind === "game";
-export const gameIdOf = (widget: HasManifest) => gameIdFromWidgetId(widget?.manifest.id ?? "");
+/** Games are apps, so identify them by manifest rather than a fixed list. */
+export const isGame = (app: HasManifest) => app?.manifest.kind === "game";
+export const gameIdOf = (app: HasManifest) => gameIdFromAppId(app?.manifest.id ?? "");
 
 /** "core.pacman" -> "pacman", the id the game routes use. */
-export const gameIdFromWidgetId = (widgetId: string) => widgetId.replace(/^[^.]+\./, "");
+export const gameIdFromAppId = (appId: string) => appId.replace(/^[^.]+\./, "");
 
-export interface LocalWidget {
-  manifest: WidgetManifest;
+export interface LocalApp {
+  manifest: AppManifest;
   installed: boolean;
   builtIn: boolean;
   enabled: boolean;
@@ -93,24 +93,24 @@ export interface LocalWidget {
   active: boolean;
 }
 
-export const listLocalWidgets = () => apiGet<{ widgets: LocalWidget[] }>("/api/widgets/local");
-export const getWidgetConfig = (id: string) =>
-  apiGet<{ widgetId: string; config: Record<string, unknown> }>(`/api/widgets/local/${encodeURIComponent(id)}/config`);
-export const saveWidgetConfig = (id: string, config: Record<string, unknown>) =>
-  apiPost(`/api/widgets/local/${encodeURIComponent(id)}/config`, { config });
-export const applyWidget = (id: string, config: Record<string, unknown> | null = null) =>
-  apiPost(`/api/widgets/local/${encodeURIComponent(id)}/apply`, { config });
-export const previewWidget = (widgetId: string, config: Record<string, unknown>) =>
-  apiPost<{ dataUrl: string }>("/api/widgets/preview", { widgetId, config });
+export const listLocalApps = () => apiGet<{ apps: LocalApp[] }>("/api/apps/local");
+export const getAppConfig = (id: string) =>
+  apiGet<{ appId: string; config: Record<string, unknown> }>(`/api/apps/local/${encodeURIComponent(id)}/config`);
+export const saveAppConfig = (id: string, config: Record<string, unknown>) =>
+  apiPost(`/api/apps/local/${encodeURIComponent(id)}/config`, { config });
+export const applyApp = (id: string, config: Record<string, unknown> | null = null) =>
+  apiPost(`/api/apps/local/${encodeURIComponent(id)}/apply`, { config });
+export const previewApp = (appId: string, config: Record<string, unknown>) =>
+  apiPost<{ dataUrl: string }>("/api/apps/preview", { appId, config });
 
 const CORE_PREVIEWABLE = new Set([
   "core.text", "core.image", "core.draw", "core.slideshow",
   "core.clock", "core.agent", "core.weather", "core.spotify", "core.testPattern",
 ]);
 
-/** Core widgets render a preview, and so does every game plugin. */
-export const canPreview = (widget: HasManifest) =>
-  Boolean(widget) && (CORE_PREVIEWABLE.has(widget!.manifest.id) || isGame(widget));
+/** Core apps render a preview, and so does every game app. */
+export const canPreview = (app: HasManifest) =>
+  Boolean(app) && (CORE_PREVIEWABLE.has(app!.manifest.id) || isGame(app));
 
 export type TetrisAction =
   | "left" | "right" | "softDrop" | "hardDrop"
@@ -150,11 +150,11 @@ export const saveConfig = (config: Record<string, unknown>) => apiPost<Record<st
 export const createPairing = () =>
   apiPost<{ pairingToken: string; expiresInSeconds: number; command: string }>("/api/auth/session", {});
 
-export interface RotationItem { widgetId: string; durationSeconds: number; enabled: boolean }
-export interface TriggerRule { event: string; widgetId: string; enabled: boolean; priority: number; minDurationSeconds: number }
+export interface RotationItem { appId: string; durationSeconds: number; enabled: boolean }
+export interface TriggerRule { event: string; appId: string; enabled: boolean; priority: number; minDurationSeconds: number }
 export interface DisplayPolicy {
   mode: "single" | "rotation";
-  activeWidgetId: string;
+  activeAppId: string;
   rotation: RotationItem[];
   triggers: TriggerRule[];
 }
@@ -196,7 +196,7 @@ export async function deleteAsset(name: string) {
   return r.json();
 }
 
-export interface StoreWidget {
+export interface StoreApp {
   id: string;
   name: string;
   version: string;
@@ -208,10 +208,10 @@ export interface StoreWidget {
   previewGifUrl: string;
   matrixPreviewUrl: string;
 }
-export const listStoreWidgets = () => apiGet<{ widgets: StoreWidget[] }>("/api/widgets/store");
-export const installWidget = (widgetId: string) => apiPost("/api/widgets/install", { widgetId });
-export async function uninstallWidget(widgetId: string) {
-  const r = await fetch(`/api/widgets/local/${encodeURIComponent(widgetId)}`, { method: "DELETE" });
+export const listStoreApps = () => apiGet<{ apps: StoreApp[] }>("/api/apps/store");
+export const installApp = (appId: string) => apiPost("/api/apps/install", { appId });
+export async function uninstallApp(appId: string) {
+  const r = await fetch(`/api/apps/local/${encodeURIComponent(appId)}`, { method: "DELETE" });
   if (!r.ok) throw new Error("Uninstall failed");
   return r.json();
 }
@@ -222,7 +222,7 @@ export interface GameSummary {
   id: string;
   name: string;
   summary: string;
-  widgetId: string;
+  appId: string;
   layout: GameLayout;
   actions: string[];
   active: boolean;
@@ -366,7 +366,7 @@ export interface BindingProfile {
 
 export interface GameBindings {
   gameId: string;
-  widgetId: string;
+  appId: string;
   /** The device these bindings are for. */
   profile: string;
   profiles: BindingProfile[];

@@ -1,4 +1,4 @@
-"""64x64 matrix drawing helper for widget authors."""
+"""64x64 matrix drawing helper for app authors."""
 
 from __future__ import annotations
 

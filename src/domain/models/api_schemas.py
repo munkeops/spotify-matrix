@@ -37,8 +37,8 @@ class RuntimeConfig(BaseModel):
 
 
 class DisplayConfig(BaseModel):
-    mode: Literal["spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"] = "spotify"
-    widgetId: str = ""
+    mode: Literal["spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "app"] = "spotify"
+    appId: str = ""
 
 
 class ClockConfig(BaseModel):
@@ -154,7 +154,7 @@ class AudioConfig(BaseModel):
 
 
 class ControllerConfig(BaseModel):
-    """Controller bindings, keyed by device profile, widget id, then control.
+    """Controller bindings, keyed by device profile, app id, then control.
 
     The profile comes first because the mini-joystick module and a gamepad
     are not the same shape: the module has five buttons, a pad has thirteen.
@@ -166,7 +166,7 @@ class ControllerConfig(BaseModel):
 
 
 class StoreConfig(BaseModel):
-    indexUrl: str = "configs/widget_store_index.json"
+    indexUrl: str = "configs/app_store_index.json"
 
 
 class AssetUploadRequest(BaseModel):
@@ -322,7 +322,7 @@ class RuntimeActionResponse(BaseModel):
 
 
 class CommandRequest(BaseModel):
-    command: Literal["set_mode", "set_widget", "set_clock_face", "set_brightness", "trigger_event", "start_runtime", "stop_runtime"]
+    command: Literal["set_mode", "set_app", "set_clock_face", "set_brightness", "trigger_event", "start_runtime", "stop_runtime"]
     value: str | int | None = None
 
 
@@ -356,7 +356,7 @@ class GameSummary(BaseModel):
     id: str
     name: str
     summary: str
-    widgetId: str
+    appId: str
     layout: str
     actions: list[str] = Field(default_factory=list)
     active: bool = False
@@ -421,7 +421,7 @@ class CommandResponse(BaseModel):
     config: AppConfig
     runtime: Any = None
     matched: bool | None = None
-    widgetId: str | None = None
+    appId: str | None = None
 
 
 class JoystickStateResponse(BaseModel):
@@ -509,7 +509,7 @@ class BindingProfile(BaseModel):
 
 class GameBindingsResponse(BaseModel):
     gameId: str
-    widgetId: str
+    appId: str
     #: The profile these bindings are for.
     profile: str = ""
     profiles: list[BindingProfile] = Field(default_factory=list)

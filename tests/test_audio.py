@@ -245,7 +245,7 @@ def test_every_sound_a_game_asks_for_exists(game_id):
     spec = mg.discover()[game_id]
     available = {path.stem for path in spec.sounds_dir.glob("*.wav")}
 
-    source = (spec.package_dir / "renderer" / "widget.py").read_text(encoding="utf-8")
+    source = (spec.package_dir / "renderer" / "app.py").read_text(encoding="utf-8")
     import re
 
     asked = set(re.findall(r'self\.audio\.play\(\s*"([a-z_]+)"', source))
@@ -277,7 +277,7 @@ def test_snake_crashing_is_audible():
 
 
 def test_tetris_lines_and_locks_sound_different():
-    tetris = mg.plugin_module("tetris")
+    tetris = mg.app_module("tetris")
     recorder = Recorder()
     game = mg.create_game("tetris", {}, seed=1, audio=recorder)
 
@@ -554,7 +554,7 @@ def test_the_bridge_state_reaches_the_panel():
 
 
 def test_a_bluetooth_output_is_not_offered_while_the_bridge_is_down(monkeypatch):
-    """ALSA lists the bluealsa PCM whenever the plugin is installed, daemon
+    """ALSA lists the bluealsa PCM whenever the app is installed, daemon
     or no daemon, so selecting it failed with "No such device"."""
     from matrix_audio import bluealsa
     from src.domain.services import audio_service as module

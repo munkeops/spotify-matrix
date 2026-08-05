@@ -1,4 +1,4 @@
-"""Widget runtime context values."""
+"""App runtime context values."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ class Event:
 
 
 @dataclass
-class WidgetContext:
+class AppContext:
     config: dict[str, Any] = field(default_factory=dict)
     state: dict[str, Any] = field(default_factory=dict)
     assets_dir: Path | None = None
@@ -29,5 +29,5 @@ class WidgetContext:
 
     def asset(self, relative_path: str) -> Asset:
         if self.assets_dir is None:
-            raise RuntimeError("WidgetContext.assets_dir is not set.")
+            raise RuntimeError("AppContext.assets_dir is not set.")
         return Asset(path=self.assets_dir / relative_path)

@@ -1,6 +1,6 @@
 """Per-game persistent storage.
 
-Games run in a process that restarts whenever the panel switches plugins, so
+Games run in a process that restarts whenever the panel switches apps, so
 anything a game wants to remember between sessions — a high score, how many
 times it has been played, which level you reached — has to live on disk.
 

@@ -25,7 +25,7 @@ async def list_games() -> GameListResponse:
             id=spec.game_id,
             name=spec.name,
             summary=spec.summary,
-            widgetId=spec.widget_id,
+            appId=spec.app_id,
             layout=spec.layout,
             actions=list(spec.actions),
             active=spec.game_id == active,

@@ -228,22 +228,22 @@ the stick towards a wedge and release, exactly like a weapon wheel:
 
 | In a game | Otherwise |
 |---|---|
-| Pause, Restart, Exit | Plugins, Power |
-| Brighter, Dimmer, Plugins | Brighter, Dimmer |
+| Pause, Restart, Exit | Apps, Power |
+| Brighter, Dimmer, Apps | Brighter, Dimmer |
 
 **Exit** leaves the game for whatever was on the panel before it. B cancels, and
 releasing without pointing at anything does nothing.
 
 **When no game is running** the controller drives the panel itself.
 
-Click the stick (or **Start** on a gamepad) and a plugin menu appears **on the
+Click the stick (or **Start** on a gamepad) and a app menu appears **on the
 matrix**, drawn over whatever is already showing. Move the highlight, click
 again to pick. Nothing changes until you pick, so browsing is free:
 
 | Input | Menu closed | Menu open |
 |---|---|---|
-| Stick ↑/↓ ←/→ | flick straight to the next/previous plugin | move the highlight |
-| OK / Start | open the menu | select the highlighted plugin |
+| Stick ↑/↓ ←/→ | flick straight to the next/previous app | move the highlight |
+| OK / Start | open the menu | select the highlighted app |
 | A | brightness up | select |
 | B | brightness down | cancel |
 | C | open the menu | — |
@@ -253,9 +253,9 @@ Brightness applies **live** — the panel dims as you press, with a bar on scree
 to show the level, and the setting is saved. No restart, so whatever is playing
 keeps playing.
 
-The menu draws over any widget, not just games, because the runtime composites
+The menu draws over any app, not just games, because the runtime composites
 it on top of the last frame. It has its own redraw loop, so it stays responsive
-even over a plugin that only redraws once a second, like the clock.
+even over a app that only redraws once a second, like the clock.
 
 ### Settings
 

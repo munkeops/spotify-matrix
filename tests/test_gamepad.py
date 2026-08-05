@@ -145,7 +145,7 @@ def test_a_pad_press_becomes_a_game_action():
     assert game_action(left, set(GAMES["pacman"].actions)) == "left"
 
 
-def test_start_pauses_and_the_pad_walks_plugins():
+def test_start_pauses_and_the_pad_walks_apps():
     pad = mapper()
     start = pad.feed(EV_KEY, BTN_START, 1)[0]
     right = pad.feed(EV_ABS, ABS_HAT0X, 1)[0]
@@ -168,7 +168,7 @@ SERVICE_MODULES = [
     "src.domain.services.config_service",
     "src.domain.services.game_service",
     "src.domain.services.runtime_service",
-    "src.domain.services.widget_registry_service",
+    "src.domain.services.app_registry_service",
     "src.domain.services.joystick_service",
     "src.domain.services.gamepad_service",
 ]
@@ -188,8 +188,8 @@ def reload_stack(monkeypatch, data_dir: Path):
 def test_the_pad_drives_the_running_game(tmp_path, monkeypatch):
     config_module, game_module, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.invaders"
+    config.display.mode = "app"
+    config.display.appId = "core.invaders"
     config_module.config_service.save_config(config)
 
     pad = FakeGamepad([(EV_ABS, ABS_HAT0X, -1), (EV_KEY, BTN_SOUTH, 1)])
@@ -373,8 +373,8 @@ def test_a_long_press_opens_the_wheel_from_a_pad(tmp_path, monkeypatch):
 
     config_module, game_module, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.breakout"
+    config.display.mode = "app"
+    config.display.appId = "core.breakout"
     config_module.config_service.save_config(config)
 
     pad = FakeGamepad([(EV_KEY, BTN_START, 1)])
@@ -391,8 +391,8 @@ def test_holding_left_keeps_moving_the_paddle(tmp_path, monkeypatch):
     _, game_module, gamepad_module = reload_stack(monkeypatch, tmp_path / "data")
     config_module = importlib.import_module("src.domain.services.config_service")
     config = config_module.config_service.get_config()
-    config.display.mode = "widget"
-    config.display.widgetId = "core.breakout"
+    config.display.mode = "app"
+    config.display.appId = "core.breakout"
     config_module.config_service.save_config(config)
 
     pad = FakeGamepad([(EV_ABS, ABS_HAT0X, -1)])

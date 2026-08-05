@@ -10,7 +10,7 @@ from assistant_matrix_sdk.game import (  # noqa: F401
     RESTART_GRACE_SECONDS,
     WON,
     Game,
-    GameWidget,
+    GameApp,
 )
 
-__all__ = ["Game", "GameWidget", "PLAYING", "PAUSED", "GAME_OVER", "WON", "RESTART_ACTIONS", "RESTART_GRACE_SECONDS"]
+__all__ = ["Game", "GameApp", "PLAYING", "PAUSED", "GAME_OVER", "WON", "RESTART_ACTIONS", "RESTART_GRACE_SECONDS"]

@@ -1,4 +1,4 @@
-"""High score routes for game plugins."""
+"""High score routes for game apps."""
 
 from __future__ import annotations
 

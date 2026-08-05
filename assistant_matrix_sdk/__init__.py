@@ -1,22 +1,31 @@
-"""Public SDK primitives for Assistant Matrix widgets and games."""
+"""Public SDK primitives for Assistant Matrix apps and games."""
 
 from assistant_matrix_sdk.config import ConfigField
-from assistant_matrix_sdk.context import Asset, Event, WidgetContext
-from assistant_matrix_sdk.manifest import WidgetPermission, WidgetPreview, WidgetTrigger
+from assistant_matrix_sdk.context import Asset, Event, AppContext
+from assistant_matrix_sdk.manifest import AppPermission, AppPreview, AppTrigger
+
+# Apps used to be called widgets. An app written against the old SDK still
+# subclasses GameWidget and imports WidgetPreview, and there is no reason to
+# break it over a word, so both spellings resolve to the same classes. The
+# lazy ones are handled in __getattr__ below.
+WidgetContext = AppContext
+WidgetPermission = AppPermission
+WidgetPreview = AppPreview
+WidgetTrigger = AppTrigger
 
 __all__ = [
     "Asset",
     "ConfigField",
     "Event",
-    "GameWidget",
+    "GameApp",
     "GameStore",
     "SilentAudio",
     "MatrixCanvas",
-    "Widget",
-    "WidgetContext",
-    "WidgetPermission",
-    "WidgetPreview",
-    "WidgetTrigger",
+    "App",
+    "AppContext",
+    "AppPermission",
+    "AppPreview",
+    "AppTrigger",
     # Pixel helpers, so a game draws the way the built-ins do.
     "PANEL",
     "draw_banner",
@@ -43,16 +52,19 @@ _PIXEL_EXPORTS = {
     "shade",
 }
 
+#: Names the SDK answered to before apps were called apps.
+_LEGACY_NAMES = ("Widget", "WidgetContext", "WidgetPermission", "WidgetPreview", "WidgetTrigger", "GameWidget")
+
 
 def __getattr__(name: str):
     if name == "MatrixCanvas":
         from assistant_matrix_sdk.canvas import MatrixCanvas
 
         return MatrixCanvas
-    if name == "Widget":
-        from assistant_matrix_sdk.widget import Widget
+    if name in ("App", "Widget"):
+        from assistant_matrix_sdk.app import App
 
-        return Widget
+        return App
     if name == "SilentAudio":
         from assistant_matrix_sdk.audio import SilentAudio
 
@@ -61,12 +73,14 @@ def __getattr__(name: str):
         from assistant_matrix_sdk.store import GameStore
 
         return GameStore
-    if name in ("GameWidget", "Game"):
-        from assistant_matrix_sdk.game import GameWidget
+    if name in ("GameApp", "Game", "GameWidget"):
+        from assistant_matrix_sdk.game import GameApp
 
-        return GameWidget
+        return GameApp
     if name in _PIXEL_EXPORTS:
         import assistant_matrix_sdk.pixels as pixels
 
         return getattr(pixels, name)
     raise AttributeError(name)
+
+__all__ = list(__all__) + list(_LEGACY_NAMES)

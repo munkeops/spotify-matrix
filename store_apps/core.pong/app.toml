@@ -1,0 +1,65 @@
+[app]
+id = "core.pong"
+name = "Pong"
+version = "1.0.0"
+summary = "Rally against the computer or a second phone."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:PongGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "vertical"
+actions = ["up", "down", "p2Up", "p2Down", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "opponent"
+label = "Opponent"
+type = "select"
+required = false
+default = "ai"
+placeholder = ""
+options = [{ label = "Computer", value = "ai" }, { label = "Second player", value = "human" }]
+helpText = "Second player uses the P2 buttons, so two phones can share one panel."
+
+[[config]]
+key = "target"
+label = "Play to"
+type = "number"
+required = false
+default = 7
+placeholder = ""
+helpText = ""
+min = 1
+max = 21
+step = 1
+
+[[config]]
+key = "aiSpeed"
+label = "Computer speed"
+type = "number"
+required = false
+default = 34
+placeholder = ""
+helpText = ""
+min = 10
+max = 60
+step = 2
+
+[[config]]
+key = "ballSpeed"
+label = "Ball speed"
+type = "number"
+required = false
+default = 32
+placeholder = ""
+helpText = ""
+min = 18
+max = 60
+step = 2

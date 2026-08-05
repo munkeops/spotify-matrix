@@ -6,15 +6,15 @@ import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
 import {
-  LocalWidget,
-  StoreWidget,
-  applyWidget,
-  gameIdFromWidgetId,
-  installWidget,
+  LocalApp,
+  StoreApp,
+  applyApp,
+  gameIdFromAppId,
+  installApp,
   isGame,
-  listLocalWidgets,
-  listStoreWidgets,
-  previewWidget,
+  listLocalApps,
+  listStoreApps,
+  previewApp,
 } from "../api";
 import { SHELVES, ShelfKey, ShelfTabs, colorFor, groupByShelf } from "../shelves";
 
@@ -32,44 +32,44 @@ interface StoreItem {
   artwork: string;
 }
 
-// Local widgets know what is installed and running; the catalogue knows what
+// Local apps know what is installed and running; the catalogue knows what
 // else is out there. Merge so one card can show both.
-function mergeCatalogue(local: LocalWidget[], store: StoreWidget[]): StoreItem[] {
+function mergeCatalogue(local: LocalApp[], store: StoreApp[]): StoreItem[] {
   const items = new Map<string, StoreItem>();
-  for (const widget of local) {
-    items.set(widget.manifest.id, {
-      id: widget.manifest.id,
-      name: widget.manifest.name,
-      summary: widget.manifest.summary,
-      category: widget.manifest.category,
-      author: widget.manifest.author,
-      version: widget.manifest.version,
+  for (const app of local) {
+    items.set(app.manifest.id, {
+      id: app.manifest.id,
+      name: app.manifest.name,
+      summary: app.manifest.summary,
+      category: app.manifest.category,
+      author: app.manifest.author,
+      version: app.manifest.version,
       installed: true,
-      active: widget.active,
-      isGame: isGame(widget),
-      configurable: widget.configurable,
+      active: app.active,
+      isGame: isGame(app),
+      configurable: app.configurable,
       artwork: "",
     });
   }
-  for (const widget of store) {
-    const existing = items.get(widget.id);
+  for (const app of store) {
+    const existing = items.get(app.id);
     if (existing) {
-      existing.summary = existing.summary || widget.summary;
-      existing.artwork = existing.artwork || widget.matrixPreviewUrl;
+      existing.summary = existing.summary || app.summary;
+      existing.artwork = existing.artwork || app.matrixPreviewUrl;
       continue;
     }
-    items.set(widget.id, {
-      id: widget.id,
-      name: widget.name,
-      summary: widget.summary,
-      category: widget.category,
-      author: widget.author,
-      version: widget.version,
-      installed: widget.installed,
+    items.set(app.id, {
+      id: app.id,
+      name: app.name,
+      summary: app.summary,
+      category: app.category,
+      author: app.author,
+      version: app.version,
+      installed: app.installed,
       active: false,
-      isGame: widget.category === "games",
+      isGame: app.category === "games",
       configurable: false,
-      artwork: widget.matrixPreviewUrl,
+      artwork: app.matrixPreviewUrl,
     });
   }
   return [...items.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -95,7 +95,7 @@ export default function Store() {
         return;
       }
       try {
-        const preview = await previewWidget(item.id, {});
+        const preview = await previewApp(item.id, {});
         setPreviews((prev) => ({ ...prev, [item.id]: preview.dataUrl }));
       } catch {
         if (item.artwork) setPreviews((prev) => ({ ...prev, [item.id]: item.artwork }));
@@ -108,10 +108,10 @@ export default function Store() {
       // The catalogue is optional: a missing store index must not hide what is
       // already installed.
       const [local, store] = await Promise.all([
-        listLocalWidgets(),
-        listStoreWidgets().catch(() => ({ widgets: [] as StoreWidget[] })),
+        listLocalApps(),
+        listStoreApps().catch(() => ({ apps: [] as StoreApp[] })),
       ]);
-      const merged = mergeCatalogue(local.widgets || [], store.widgets || []);
+      const merged = mergeCatalogue(local.apps || [], store.apps || []);
       setItems(merged);
       setError("");
       loadPreviews(merged);
@@ -127,7 +127,7 @@ export default function Store() {
   const install = async (id: string) => {
     setBusy(id);
     try {
-      await installWidget(id);
+      await installApp(id);
       await refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -139,9 +139,9 @@ export default function Store() {
   const run = async (item: StoreItem) => {
     setBusy(item.id);
     try {
-      await applyWidget(item.id, null);
+      await applyApp(item.id, null);
       if (item.isGame) {
-        navigate(`/play/${gameIdFromWidgetId(item.id)}`);
+        navigate(`/play/${gameIdFromAppId(item.id)}`);
         return;
       }
       await refresh();
@@ -164,7 +164,7 @@ export default function Store() {
   return (
     <Stack spacing={2}>
       <Box>
-        <Typography variant="h6">Store</Typography>
+        <Typography variant="h6">App Store</Typography>
         <Typography variant="body2" color="text.secondary">{current.blurb}</Typography>
       </Box>
 
@@ -177,7 +177,7 @@ export default function Store() {
       {error ? <Alert severity="error">{error}</Alert> : null}
       {shelf.length === 0 ? (
         <Alert severity="info">
-          Nothing here yet. {tab === "play" ? "Game plugins appear once installed." : "Check the store URL in Settings."}
+          Nothing here yet. {tab === "play" ? "Game apps appear once installed." : "Check the store URL in Settings."}
         </Alert>
       ) : null}
 

@@ -1,0 +1,55 @@
+[app]
+id = "core.breakout"
+name = "Breakout"
+version = "1.0.0"
+summary = "Bounce the ball and clear every brick."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:BreakoutGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "horizontal"
+actions = ["left", "right", "fire", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "paddleWidth"
+label = "Paddle width"
+type = "number"
+required = false
+default = 12
+placeholder = ""
+helpText = ""
+min = 6
+max = 20
+step = 1
+
+[[config]]
+key = "ballSpeed"
+label = "Ball speed"
+type = "number"
+required = false
+default = 34
+placeholder = ""
+helpText = ""
+min = 18
+max = 60
+step = 2
+
+[[config]]
+key = "lives"
+label = "Lives"
+type = "number"
+required = false
+default = 3
+placeholder = ""
+helpText = ""
+min = 1
+max = 5
+step = 1

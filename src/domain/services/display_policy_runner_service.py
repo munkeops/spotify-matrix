@@ -5,9 +5,9 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from src.domain.models.widget_schemas import DisplayPolicy, DisplayPolicyRuntimeState
+from src.domain.models.app_schemas import DisplayPolicy, DisplayPolicyRuntimeState
 from src.domain.services.display_policy_service import display_policy_service
-from src.domain.services.widget_registry_service import widget_registry_service
+from src.domain.services.app_registry_service import app_registry_service
 
 
 class DisplayPolicyRunnerService:
@@ -30,14 +30,14 @@ class DisplayPolicyRunnerService:
         self._cancel_trigger_timer()
         if policy.mode == "single":
             self.stop()
-            _, runtime = widget_registry_service.apply_widget(policy.activeWidgetId)
+            _, runtime = app_registry_service.apply_app(policy.activeAppId)
             with self._lock:
-                self._state = DisplayPolicyRuntimeState(schedulerRunning=False, activeWidgetId=policy.activeWidgetId, mode=policy.mode)
+                self._state = DisplayPolicyRuntimeState(schedulerRunning=False, activeAppId=policy.activeAppId, mode=policy.mode)
             return self.state(), runtime
 
         enabled_items = [item for item in policy.rotation if item.enabled]
         if not enabled_items:
-            raise ValueError("Rotation mode needs at least one enabled widget.")
+            raise ValueError("Rotation mode needs at least one enabled app.")
 
         self.stop()
         self._stop_event.clear()
@@ -66,11 +66,11 @@ class DisplayPolicyRunnerService:
 
         rule = sorted(matching_rules, key=lambda item: item.priority, reverse=True)[0]
         self.stop()
-        _, runtime = widget_registry_service.apply_widget(rule.widgetId)
+        _, runtime = app_registry_service.apply_app(rule.appId)
         with self._lock:
             self._state = DisplayPolicyRuntimeState(
                 schedulerRunning=False,
-                activeWidgetId=rule.widgetId,
+                activeAppId=rule.appId,
                 mode=policy.mode,
                 activeEvent=event,
                 lastError=None,
@@ -81,7 +81,7 @@ class DisplayPolicyRunnerService:
             self._trigger_timer = threading.Timer(duration, self._resume_policy_after_trigger, args=(policy,))
             self._trigger_timer.daemon = True
             self._trigger_timer.start()
-        return self.state(), runtime, rule.widgetId
+        return self.state(), runtime, rule.appId
 
     def _cancel_trigger_timer(self) -> None:
         timer = self._trigger_timer
@@ -103,13 +103,13 @@ class DisplayPolicyRunnerService:
         while not self._stop_event.is_set():
             item = items[index % len(items)]
             try:
-                widget_registry_service.apply_widget(item.widgetId)
+                app_registry_service.apply_app(item.appId)
                 with self._lock:
-                    self._state = DisplayPolicyRuntimeState(schedulerRunning=True, activeWidgetId=item.widgetId, mode="rotation", lastError=None)
+                    self._state = DisplayPolicyRuntimeState(schedulerRunning=True, activeAppId=item.appId, mode="rotation", lastError=None)
                 wait_seconds = max(5, item.durationSeconds)
             except Exception as exc:
                 with self._lock:
-                    self._state = DisplayPolicyRuntimeState(schedulerRunning=True, activeWidgetId=item.widgetId, mode="rotation", lastError=str(exc))
+                    self._state = DisplayPolicyRuntimeState(schedulerRunning=True, activeAppId=item.appId, mode="rotation", lastError=str(exc))
                 wait_seconds = 5
             index += 1
             self._stop_event.wait(wait_seconds)

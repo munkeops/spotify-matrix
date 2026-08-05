@@ -1,1 +1,1 @@
-"""Assistant Matrix plugin store server (self-hosted on the Pi)."""
+"""Assistant Matrix app store server (self-hosted on the Pi)."""

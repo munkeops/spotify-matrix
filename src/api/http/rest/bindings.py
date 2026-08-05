@@ -48,7 +48,7 @@ def _response(game_id: str, device: str) -> GameBindingsResponse:
     chosen = profile(device)
     actions = list(spec.actions)
     defaults = default_bindings(set(actions), chosen.id)
-    saved = config_service.get_config().controller.profiles.get(chosen.id, {}).get(spec.widget_id, {})
+    saved = config_service.get_config().controller.profiles.get(chosen.id, {}).get(spec.app_id, {})
 
     # Saved values win, but only where the game still declares that action and
     # this device actually has that control.
@@ -62,7 +62,7 @@ def _response(game_id: str, device: str) -> GameBindingsResponse:
     )
     return GameBindingsResponse(
         gameId=spec.game_id,
-        widgetId=spec.widget_id,
+        appId=spec.app_id,
         profile=chosen.id,
         profiles=_profiles(),
         controls=list(chosen.controls),
@@ -96,7 +96,7 @@ async def save_game_bindings(game_id: str, body: GameBindingsRequest) -> GameBin
     config = config_service.get_config()
     profiles = {name: dict(games) for name, games in config.controller.profiles.items()}
     games = dict(profiles.get(chosen.id, {}))
-    games[spec.widget_id] = dict(body.bindings)
+    games[spec.app_id] = dict(body.bindings)
     profiles[chosen.id] = games
     config.controller.profiles = profiles
     config_service.save_config(config)
@@ -110,7 +110,7 @@ async def reset_game_bindings(game_id: str, device: str = DEFAULT_PROFILE) -> Ga
     config = config_service.get_config()
     profiles = {name: dict(games) for name, games in config.controller.profiles.items()}
     games = dict(profiles.get(chosen.id, {}))
-    games.pop(spec.widget_id, None)
+    games.pop(spec.app_id, None)
     profiles[chosen.id] = games
     config.controller.profiles = profiles
     config_service.save_config(config)

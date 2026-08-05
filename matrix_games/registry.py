@@ -1,17 +1,17 @@
-"""Discovery of installable game plugins.
+"""Discovery of installable game apps.
 
-A game is a widget package: a directory with a ``widget.toml`` whose
-``[widget] kind`` is ``"game"``, plus a Python entrypoint exposing a
-:class:`assistant_matrix_sdk.game.GameWidget` subclass.
+A game is a app package: a directory with a ``app.toml`` whose
+``[app] kind`` is ``"game"``, plus a Python entrypoint exposing a
+:class:`assistant_matrix_sdk.game.GameApp` subclass.
 
 Two roots are searched:
 
-* ``store_widgets/`` beside the app, which is where the games that ship with
+* ``store_apps/`` beside the app, which is where the games that ship with
   Assistant Matrix live.
-* ``<data>/widgets/packages/``, where the Store installs anything you add.
+* ``<data>/apps/packages/``, where the Store installs anything you add.
 
 Manifests are read without importing anything, so listing the arcade never
-executes plugin code. The entrypoint is imported only when a game is created.
+executes app code. The entrypoint is imported only when a game is created.
 """
 
 from __future__ import annotations
@@ -22,14 +22,16 @@ import sys
 import threading
 import time
 import tomllib
+
+from assistant_matrix_sdk.manifest import manifest_path, manifest_section
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from assistant_matrix_sdk.game import GameWidget
+from assistant_matrix_sdk.game import GameApp
 
 #: Games that ship with the app.
-BUNDLED_DIR = Path(os.environ.get("ASSISTANT_MATRIX_BUNDLED_WIDGETS", Path(__file__).resolve().parent.parent / "store_widgets"))
+BUNDLED_DIR = Path(os.environ.get("ASSISTANT_MATRIX_BUNDLED_APPS", Path(__file__).resolve().parent.parent / "store_apps"))
 
 GAME_KIND = "game"
 DEFAULT_LAYOUT = "dpad"
@@ -40,7 +42,7 @@ class GameSpec:
     """Everything the host needs about a game without importing it."""
 
     game_id: str
-    widget_id: str
+    app_id: str
     name: str
     summary: str
     layout: str
@@ -60,7 +62,7 @@ class GameSpec:
     def preview_path(self) -> Path:
         return self.package_dir / "previews" / "matrix-64.png"
 
-    def load(self) -> type[GameWidget]:
+    def load(self) -> type[GameApp]:
         return load_game_class(self)
 
     def create(
@@ -69,7 +71,7 @@ class GameSpec:
         seed: int | None = None,
         store: Any = None,
         audio: Any = None,
-    ) -> GameWidget:
+    ) -> GameApp:
         return self.load()(config or {}, seed, store, audio)
 
     @property
@@ -78,31 +80,31 @@ class GameSpec:
 
 
 def _spec_from_manifest(package_dir: Path, *, bundled: bool) -> GameSpec | None:
-    manifest_path = package_dir / "widget.toml"
-    if not manifest_path.exists():
+    path = manifest_path(package_dir)
+    if not path.exists():
         return None
     try:
-        payload = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        payload = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return None
-    widget = payload.get("widget", {})
-    if widget.get("kind") != GAME_KIND:
+    app = manifest_section(payload)
+    if app.get("kind") != GAME_KIND:
         return None
-    widget_id = str(widget.get("id", "") or "")
-    entrypoint = str(widget.get("entrypoint", "") or "")
-    if not widget_id or ":" not in entrypoint:
+    app_id = str(app.get("id", "") or "")
+    entrypoint = str(app.get("entrypoint", "") or "")
+    if not app_id or ":" not in entrypoint:
         return None
     return GameSpec(
-        game_id=widget_id.split(".", 1)[-1],
-        widget_id=widget_id,
-        name=str(widget.get("name", widget_id)),
-        summary=str(widget.get("summary", "")),
-        layout=str(widget.get("layout", DEFAULT_LAYOUT) or DEFAULT_LAYOUT),
-        actions=tuple(widget.get("actions", []) or ()),
+        game_id=app_id.split(".", 1)[-1],
+        app_id=app_id,
+        name=str(app.get("name", app_id)),
+        summary=str(app.get("summary", "")),
+        layout=str(app.get("layout", DEFAULT_LAYOUT) or DEFAULT_LAYOUT),
+        actions=tuple(app.get("actions", []) or ()),
         package_dir=package_dir,
         entrypoint=entrypoint,
-        version=str(widget.get("version", "1.0.0")),
-        author=str(widget.get("author", "Assistant Matrix")),
+        version=str(app.get("version", "1.0.0")),
+        author=str(app.get("author", "Assistant Matrix")),
         config=list(payload.get("config", []) or []),
         bundled=bundled,
     )
@@ -138,7 +140,7 @@ def _roots_fingerprint(roots: list[tuple[Path, bool]]) -> tuple:
         stamped = []
         for name in entries:
             try:
-                stamped.append((name, (root / name / "widget.toml").stat().st_mtime_ns))
+                stamped.append((name, manifest_path(root / name).stat().st_mtime_ns))
             except OSError:
                 stamped.append((name, 0))
         marks.append((str(root), tuple(stamped)))
@@ -152,7 +154,7 @@ def invalidate_cache() -> None:
 
 
 def discover(installed_dir: Path | None = None) -> dict[str, GameSpec]:
-    """Every game plugin available, keyed by game id.
+    """Every game app available, keyed by game id.
 
     An installed package shadows a bundled one with the same id, so a user can
     upgrade a shipped game by installing a newer build of it.
@@ -198,25 +200,25 @@ def _scan(roots: list[tuple[Path, bool]]) -> dict[str, GameSpec]:
     return specs
 
 
-def load_game_class(spec: GameSpec) -> type[GameWidget]:
+def load_game_class(spec: GameSpec) -> type[GameApp]:
     """Import a package's entrypoint under a name unique to that package.
 
-    Every package uses the same ``renderer.widget`` path, so importing them
+    Every package uses the same ``renderer.app`` path, so importing them
     normally would make the second one collide with the first.
     """
     module_name, _, object_name = spec.entrypoint.partition(":")
-    unique = f"matrix_games._plugins.{spec.widget_id.replace('.', '_')}.{module_name.replace('.', '_')}"
+    unique = f"matrix_games._apps.{spec.app_id.replace('.', '_')}.{module_name.replace('.', '_')}"
     cached = sys.modules.get(unique)
     if cached is not None:
         return getattr(cached, object_name)
 
     module_path = spec.package_dir.joinpath(*module_name.split(".")).with_suffix(".py")
     if not module_path.exists():
-        raise ValueError(f"Game {spec.widget_id} entrypoint {spec.entrypoint} is missing at {module_path}.")
+        raise ValueError(f"Game {spec.app_id} entrypoint {spec.entrypoint} is missing at {module_path}.")
 
     loader_spec = importlib.util.spec_from_file_location(unique, module_path)
     if loader_spec is None or loader_spec.loader is None:
-        raise ValueError(f"Could not load game {spec.widget_id} from {module_path}.")
+        raise ValueError(f"Could not load game {spec.app_id} from {module_path}.")
     module = importlib.util.module_from_spec(loader_spec)
     sys.modules[unique] = module
     # On the path so a package can split itself across several modules.
@@ -234,29 +236,29 @@ def load_game_class(spec: GameSpec) -> type[GameWidget]:
             sys.path.remove(package_root)
 
     game_class = getattr(module, object_name, None)
-    if game_class is None or not (isinstance(game_class, type) and issubclass(game_class, GameWidget)):
-        raise ValueError(f"Game {spec.widget_id} entrypoint {spec.entrypoint} is not a GameWidget subclass.")
+    if game_class is None or not (isinstance(game_class, type) and issubclass(game_class, GameApp)):
+        raise ValueError(f"Game {spec.app_id} entrypoint {spec.entrypoint} is not a GameApp subclass.")
     return game_class
 
 
 def _module_name(spec: GameSpec) -> str:
     module_path = spec.entrypoint.partition(":")[0]
-    return f"matrix_games._plugins.{spec.widget_id.replace('.', '_')}.{module_path.replace('.', '_')}"
+    return f"matrix_games._apps.{spec.app_id.replace('.', '_')}.{module_path.replace('.', '_')}"
 
 
 def load_module(spec: GameSpec):
-    """The imported plugin module, for its constants and helpers."""
+    """The imported app module, for its constants and helpers."""
     load_game_class(spec)
     return sys.modules[_module_name(spec)]
 
 
-def demo_instance(spec: GameSpec) -> GameWidget:
+def demo_instance(spec: GameSpec) -> GameApp:
     """A game posed mid-play for preview tiles, if the package provides one."""
     game_class = load_game_class(spec)
     demo = getattr(load_module(spec), "demo_snapshot", None)
     if demo is not None:
         posed = demo()
-        if isinstance(posed, GameWidget):
+        if isinstance(posed, GameApp):
             return posed
     return game_class({}, 1)
 

@@ -36,7 +36,7 @@ def _safe_game_id(game_id: str) -> str:
 class GameService:
     @property
     def state_dir(self) -> Path:
-        return config_service.data_dir / "widgets" / "state"
+        return config_service.data_dir / "apps" / "state"
 
     def input_path(self, game_id: str) -> Path:
         return self.state_dir / f"{_safe_game_id(game_id)}-input.json"
@@ -46,7 +46,7 @@ class GameService:
 
     @property
     def scores_dir(self) -> Path:
-        return config_service.data_dir / "widgets" / "scores"
+        return config_service.data_dir / "apps" / "scores"
 
     def scores_path(self, game_id: str) -> Path:
         return self.scores_dir / f"{_safe_game_id(game_id)}.json"
@@ -65,10 +65,10 @@ class GameService:
         return store.snapshot()
 
     def packages_dir(self) -> Path:
-        return config_service.data_dir / "widgets" / "packages"
+        return config_service.data_dir / "apps" / "packages"
 
     def specs(self) -> dict[str, GameSpec]:
-        """Every game plugin available right now, bundled or installed."""
+        """Every game app available right now, bundled or installed."""
         return discover(self.packages_dir())
 
     def spec(self, game_id: str) -> GameSpec | None:
@@ -80,23 +80,23 @@ class GameService:
             raise ValueError(f"Unknown game {game_id}.")
         return spec
 
-    def widget_package_dir(self, widget_id: str) -> Path:
-        """Where a widget's package lives: installed if present, else bundled."""
-        installed = self.packages_dir() / widget_id
-        if (installed / "widget.toml").exists():
+    def app_package_dir(self, app_id: str) -> Path:
+        """Where a app's package lives: installed if present, else bundled."""
+        installed = self.packages_dir() / app_id
+        if (installed / "app.toml").exists():
             return installed
         for spec in self.specs().values():
-            if spec.widget_id == widget_id:
+            if spec.app_id == app_id:
                 return spec.package_dir
         return installed
 
     def active_game_id(self) -> str:
         config = config_service.get_config()
-        if config.runtime.testPattern or config.display.mode != "widget":
+        if config.runtime.testPattern or config.display.mode != "app":
             return ""
-        widget_id = config.display.widgetId
+        app_id = config.display.appId
         for game_id, spec in self.specs().items():
-            if spec.widget_id == widget_id:
+            if spec.app_id == app_id:
                 return game_id
         return ""
 

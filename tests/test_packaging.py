@@ -96,7 +96,7 @@ def test_a_config_naming_an_old_game_mode_still_boots(tmp_path, monkeypatch):
     (data_dir / "config.json").write_text(
         json.dumps(
             {
-                "display": {"mode": "tetris", "widgetId": ""},
+                "display": {"mode": "tetris", "appId": ""},
                 "spotify": {"clientId": "abc", "clientSecret": "shh"},
                 "tetris": {"startLevel": 4},
             }
@@ -110,16 +110,16 @@ def test_a_config_naming_an_old_game_mode_still_boots(tmp_path, monkeypatch):
 
     config = module.config_service.get_config()
 
-    assert config.display.mode == "widget"
-    assert config.display.widgetId == "core.tetris"
+    assert config.display.mode == "app"
+    assert config.display.appId == "core.tetris"
     # Unrelated settings survive the migration.
     assert config.spotify.clientId == "abc"
     assert config.spotify.clientSecret == "shh"
 
     # And it is written back, so the next read needs no migration.
     saved = json.loads((data_dir / "config.json").read_text(encoding="utf-8"))
-    assert saved["display"]["mode"] == "widget"
-    assert saved["display"]["widgetId"] == "core.tetris"
+    assert saved["display"]["mode"] == "app"
+    assert saved["display"]["appId"] == "core.tetris"
 
 
 def test_an_unknown_display_mode_falls_back_instead_of_crashing(tmp_path, monkeypatch):
@@ -138,22 +138,22 @@ def test_an_unknown_display_mode_falls_back_instead_of_crashing(tmp_path, monkey
     assert module.config_service.get_config().display.mode == "spotify"
 
 
-def test_every_legacy_game_mode_maps_to_its_widget():
+def test_every_legacy_game_mode_maps_to_its_app():
     from src.domain.services.config_service import LEGACY_GAME_MODES, migrate_config
 
     for mode in LEGACY_GAME_MODES:
-        payload, changed = migrate_config({"display": {"mode": mode, "widgetId": ""}})
+        payload, changed = migrate_config({"display": {"mode": mode, "appId": ""}})
         assert changed is True
-        assert payload["display"]["mode"] == "widget"
-        assert payload["display"]["widgetId"] == f"core.{mode}"
+        assert payload["display"]["mode"] == "app"
+        assert payload["display"]["appId"] == f"core.{mode}"
 
 
 def test_a_current_config_is_left_alone():
     from src.domain.services.config_service import migrate_config
 
-    payload, changed = migrate_config({"display": {"mode": "widget", "widgetId": "core.snake"}})
+    payload, changed = migrate_config({"display": {"mode": "app", "appId": "core.snake"}})
     assert changed is False
-    assert payload["display"]["widgetId"] == "core.snake"
+    assert payload["display"]["appId"] == "core.snake"
 
 
 def test_runtime_dependencies_are_declared():

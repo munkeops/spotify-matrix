@@ -95,7 +95,7 @@ export default function JoystickPanel() {
                 />
               </Stack>
               <Typography variant="caption" color="text.secondary">
-                Drives whichever game is on the panel, and flicks through plugins when none is.
+                Drives whichever game is on the panel, and flicks through apps when none is.
                 The module is 5V — use a level shifter on SDA and SCL.
               </Typography>
               <Box>

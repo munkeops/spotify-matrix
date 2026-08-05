@@ -13,9 +13,26 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from configs import base_config
-from src.api.http.rest import assets, audio, auth, bindings, bluetooth, commands, config, display, gamepad, games, joystick, runtime, scores, status, tetris, widgets
+from src.api.http.rest import assets, audio, auth, bindings, bluetooth, commands, config, display, gamepad, games, joystick, runtime, scores, status, tetris, apps
 from src.domain.models.response import ErrorResponse, SuccessResponse
 from src.utils.logging_setup import initialize_logging
+
+
+def _alias_routes(app, router, current: str, legacy: str) -> None:
+    """Serve a router's paths under an older prefix as well."""
+    from fastapi.routing import APIRoute
+
+    for route in list(router.routes):
+        if not isinstance(route, APIRoute) or not route.path.startswith(current):
+            continue
+        app.add_api_route(
+            legacy + route.path[len(current):],
+            route.endpoint,
+            methods=list(route.methods or []),
+            response_model=route.response_model,
+            # Kept out of the docs: one canonical name for each thing.
+            include_in_schema=False,
+        )
 
 
 def create_app() -> FastAPI:
@@ -113,7 +130,11 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(commands.router)
     app.include_router(runtime.router)
-    app.include_router(widgets.router)
+    app.include_router(apps.router)
+    # /api/widgets/... was the route before apps were called apps. Anything
+    # holding an old URL - a script, a bookmarked call, a cached bundle -
+    # keeps working rather than getting a 404.
+    _alias_routes(app, apps.router, "/api/apps", "/api/widgets")
     app.include_router(display.router)
     app.include_router(assets.router)
     app.include_router(bluetooth.router)

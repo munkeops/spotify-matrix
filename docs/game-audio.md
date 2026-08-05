@@ -29,7 +29,7 @@ aplay -l                                        # on the Pi: any cards at all?
 docker compose exec spotify-matrix aplay -L     # what the container can see
 ```
 
-## Sound in a game plugin
+## Sound in a game app
 
 A game just plays a name. Whether audio exists is the host's problem:
 
@@ -40,7 +40,7 @@ def _eat(self) -> None:
 
 Drop WAVs in `sounds/` inside the package and they load automatically, named
 after the file. Without a host engine `self.audio` is `SilentAudio` and every
-call is a cheap no-op, which is why a plugin can call `play` unconditionally and
+call is a cheap no-op, which is why a app can call `play` unconditionally and
 why tests and preview tiles never make a noise.
 
 Every game ships the shared set — `start`, `pause`, `game_over`, `select` — so

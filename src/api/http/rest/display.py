@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from src.domain.models.widget_schemas import DisplayEventRequest, DisplayEventResponse, DisplayPolicyApplyResponse, DisplayPolicyResponse, DisplayPolicyRuntimeState, DisplayPolicyUpdateRequest
+from src.domain.models.app_schemas import DisplayEventRequest, DisplayEventResponse, DisplayPolicyApplyResponse, DisplayPolicyResponse, DisplayPolicyRuntimeState, DisplayPolicyUpdateRequest
 from src.domain.services.display_policy_service import display_policy_service
 from src.domain.services.display_policy_runner_service import display_policy_runner_service
 
@@ -40,12 +40,12 @@ async def stop_display_policy() -> DisplayPolicyRuntimeState:
 
 @router.post("/api/display/events", response_model=DisplayEventResponse)
 async def trigger_display_event(body: DisplayEventRequest) -> DisplayEventResponse:
-    state, runtime, widget_id = display_policy_runner_service.trigger_event(body.event)
+    state, runtime, app_id = display_policy_runner_service.trigger_event(body.event)
     return DisplayEventResponse(
         ok=True,
-        matched=widget_id is not None,
+        matched=app_id is not None,
         event=body.event,
-        widgetId=widget_id,
+        appId=app_id,
         state=state,
         runtime=runtime,
     )

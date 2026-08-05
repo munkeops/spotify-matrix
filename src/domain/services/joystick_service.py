@@ -2,7 +2,7 @@
 
 Polls the mini-joystick on its own thread. While a game is on the panel the
 stick and buttons drive that game through the same command queue the web pad
-uses; otherwise they shuffle through the installed plugins.
+uses; otherwise they shuffle through the installed apps.
 """
 
 from __future__ import annotations
@@ -43,12 +43,12 @@ WHEEL_IN_GAME = (
     {"action": "restart", "label": "Restart", "short": "RESET"},
     {"action": "exitGame", "label": "Exit", "short": "EXIT"},
     {"action": "brightnessDown", "label": "Dimmer", "short": "DIM"},
-    {"action": "openMenu", "label": "Plugins", "short": "PLUG"},
+    {"action": "openMenu", "label": "Apps", "short": "PLUG"},
     {"action": "brightnessUp", "label": "Brighter", "short": "BRIGHT"},
 )
 
 WHEEL_SHELL = (
-    {"action": "openMenu", "label": "Plugins", "short": "PLUG"},
+    {"action": "openMenu", "label": "Apps", "short": "PLUG"},
     {"action": "brightnessUp", "label": "Brighter", "short": "BRIGHT"},
     {"action": "power", "label": "Power", "short": "POWER"},
     {"action": "brightnessDown", "label": "Dimmer", "short": "DIM"},
@@ -353,17 +353,17 @@ class JoystickService:
 
     def _exit_game(self) -> None:
         """Leave a game for whatever was on the panel before it."""
-        widgets = self._widgets()
-        if not widgets:
+        apps = self._apps()
+        if not apps:
             return
         target = self._last_non_game
-        available = {widget.manifest.id for widget in widgets}
+        available = {app.manifest.id for app in apps}
         if target not in available:
             target = next(
-                (w.manifest.id for w in widgets if w.manifest.kind != "game"),
-                widgets[0].manifest.id,
+                (w.manifest.id for w in apps if w.manifest.kind != "game"),
+                apps[0].manifest.id,
             )
-        self._apply_widget(target)
+        self._apply_app(target)
 
     def _toggle_power(self) -> None:
         from src.domain.services.runtime_service import runtime_service
@@ -374,25 +374,25 @@ class JoystickService:
             runtime_service.start()
         self._record("power")
 
-    def _game_bindings(self, widget_id: str) -> dict:
+    def _game_bindings(self, app_id: str) -> dict:
         device = getattr(self, "_device", DEFAULT_PROFILE)
         saved = config_service.get_config().controller.profiles.get(device, {})
-        return dict(saved.get(widget_id, {}))
+        return dict(saved.get(app_id, {}))
 
     def _dispatch_game(self, game_id: str, event) -> None:
         spec = game_service.spec(game_id)
         if spec is None:
             return
-        action = game_action(event, set(spec.actions), self._game_bindings(spec.widget_id))
+        action = game_action(event, set(spec.actions), self._game_bindings(spec.app_id))
         if not action:
             return
         game_service.queue_command(game_id, action)
         self._record(f"{game_id}:{action}")
 
-    def _widgets(self) -> list:
-        from src.domain.services.widget_registry_service import widget_registry_service
+    def _apps(self) -> list:
+        from src.domain.services.app_registry_service import app_registry_service
 
-        return [widget for widget in widget_registry_service.list_local_widgets() if widget.enabled]
+        return [app for app in app_registry_service.list_local_apps() if app.enabled]
 
     def _publish_shell(self, brightness: int | None = None) -> None:
         """Tell the runtime what to draw, and how bright to be."""
@@ -400,10 +400,10 @@ class JoystickService:
         from src.domain.services.game_service import game_service
 
         config = config_service.get_config()
-        widgets = self._widgets() if self._menu_open else []
+        apps = self._apps() if self._menu_open else []
         items = [
-            {"id": widget.manifest.id, "name": widget.manifest.name, "active": widget.active}
-            for widget in widgets
+            {"id": app.manifest.id, "name": app.manifest.name, "active": app.active}
+            for app in apps
         ]
         self._shell_seq += 1
         write_shell_state(
@@ -432,11 +432,11 @@ class JoystickService:
         self._record(f"brightness:{level}")
 
     def _open_menu(self) -> None:
-        widgets = self._widgets()
-        if not widgets:
+        apps = self._apps()
+        if not apps:
             return
-        ids = [widget.manifest.id for widget in widgets]
-        active = next((index for index, widget in enumerate(widgets) if widget.active), 0)
+        ids = [app.manifest.id for app in apps]
+        active = next((index for index, app in enumerate(apps) if app.active), 0)
         self._cursor = active if 0 <= active < len(ids) else 0
         self._menu_open = True
         self._publish_shell()
@@ -448,28 +448,28 @@ class JoystickService:
         self._record("menu:close")
 
     def _move_cursor(self, step: int) -> None:
-        widgets = self._widgets()
-        if not widgets:
+        apps = self._apps()
+        if not apps:
             return
-        self._cursor = (self._cursor + step) % len(widgets)
+        self._cursor = (self._cursor + step) % len(apps)
         self._publish_shell()
 
     def _select_from_menu(self) -> None:
-        widgets = self._widgets()
-        if not widgets:
+        apps = self._apps()
+        if not apps:
             return
-        widget_id = widgets[self._cursor % len(widgets)].manifest.id
+        app_id = apps[self._cursor % len(apps)].manifest.id
         # Close first: applying restarts the runtime, which drops the overlay.
         self._menu_open = False
         self._publish_shell()
-        self._apply_widget(widget_id)
+        self._apply_app(app_id)
 
     def menu_state(self) -> dict:
-        widgets = self._widgets() if self._menu_open else []
+        apps = self._apps() if self._menu_open else []
         return {
             "open": self._menu_open,
             "cursor": self._cursor,
-            "items": [{"id": w.manifest.id, "name": w.manifest.name, "active": w.active} for w in widgets],
+            "items": [{"id": w.manifest.id, "name": w.manifest.name, "active": w.active} for w in apps],
         }
 
     def _dispatch_shell(self, event) -> None:
@@ -498,13 +498,13 @@ class JoystickService:
         if action.kind == "brightnessDown":
             self._adjust_brightness(-BRIGHTNESS_STEP)
             return
-        widgets = self._widgets()
-        if not widgets:
+        apps = self._apps()
+        if not apps:
             return
-        ids = [widget.manifest.id for widget in widgets]
-        active_id = next((widget.manifest.id for widget in widgets if widget.active), "")
+        ids = [app.manifest.id for app in apps]
+        active_id = next((app.manifest.id for app in apps if app.active), "")
         # Resync only when something else moved the panel, so repeated pushes
-        # keep walking the list instead of bouncing off the active widget.
+        # keep walking the list instead of bouncing off the active app.
         if active_id and active_id != self._last_active:
             self._last_active = active_id
             if active_id in ids:
@@ -514,12 +514,12 @@ class JoystickService:
         if action.kind in ("next", "previous"):
             step = 1 if action.kind == "next" else -1
             self._cursor = (self._cursor + step) % len(ids)
-            self._apply_widget(ids[self._cursor])
+            self._apply_app(ids[self._cursor])
         elif action.kind == "apply":
-            self._apply_widget(ids[self._cursor % len(ids)])
+            self._apply_app(ids[self._cursor % len(ids)])
         elif action.kind == "open" and action.value in ids:
             self._cursor = ids.index(action.value)
-            self._apply_widget(action.value)
+            self._apply_app(action.value)
         elif action.kind == "power":
             from src.domain.services.runtime_service import runtime_service
 
@@ -529,18 +529,18 @@ class JoystickService:
                 runtime_service.start()
             self._record("power")
 
-    def _apply_widget(self, widget_id: str) -> None:
-        from src.domain.services.widget_registry_service import widget_registry_service
+    def _apply_app(self, app_id: str) -> None:
+        from src.domain.services.app_registry_service import app_registry_service
 
-        spec = game_service.spec(widget_id.replace("core.", "", 1))
-        if spec is None or spec.widget_id != widget_id:
-            self._last_non_game = widget_id
+        spec = game_service.spec(app_id.replace("core.", "", 1))
+        if spec is None or spec.app_id != app_id:
+            self._last_non_game = app_id
         try:
-            widget_registry_service.apply_widget(widget_id)
-            self._record(f"apply:{widget_id}")
+            app_registry_service.apply_app(app_id)
+            self._record(f"apply:{app_id}")
         except Exception as exc:
             self.last_error = str(exc)
-            logger.warning("[joystick] could not apply {}: {}", widget_id, exc)
+            logger.warning("[joystick] could not apply {}: {}", app_id, exc)
 
     def _record(self, action: str) -> None:
         self.last_action = action

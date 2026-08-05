@@ -1,4 +1,4 @@
-"""Command line tools for Assistant Matrix widget authors."""
+"""Command line tools for Assistant Matrix app authors."""
 
 from __future__ import annotations
 
@@ -18,59 +18,59 @@ from typing import Any
 ALLOWED_CATEGORIES = {"media", "time", "assistant", "information", "diagnostics", "games", "custom"}
 ALLOWED_FIELD_TYPES = {"string", "number", "boolean", "select", "secret", "location", "color"}
 ALLOWED_RUNTIMES = {"python", "builtin"}
-WIDGET_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+APP_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 SEMVERISH_PATTERN = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?$")
 MATRIX_SIZE_PATTERN = re.compile(r"^[1-9][0-9]*x[1-9][0-9]*$")
 
 
-def class_name_from_widget_id(widget_id: str) -> str:
-    parts = [part for part in widget_id.replace("-", ".").replace("_", ".").split(".") if part]
-    return "".join(part[:1].upper() + part[1:] for part in parts) + "Widget"
+def class_name_from_app_id(app_id: str) -> str:
+    parts = [part for part in app_id.replace("-", ".").replace("_", ".").split(".") if part]
+    return "".join(part[:1].upper() + part[1:] for part in parts) + "App"
 
 
-def display_name_from_widget_id(widget_id: str) -> str:
-    tail = widget_id.split(".")[-1]
-    return tail.replace("-", " ").replace("_", " ").title() or widget_id
+def display_name_from_app_id(app_id: str) -> str:
+    tail = app_id.split(".")[-1]
+    return tail.replace("-", " ").replace("_", " ").title() or app_id
 
 
-def load_widget(target: str):
-    from assistant_matrix_sdk.widget import Widget
+def load_app(target: str):
+    from assistant_matrix_sdk.app import App
 
     if ":" not in target:
-        raise ValueError("Widget target must use module.path:ClassName.")
+        raise ValueError("App target must use module.path:ClassName.")
     module_name, class_name = target.split(":", 1)
     module = importlib.import_module(module_name)
     candidate = getattr(module, class_name)
-    if not isinstance(candidate, type) or not issubclass(candidate, Widget):
-        raise TypeError(f"{target} is not an assistant_matrix_sdk.Widget subclass.")
+    if not isinstance(candidate, type) or not issubclass(candidate, App):
+        raise TypeError(f"{target} is not an assistant_matrix_sdk.App subclass.")
     return candidate
 
 
 def validate_manifest_data(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    widget = data.get("widget")
-    if not isinstance(widget, dict):
-        return ["Missing [widget] section."]
+    app = data.get("app")
+    if not isinstance(app, dict):
+        return ["Missing [app] section."]
 
     for key in ("id", "name", "version", "summary", "runtime", "entrypoint"):
-        if not str(widget.get(key, "")).strip():
-            errors.append(f"Missing widget.{key}.")
+        if not str(app.get(key, "")).strip():
+            errors.append(f"Missing app.{key}.")
 
-    widget_id = str(widget.get("id", ""))
-    version = str(widget.get("version", ""))
-    category = str(widget.get("category", "custom"))
-    matrix_size = str(widget.get("matrix_size", widget.get("matrixSize", "64x64")))
+    app_id = str(app.get("id", ""))
+    version = str(app.get("version", ""))
+    category = str(app.get("category", "custom"))
+    matrix_size = str(app.get("matrix_size", app.get("matrixSize", "64x64")))
 
-    if widget_id and not WIDGET_ID_PATTERN.match(widget_id):
-        errors.append("widget.id may only contain letters, numbers, dots, underscores, and hyphens, and must start with a letter or number.")
+    if app_id and not APP_ID_PATTERN.match(app_id):
+        errors.append("app.id may only contain letters, numbers, dots, underscores, and hyphens, and must start with a letter or number.")
     if version and not SEMVERISH_PATTERN.match(version):
-        errors.append("widget.version should use semantic version format, for example 0.1.0.")
-    if widget.get("runtime") not in ALLOWED_RUNTIMES:
-        errors.append("widget.runtime must be python or builtin.")
+        errors.append("app.version should use semantic version format, for example 0.1.0.")
+    if app.get("runtime") not in ALLOWED_RUNTIMES:
+        errors.append("app.runtime must be python or builtin.")
     if category not in ALLOWED_CATEGORIES:
-        errors.append(f"widget.category must be one of: {', '.join(sorted(ALLOWED_CATEGORIES))}.")
+        errors.append(f"app.category must be one of: {', '.join(sorted(ALLOWED_CATEGORIES))}.")
     if matrix_size and not MATRIX_SIZE_PATTERN.match(matrix_size):
-        errors.append("widget.matrix_size must look like 64x64.")
+        errors.append("app.matrix_size must look like 64x64.")
 
     preview = data.get("preview")
     if preview is not None and not isinstance(preview, dict):
@@ -119,19 +119,19 @@ def validate_manifest_data(data: dict[str, Any]) -> list[str]:
     return errors
 
 
-def validate_widget_package_files(manifest: dict[str, Any], widget_dir: Path) -> list[str]:
+def validate_app_package_files(manifest: dict[str, Any], app_dir: Path) -> list[str]:
     errors: list[str] = []
-    widget = manifest.get("widget", {})
-    if not isinstance(widget, dict):
+    app = manifest.get("app", {})
+    if not isinstance(app, dict):
         return errors
-    if widget.get("runtime") == "python":
-        entrypoint = str(widget.get("entrypoint", ""))
+    if app.get("runtime") == "python":
+        entrypoint = str(app.get("entrypoint", ""))
         module_name = entrypoint.split(":", 1)[0]
         if not module_name:
             return errors
-        module_path = widget_dir / Path(*module_name.split(".")).with_suffix(".py")
+        module_path = app_dir / Path(*module_name.split(".")).with_suffix(".py")
         if not module_path.exists():
-            errors.append(f"Missing Python entrypoint file {module_path.relative_to(widget_dir)}.")
+            errors.append(f"Missing Python entrypoint file {module_path.relative_to(app_dir)}.")
 
     preview = manifest.get("preview", {})
     if not isinstance(preview, dict):
@@ -140,11 +140,11 @@ def validate_widget_package_files(manifest: dict[str, Any], widget_dir: Path) ->
         relative = str(preview.get(key, "")).strip()
         if not relative:
             continue
-        preview_path = widget_dir / relative
+        preview_path = app_dir / relative
         try:
-            preview_path.resolve().relative_to(widget_dir.resolve())
+            preview_path.resolve().relative_to(app_dir.resolve())
         except ValueError:
-            errors.append(f"preview.{key} must stay inside the widget package.")
+            errors.append(f"preview.{key} must stay inside the app package.")
             continue
         if not preview_path.exists():
             errors.append(f"Missing preview.{key} file {relative}.")
@@ -155,31 +155,31 @@ def validate_store_index_data(data: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if data.get("schemaVersion") != 1:
         errors.append("schemaVersion must be 1.")
-    widgets = data.get("widgets")
-    if not isinstance(widgets, list):
-        return errors + ["widgets must be a list."]
+    apps = data.get("apps")
+    if not isinstance(apps, list):
+        return errors + ["apps must be a list."]
 
     seen_ids: set[str] = set()
-    for index, widget in enumerate(widgets):
-        if not isinstance(widget, dict):
-            errors.append(f"widgets[{index}] must be an object.")
+    for index, app in enumerate(apps):
+        if not isinstance(app, dict):
+            errors.append(f"apps[{index}] must be an object.")
             continue
-        prefix = f"widgets[{index}]"
+        prefix = f"apps[{index}]"
         for key in ("id", "name", "version", "summary"):
-            if not str(widget.get(key, "")).strip():
+            if not str(app.get(key, "")).strip():
                 errors.append(f"{prefix} missing {key}.")
-        widget_id = str(widget.get("id", ""))
-        version = str(widget.get("version", ""))
-        category = str(widget.get("category", "custom"))
-        sha256 = str(widget.get("sha256", ""))
-        archive_url = str(widget.get("archiveUrl", ""))
-        matrix_preview_url = str(widget.get("matrixPreviewUrl", ""))
+        app_id = str(app.get("id", ""))
+        version = str(app.get("version", ""))
+        category = str(app.get("category", "custom"))
+        sha256 = str(app.get("sha256", ""))
+        archive_url = str(app.get("archiveUrl", ""))
+        matrix_preview_url = str(app.get("matrixPreviewUrl", ""))
 
-        if widget_id:
-            if widget_id in seen_ids:
-                errors.append(f"{prefix}.id duplicates {widget_id}.")
-            seen_ids.add(widget_id)
-            if not WIDGET_ID_PATTERN.match(widget_id):
+        if app_id:
+            if app_id in seen_ids:
+                errors.append(f"{prefix}.id duplicates {app_id}.")
+            seen_ids.add(app_id)
+            if not APP_ID_PATTERN.match(app_id):
                 errors.append(f"{prefix}.id may only contain letters, numbers, dots, underscores, and hyphens, and must start with a letter or number.")
         if version and not SEMVERISH_PATTERN.match(version):
             errors.append(f"{prefix}.version should use semantic version format, for example 0.1.0.")
@@ -228,7 +228,7 @@ def inline_table(data: dict[str, Any]) -> str:
 
 def write_toml_manifest(path: Path, data: dict[str, Any]) -> None:
     lines: list[str] = []
-    for section_name in ("widget", "preview"):
+    for section_name in ("app", "preview"):
         section = data.get(section_name, {})
         lines.append(f"[{section_name}]")
         for key, value in section.items():
@@ -256,37 +256,37 @@ def write_manifest(path: Path, data: dict[str, Any]) -> None:
 
 
 def command_manifest(args: argparse.Namespace) -> int:
-    widget_class = load_widget(args.widget)
-    manifest = widget_class.manifest(entrypoint=args.entrypoint or args.widget)
+    app_class = load_app(args.app)
+    manifest = app_class.manifest(entrypoint=args.entrypoint or args.app)
     write_manifest(Path(args.output), manifest)
     print(f"Wrote {args.output}")
     return 0
 
 
 def command_init(args: argparse.Namespace) -> int:
-    widget_id = args.widget_id
-    target_dir = Path(args.directory or widget_id).resolve()
+    app_id = args.app_id
+    target_dir = Path(args.directory or app_id).resolve()
     if target_dir.exists() and any(target_dir.iterdir()) and not args.force:
         raise FileExistsError(f"{target_dir} is not empty. Use --force to write into it.")
 
-    name = args.name or display_name_from_widget_id(widget_id)
-    class_name = class_name_from_widget_id(widget_id)
-    summary = args.summary or f"{name} widget for Assistant Matrix."
+    name = args.name or display_name_from_app_id(app_id)
+    class_name = class_name_from_app_id(app_id)
+    summary = args.summary or f"{name} app for Assistant Matrix."
     target_dir.mkdir(parents=True, exist_ok=True)
     (target_dir / "renderer").mkdir(parents=True, exist_ok=True)
     (target_dir / "previews").mkdir(parents=True, exist_ok=True)
     (target_dir / "assets").mkdir(parents=True, exist_ok=True)
 
     manifest = {
-        "widget": {
-            "id": widget_id,
+        "app": {
+            "id": app_id,
             "name": name,
             "version": args.version,
             "summary": summary,
             "author": args.author,
             "category": args.category,
             "runtime": "python",
-            "entrypoint": "renderer.widget:WidgetRenderer",
+            "entrypoint": "renderer.app:AppRenderer",
             "matrix_size": "64x64",
             "license": args.license,
         },
@@ -313,17 +313,17 @@ def command_init(args: argparse.Namespace) -> int:
             }
         ],
     }
-    write_manifest(target_dir / "widget.toml", manifest)
+    write_manifest(target_dir / "app.toml", manifest)
 
-    renderer = f'''"""Starter Assistant Matrix widget."""
+    renderer = f'''"""Starter Assistant Matrix app."""
 
 from __future__ import annotations
 
-from assistant_matrix_sdk import MatrixCanvas, Widget, WidgetContext
+from assistant_matrix_sdk import MatrixCanvas, App, AppContext
 
 
-class {class_name}(Widget):
-    def render(self, canvas: MatrixCanvas, context: WidgetContext) -> None:
+class {class_name}(App):
+    def render(self, canvas: MatrixCanvas, context: AppContext) -> None:
         message = str(context.config.get("message", "HI"))[:8].upper()
         canvas.background("#050607")
         canvas.rect(0, 0, 64, 16, "#203a5f")
@@ -331,9 +331,9 @@ class {class_name}(Widget):
         canvas.text(8, 28, message, "#9bd0d9")
 
 
-WidgetRenderer = {class_name}
+AppRenderer = {class_name}
 '''
-    (target_dir / "renderer" / "widget.py").write_text(renderer, encoding="utf-8")
+    (target_dir / "renderer" / "app.py").write_text(renderer, encoding="utf-8")
     (target_dir / "renderer" / "__init__.py").write_text("", encoding="utf-8")
 
     readme = f"""# {name}
@@ -343,30 +343,30 @@ WidgetRenderer = {class_name}
 ## Develop
 
 ```bash
-assistant-matrix-widget validate widget.toml
-assistant-matrix-widget preview renderer.widget:{class_name} --output previews/matrix-64.png --config '{{"message":"HI"}}'
-assistant-matrix-widget package . --output-dir dist
-assistant-matrix-widget publish . --store-dir store-dist --base-url https://store.example.com
+assistant-matrix-app validate app.toml
+assistant-matrix-app preview renderer.app:{class_name} --output previews/matrix-64.png --config '{{"message":"HI"}}'
+assistant-matrix-app package . --output-dir dist
+assistant-matrix-app publish . --store-dir store-dist --base-url https://store.example.com
 ```
 """
     (target_dir / "README.md").write_text(readme, encoding="utf-8")
 
-    print(f"Created widget scaffold at {target_dir}")
-    print(f"Entrypoint renderer.widget:{class_name}")
+    print(f"Created app scaffold at {target_dir}")
+    print(f"Entrypoint renderer.app:{class_name}")
     return 0
 
 
 def command_preview(args: argparse.Namespace) -> int:
-    from assistant_matrix_sdk.context import WidgetContext
+    from assistant_matrix_sdk.context import AppContext
 
-    widget_class = load_widget(args.widget)
+    app_class = load_app(args.app)
     if args.config.startswith("@"):
         config = json.loads(Path(args.config[1:]).read_text(encoding="utf-8"))
     else:
         config = json.loads(args.config) if args.config else {}
-    widget = widget_class()
+    app = app_class()
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-    widget.preview(args.output, WidgetContext(config=config), size=args.size)
+    app.preview(args.output, AppContext(config=config), size=args.size)
     print(f"Wrote {args.output}")
     return 0
 
@@ -401,54 +401,54 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def widget_store_entry(manifest: dict[str, Any], *, base_url: str, archive_path: Path, widget_dir: Path | None = None) -> dict[str, Any]:
-    widget = manifest["widget"]
+def app_store_entry(manifest: dict[str, Any], *, base_url: str, archive_path: Path, app_dir: Path | None = None) -> dict[str, Any]:
+    app = manifest["app"]
     preview = manifest.get("preview", {})
-    widget_id = widget["id"]
-    version = widget["version"]
+    app_id = app["id"]
+    version = app["version"]
     base = base_url.rstrip("/")
-    widget_base = f"{base}/widgets/{widget_id}/{version}"
+    app_base = f"{base}/apps/{app_id}/{version}"
     card_gif = preview.get("card_gif", "previews/card.gif")
     matrix_png = preview.get("matrix_png", "previews/matrix-64.png")
     entry = {
-        "id": widget_id,
-        "name": widget["name"],
+        "id": app_id,
+        "name": app["name"],
         "version": version,
-        "summary": widget["summary"],
-        "category": widget.get("category", "custom"),
-        "author": widget.get("author", "Assistant Matrix"),
-        "manifestUrl": f"{widget_base}/widget.toml",
-        "archiveUrl": f"{widget_base}/{archive_path.name}",
+        "summary": app["summary"],
+        "category": app.get("category", "custom"),
+        "author": app.get("author", "Assistant Matrix"),
+        "manifestUrl": f"{app_base}/app.toml",
+        "archiveUrl": f"{app_base}/{archive_path.name}",
         "previewGifUrl": "",
-        "matrixPreviewUrl": f"{widget_base}/{matrix_png}",
+        "matrixPreviewUrl": f"{app_base}/{matrix_png}",
         "sha256": sha256_file(archive_path),
     }
-    if card_gif and (widget_dir is None or (widget_dir / card_gif).exists()):
-        entry["previewGifUrl"] = f"{widget_base}/{card_gif}"
+    if card_gif and (app_dir is None or (app_dir / card_gif).exists()):
+        entry["previewGifUrl"] = f"{app_base}/{card_gif}"
     return entry
 
 
 def command_package(args: argparse.Namespace) -> int:
-    widget_dir = Path(args.widget_dir).resolve()
-    manifest_path = widget_dir / "widget.toml"
+    app_dir = Path(args.app_dir).resolve()
+    manifest_path = app_dir / "app.toml"
     if not manifest_path.exists():
         raise FileNotFoundError(f"Expected {manifest_path}")
     manifest = read_manifest(manifest_path)
     errors = validate_manifest_data(manifest)
-    errors.extend(validate_widget_package_files(manifest, widget_dir))
+    errors.extend(validate_app_package_files(manifest, app_dir))
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
-    widget = manifest["widget"]
+    app = manifest["app"]
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = output_dir / f"{widget['id']}-{widget['version']}.tar.gz"
+    archive_path = output_dir / f"{app['id']}-{app['version']}.tar.gz"
     with tarfile.open(archive_path, "w:gz") as archive:
-        for path in sorted(widget_dir.rglob("*")):
+        for path in sorted(app_dir.rglob("*")):
             if path.is_file():
-                archive.add(path, arcname=path.relative_to(widget_dir))
+                archive.add(path, arcname=path.relative_to(app_dir))
 
     digest = sha256_file(archive_path)
     print(f"Wrote {archive_path}")
@@ -458,10 +458,10 @@ def command_package(args: argparse.Namespace) -> int:
 
 def read_store_index(path: Path) -> dict[str, Any]:
     if not path.exists():
-        return {"schemaVersion": 1, "widgets": []}
+        return {"schemaVersion": 1, "apps": []}
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload.setdefault("schemaVersion", 1)
-    payload.setdefault("widgets", [])
+    payload.setdefault("apps", [])
     return payload
 
 
@@ -470,49 +470,49 @@ def write_store_index(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def package_widget(widget_dir: Path, output_dir: Path) -> Path:
-    manifest = read_manifest(widget_dir / "widget.toml")
+def package_app(app_dir: Path, output_dir: Path) -> Path:
+    manifest = read_manifest(app_dir / "app.toml")
     errors = validate_manifest_data(manifest)
-    errors.extend(validate_widget_package_files(manifest, widget_dir))
+    errors.extend(validate_app_package_files(manifest, app_dir))
     if errors:
         raise ValueError("; ".join(errors))
-    widget = manifest["widget"]
+    app = manifest["app"]
     output_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = output_dir / f"{widget['id']}-{widget['version']}.tar.gz"
+    archive_path = output_dir / f"{app['id']}-{app['version']}.tar.gz"
     with tarfile.open(archive_path, "w:gz") as archive:
-        for path in sorted(widget_dir.rglob("*")):
+        for path in sorted(app_dir.rglob("*")):
             if path.is_file():
-                archive.add(path, arcname=path.relative_to(widget_dir))
+                archive.add(path, arcname=path.relative_to(app_dir))
     return archive_path
 
 
 def command_publish(args: argparse.Namespace) -> int:
-    widget_dir = Path(args.widget_dir).resolve()
-    manifest_path = widget_dir / "widget.toml"
+    app_dir = Path(args.app_dir).resolve()
+    manifest_path = app_dir / "app.toml"
     if not manifest_path.exists():
         raise FileNotFoundError(f"Expected {manifest_path}")
     manifest = read_manifest(manifest_path)
     errors = validate_manifest_data(manifest)
-    errors.extend(validate_widget_package_files(manifest, widget_dir))
+    errors.extend(validate_app_package_files(manifest, app_dir))
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
 
-    widget = manifest["widget"]
+    app = manifest["app"]
     publish_root = Path(args.store_dir)
-    publish_dir = publish_root / "widgets" / widget["id"] / widget["version"]
+    publish_dir = publish_root / "apps" / app["id"] / app["version"]
     publish_dir.mkdir(parents=True, exist_ok=True)
 
-    shutil.copy2(manifest_path, publish_dir / "widget.toml")
-    archive_path = package_widget(widget_dir, publish_dir)
+    shutil.copy2(manifest_path, publish_dir / "app.toml")
+    archive_path = package_app(app_dir, publish_dir)
 
     preview = manifest.get("preview", {})
     for preview_key in ("card_gif", "matrix_png"):
         relative = preview.get(preview_key)
         if not relative:
             continue
-        source = widget_dir / relative
+        source = app_dir / relative
         if source.exists():
             target = publish_dir / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -522,11 +522,11 @@ def command_publish(args: argparse.Namespace) -> int:
     if not index_path.is_absolute():
         index_path = publish_root / index_path
     index = read_store_index(index_path)
-    entry = widget_store_entry(manifest, base_url=args.base_url, archive_path=archive_path, widget_dir=widget_dir)
-    widgets = [item for item in index.get("widgets", []) if item.get("id") != entry["id"]]
-    widgets.append(entry)
-    widgets.sort(key=lambda item: item.get("name", item.get("id", "")))
-    index["widgets"] = widgets
+    entry = app_store_entry(manifest, base_url=args.base_url, archive_path=archive_path, app_dir=app_dir)
+    apps = [item for item in index.get("apps", []) if item.get("id") != entry["id"]]
+    apps.append(entry)
+    apps.sort(key=lambda item: item.get("name", item.get("id", "")))
+    index["apps"] = apps
     errors = validate_store_index_data(index)
     if errors:
         for error in errors:
@@ -542,13 +542,13 @@ def command_publish(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="assistant-matrix-widget", description="Assistant Matrix widget author tools.")
+    parser = argparse.ArgumentParser(prog="assistant-matrix-app", description="Assistant Matrix app author tools.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init = subparsers.add_parser("init", help="Create a starter widget package.")
-    init.add_argument("widget_id", help="Stable widget id, for example user.weather-badge.")
-    init.add_argument("--directory", default="", help="Target directory. Defaults to the widget id.")
-    init.add_argument("--name", default="", help="Display name. Defaults from widget id.")
+    init = subparsers.add_parser("init", help="Create a starter app package.")
+    init.add_argument("app_id", help="Stable app id, for example user.weather-badge.")
+    init.add_argument("--directory", default="", help="Target directory. Defaults to the app id.")
+    init.add_argument("--name", default="", help="Display name. Defaults from app id.")
     init.add_argument("--summary", default="", help="Short store summary.")
     init.add_argument("--author", default="Assistant Matrix")
     init.add_argument("--category", default="custom", choices=("media", "time", "assistant", "information", "diagnostics", "games", "custom"))
@@ -557,34 +557,34 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--force", action="store_true", help="Allow writing into a non-empty directory.")
     init.set_defaults(func=command_init)
 
-    manifest = subparsers.add_parser("manifest", help="Generate widget.toml from a Widget subclass.")
-    manifest.add_argument("widget", help="Widget class target, for example renderer.widget:WeatherWidget.")
-    manifest.add_argument("--entrypoint", default="", help="Runtime entrypoint stored in widget.toml. Defaults to the widget target.")
-    manifest.add_argument("--output", default="widget.toml")
+    manifest = subparsers.add_parser("manifest", help="Generate app.toml from a App subclass.")
+    manifest.add_argument("app", help="App class target, for example renderer.app:WeatherApp.")
+    manifest.add_argument("--entrypoint", default="", help="Runtime entrypoint stored in app.toml. Defaults to the app target.")
+    manifest.add_argument("--output", default="app.toml")
     manifest.set_defaults(func=command_manifest)
 
-    preview = subparsers.add_parser("preview", help="Render a 64x64 preview image from a Widget subclass.")
-    preview.add_argument("widget", help="Widget class target, for example renderer.widget:WeatherWidget.")
+    preview = subparsers.add_parser("preview", help="Render a 64x64 preview image from a App subclass.")
+    preview.add_argument("app", help="App class target, for example renderer.app:WeatherApp.")
     preview.add_argument("--output", default="previews/matrix-64.png")
-    preview.add_argument("--config", default="", help="JSON config object passed to WidgetContext, or @path/to/config.json.")
+    preview.add_argument("--config", default="", help="JSON config object passed to AppContext, or @path/to/config.json.")
     preview.add_argument("--size", type=int, default=64)
     preview.set_defaults(func=command_preview)
 
-    validate = subparsers.add_parser("validate", help="Validate widget.toml or widget.json.")
+    validate = subparsers.add_parser("validate", help="Validate app.toml or app.json.")
     validate.add_argument("manifest")
     validate.set_defaults(func=command_validate)
 
-    validate_store = subparsers.add_parser("validate-store", help="Validate a static widget store index JSON.")
+    validate_store = subparsers.add_parser("validate-store", help="Validate a static app store index JSON.")
     validate_store.add_argument("index")
     validate_store.set_defaults(func=command_validate_store)
 
-    package = subparsers.add_parser("package", help="Package a widget folder into a store archive.")
-    package.add_argument("widget_dir")
+    package = subparsers.add_parser("package", help="Package a app folder into a store archive.")
+    package.add_argument("app_dir")
     package.add_argument("--output-dir", default="dist")
     package.set_defaults(func=command_package)
 
-    publish = subparsers.add_parser("publish", help="Publish a widget folder into an object-store-style directory and update an index JSON.")
-    publish.add_argument("widget_dir")
+    publish = subparsers.add_parser("publish", help="Publish a app folder into an object-store-style directory and update an index JSON.")
+    publish.add_argument("app_dir")
     publish.add_argument("--store-dir", default="store-dist", help="Local directory that mirrors the object store root.")
     publish.add_argument("--base-url", required=True, help="Public base URL for the store root.")
     publish.add_argument("--index", default="store-index.json", help="Index path, relative to store-dir unless absolute.")

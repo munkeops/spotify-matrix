@@ -1,6 +1,35 @@
-"""Manifest helpers for store-ready widgets."""
+"""Manifest helpers for store-ready apps."""
 
 from __future__ import annotations
+
+from pathlib import Path
+
+#: The manifest filename. `widget.toml` was the old spelling and is still
+#: read, so an app installed before the rename keeps working untouched.
+MANIFEST_NAME = "app.toml"
+LEGACY_MANIFEST_NAME = "widget.toml"
+
+#: The table inside it. Same story: `[widget]` still parses.
+MANIFEST_SECTION = "app"
+LEGACY_MANIFEST_SECTION = "widget"
+
+
+def manifest_path(package_dir: Path | str) -> Path:
+    """The manifest in this package, whichever spelling it uses."""
+    package_dir = Path(package_dir)
+    current = package_dir / MANIFEST_NAME
+    if current.exists():
+        return current
+    legacy = package_dir / LEGACY_MANIFEST_NAME
+    return legacy if legacy.exists() else current
+
+
+def manifest_section(data: dict) -> dict:
+    """The app table out of a parsed manifest, old spelling included."""
+    section = data.get(MANIFEST_SECTION)
+    if not isinstance(section, dict):
+        section = data.get(LEGACY_MANIFEST_SECTION)
+    return section if isinstance(section, dict) else {}
 
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -8,8 +37,8 @@ from typing import Any, Literal
 from assistant_matrix_sdk.config import ConfigField
 
 
-WidgetCategory = Literal["media", "time", "assistant", "information", "diagnostics", "games", "custom"]
-WidgetKind = Literal["widget", "game"]
+AppCategory = Literal["media", "time", "assistant", "information", "diagnostics", "games", "custom"]
+AppKind = Literal["app", "game"]
 
 #: Control layouts a game can ask a controller to render.
 GAME_LAYOUTS = ("dpad", "horizontal", "vertical", "tap", "tetris")
@@ -19,7 +48,7 @@ COMMON_GAME_ACTIONS = ("pause", "resume", "togglePause", "restart")
 
 
 @dataclass(frozen=True)
-class WidgetPreview:
+class AppPreview:
     card_gif: str = "previews/card.gif"
     matrix_png: str = "previews/matrix-64.png"
     description: str = ""
@@ -33,7 +62,7 @@ class WidgetPreview:
 
 
 @dataclass(frozen=True)
-class WidgetPermission:
+class AppPermission:
     name: str
     reason: str
 
@@ -42,7 +71,7 @@ class WidgetPermission:
 
 
 @dataclass(frozen=True)
-class WidgetTrigger:
+class AppTrigger:
     event: str
     default_enabled: bool = False
     priority: int = 0
@@ -57,34 +86,34 @@ class WidgetTrigger:
         }
 
 
-def build_widget_manifest(
+def build_app_manifest(
     *,
-    widget_id: str,
+    app_id: str,
     name: str,
     version: str,
     summary: str,
     author: str = "Assistant Matrix",
-    category: WidgetCategory = "custom",
+    category: AppCategory = "custom",
     runtime: str = "python",
     entrypoint: str = "",
     matrix_size: str = "64x64",
     license: str = "MIT",
-    preview: WidgetPreview | None = None,
-    permissions: list[WidgetPermission] | None = None,
+    preview: AppPreview | None = None,
+    permissions: list[AppPermission] | None = None,
     config: list[ConfigField] | None = None,
-    triggers: list[WidgetTrigger] | None = None,
-    kind: WidgetKind = "widget",
+    triggers: list[AppTrigger] | None = None,
+    kind: AppKind = "app",
     layout: str = "",
     actions: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Build the canonical widget.toml-compatible manifest shape.
+    """Build the canonical app.toml-compatible manifest shape.
 
     ``kind="game"`` marks a package the host should drive with a controller;
     ``layout`` and ``actions`` tell that controller what pad to draw.
     """
 
-    widget: dict[str, Any] = {
-        "id": widget_id,
+    app: dict[str, Any] = {
+        "id": app_id,
         "name": name,
         "version": version,
         "summary": summary,
@@ -97,11 +126,11 @@ def build_widget_manifest(
         "kind": kind,
     }
     if kind == "game":
-        widget["layout"] = layout or "dpad"
-        widget["actions"] = list(actions or [])
+        app["layout"] = layout or "dpad"
+        app["actions"] = list(actions or [])
     return {
-        "widget": widget,
-        "preview": (preview or WidgetPreview()).to_manifest(),
+        "app": app,
+        "preview": (preview or AppPreview()).to_manifest(),
         "permissions": [permission.to_manifest() for permission in permissions or []],
         "config": [field.to_manifest() for field in config or []],
         "triggers": [trigger.to_manifest() for trigger in triggers or []],

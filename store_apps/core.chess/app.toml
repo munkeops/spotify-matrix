@@ -1,0 +1,48 @@
+[app]
+id = "core.chess"
+name = "Chess"
+version = "1.0.0"
+summary = "Full chess against a searching engine, on 64 by 64 pixels."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:ChessGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "dpad"
+actions = ["up", "down", "left", "right", "fire", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "level"
+label = "Engine"
+type = "select"
+required = false
+default = "normal"
+placeholder = ""
+options = [{ label = "Gives pieces away", value = "easy" }, { label = "Plays a decent game", value = "normal" }, { label = "Takes its time", value = "hard" }]
+helpText = ""
+
+[[config]]
+key = "side"
+label = "You play"
+type = "select"
+required = false
+default = "w"
+placeholder = ""
+options = [{ label = "White", value = "w" }, { label = "Black", value = "b" }]
+helpText = ""
+
+[[config]]
+key = "hints"
+label = "Show legal moves"
+type = "boolean"
+required = false
+default = true
+placeholder = ""
+helpText = "Mark where a picked-up piece can go."

@@ -13,12 +13,12 @@ from loguru import logger
 from configs import base_config
 from src.domain.models.api_schemas import AppConfig, TokenStatus
 
-# Games used to be display modes of their own before they became plugins. A
-# config saved by an older build still names one, so map it onto the widget it
+# Games used to be display modes of their own before they became apps. A
+# config saved by an older build still names one, so map it onto the app it
 # is now rather than refusing to start.
 LEGACY_GAME_MODES = ("tetris", "pacman", "snake", "breakout", "invaders", "flappy", "pong", "connect4")
 
-VALID_MODES = frozenset(("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "widget"))
+VALID_MODES = frozenset(("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "app"))
 
 
 def migrate_config(payload: Any) -> tuple[dict[str, Any], bool]:
@@ -27,6 +27,25 @@ def migrate_config(payload: Any) -> tuple[dict[str, Any], bool]:
         return {}, False
 
     changed = False
+
+    # Widgets and plugins became apps. A config written before that names the
+    # old mode, the old key and the old store index, none of which would
+    # match anything now.
+    display = payload.get("display")
+    if isinstance(display, dict):
+        if display.get("mode") == "widget":
+            display["mode"] = "app"
+            changed = True
+        if "widgetId" in display:
+            display.setdefault("appId", display.pop("widgetId"))
+            changed = True
+    store = payload.get("store")
+    if isinstance(store, dict):
+        index = store.get("indexUrl")
+        if isinstance(index, str) and index.endswith("widget_store_index.json"):
+            store["indexUrl"] = index.replace("widget_store_index.json", "app_store_index.json")
+            changed = True
+
     controller = payload.get("controller")
     if isinstance(controller, dict) and isinstance(controller.get("bindings"), dict):
         # Bindings used to be one mapping per game, shared by every device.
@@ -46,9 +65,9 @@ def migrate_config(payload: Any) -> tuple[dict[str, Any], bool]:
 
     mode = display.get("mode")
     if mode in LEGACY_GAME_MODES:
-        display["mode"] = "widget"
-        display["widgetId"] = display.get("widgetId") or f"core.{mode}"
-        logger.info("[spotify-matrix] migrated display mode {} to widget {}", mode, display["widgetId"])
+        display["mode"] = "app"
+        display["appId"] = display.get("appId") or f"core.{mode}"
+        logger.info("[spotify-matrix] migrated display mode {} to app {}", mode, display["appId"])
         return payload, True
     if isinstance(mode, str) and mode not in VALID_MODES:
         # An unknown mode should not stop the service from booting.

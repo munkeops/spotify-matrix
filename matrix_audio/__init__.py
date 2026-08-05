@@ -1,6 +1,6 @@
 """Audio for the matrix: a small mixer, an ALSA output, and a chiptune synth.
 
-The engine is what a game talks to. It owns a mixer and an output, so a plugin
+The engine is what a game talks to. It owns a mixer and an output, so a app
 just says ``self.audio.play("blip")`` and never learns whether a sound card
 exists. When there is none, every call is a no-op.
 """

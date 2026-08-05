@@ -4,31 +4,31 @@ import {
   Button, Box, Switch, FormControlLabel, Alert,
 } from "@mui/material";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import { DisplayPolicy, getPolicy, savePolicy, applyPolicy, stopPolicy, listLocalWidgets, LocalWidget } from "../api";
+import { DisplayPolicy, getPolicy, savePolicy, applyPolicy, stopPolicy, listLocalApps, LocalApp } from "../api";
 
 export default function DisplayPolicyPanel() {
   const [policy, setPolicy] = useState<DisplayPolicy | null>(null);
-  const [widgets, setWidgets] = useState<LocalWidget[]>([]);
+  const [apps, setApps] = useState<LocalApp[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    Promise.all([getPolicy(), listLocalWidgets()])
-      .then(([p, w]) => { setPolicy(p.policy); setWidgets(w.widgets || []); })
+    Promise.all([getPolicy(), listLocalApps()])
+      .then(([p, w]) => { setPolicy(p.policy); setApps(w.apps || []); })
       .catch((e) => setError((e as Error).message));
   }, []);
 
   if (!policy) return null;
 
-  const toggleRotation = (widgetId: string) => {
-    const exists = policy.rotation.find((r) => r.widgetId === widgetId);
+  const toggleRotation = (appId: string) => {
+    const exists = policy.rotation.find((r) => r.appId === appId);
     const rotation = exists
-      ? policy.rotation.map((r) => (r.widgetId === widgetId ? { ...r, enabled: !r.enabled } : r))
-      : [...policy.rotation, { widgetId, durationSeconds: 15, enabled: true }];
+      ? policy.rotation.map((r) => (r.appId === appId ? { ...r, enabled: !r.enabled } : r))
+      : [...policy.rotation, { appId, durationSeconds: 15, enabled: true }];
     setPolicy({ ...policy, rotation });
   };
-  const setDuration = (widgetId: string, durationSeconds: number) =>
-    setPolicy({ ...policy, rotation: policy.rotation.map((r) => (r.widgetId === widgetId ? { ...r, durationSeconds } : r)) });
+  const setDuration = (appId: string, durationSeconds: number) =>
+    setPolicy({ ...policy, rotation: policy.rotation.map((r) => (r.appId === appId ? { ...r, durationSeconds } : r)) });
 
   const save = async (apply: boolean) => {
     setBusy(true);
@@ -51,18 +51,18 @@ export default function DisplayPolicyPanel() {
         <Stack spacing={2}>
           {error ? <Alert severity="error">{error}</Alert> : null}
           <TextField select label="Mode" size="small" value={policy.mode} onChange={(e) => setPolicy({ ...policy, mode: e.target.value as DisplayPolicy["mode"] })}>
-            <MenuItem value="single">Single widget</MenuItem>
-            <MenuItem value="rotation">Rotate widgets</MenuItem>
+            <MenuItem value="single">Single app</MenuItem>
+            <MenuItem value="rotation">Rotate apps</MenuItem>
           </TextField>
 
           {policy.mode === "single" ? (
-            <TextField select label="Active widget" size="small" value={policy.activeWidgetId} onChange={(e) => setPolicy({ ...policy, activeWidgetId: e.target.value })}>
-              {widgets.map((w) => <MenuItem key={w.manifest.id} value={w.manifest.id}>{w.manifest.name}</MenuItem>)}
+            <TextField select label="Active app" size="small" value={policy.activeAppId} onChange={(e) => setPolicy({ ...policy, activeAppId: e.target.value })}>
+              {apps.map((w) => <MenuItem key={w.manifest.id} value={w.manifest.id}>{w.manifest.name}</MenuItem>)}
             </TextField>
           ) : (
             <Stack spacing={0.5}>
-              {widgets.map((w) => {
-                const item = policy.rotation.find((r) => r.widgetId === w.manifest.id);
+              {apps.map((w) => {
+                const item = policy.rotation.find((r) => r.appId === w.manifest.id);
                 return (
                   <Box key={w.manifest.id} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
                     <FormControlLabel control={<Switch checked={Boolean(item?.enabled)} onChange={() => toggleRotation(w.manifest.id)} />} label={w.manifest.name} />

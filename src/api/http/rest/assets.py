@@ -1,4 +1,4 @@
-"""Widget image asset upload, gallery, and preview routes."""
+"""App image asset upload, gallery, and preview routes."""
 
 from __future__ import annotations
 

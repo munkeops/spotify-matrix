@@ -30,6 +30,8 @@ smbus2 = { version = ">=0.4.3", markers = "sys_platform == 'linux'" }
 evdev = { version = ">=1.6", markers = "sys_platform == 'linux'" }
 
 [tool.poetry.scripts]
+assistant-matrix-app = "assistant_matrix_sdk.cli:main"
+# The command before apps were called apps. Kept so existing scripts run.
 assistant-matrix-widget = "assistant_matrix_sdk.cli:main"
 
 [tool.poetry.group.test.dependencies]

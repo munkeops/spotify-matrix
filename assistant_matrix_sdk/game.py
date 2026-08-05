@@ -1,6 +1,6 @@
 """The contract every playable matrix game implements.
 
-A game plugin subclasses :class:`GameWidget`, implements ``reset``, ``advance``,
+A game app subclasses :class:`GameApp`, implements ``reset``, ``advance``,
 ``handle`` and ``render``, and declares the actions it accepts. The host drives
 timing and IO, so a game stays pure enough to unit test on its own.
 """
@@ -16,10 +16,10 @@ from assistant_matrix_sdk.audio import Audio, SilentAudio
 from assistant_matrix_sdk.config import ConfigField
 from assistant_matrix_sdk.manifest import (
     COMMON_GAME_ACTIONS,
-    WidgetPermission,
-    WidgetPreview,
-    WidgetTrigger,
-    build_widget_manifest,
+    AppPermission,
+    AppPreview,
+    AppTrigger,
+    build_app_manifest,
 )
 from assistant_matrix_sdk.pixels import PANEL, encode_frame
 from assistant_matrix_sdk.store import GameStore
@@ -35,7 +35,7 @@ RESTART_ACTIONS = ("hardDrop", "softDrop", "fire", "flap", "drop", "start")
 RESTART_GRACE_SECONDS = 0.8
 
 
-class GameWidget:
+class GameApp:
     """A game the host steps, renders and publishes once per frame.
 
     Subclasses implement ``reset``, ``advance``, ``handle`` and ``render``.
@@ -55,10 +55,10 @@ class GameWidget:
     layout = "dpad"
     # Actions accepted beyond the universally handled pause/resume/restart set.
     actions: tuple[str, ...] = ()
-    preview_media = WidgetPreview()
-    permissions: list[WidgetPermission] = []
+    preview_media = AppPreview()
+    permissions: list[AppPermission] = []
     config_fields: list[ConfigField] = []
-    triggers: list[WidgetTrigger] = []
+    triggers: list[AppTrigger] = []
 
     def __init__(
         self,
@@ -183,7 +183,7 @@ class GameWidget:
 
 
     @classmethod
-    def widget_id(cls) -> str:
+    def app_id(cls) -> str:
         return cls.id or f"core.{cls.game_id}"
 
     @classmethod
@@ -193,8 +193,8 @@ class GameWidget:
 
     @classmethod
     def manifest(cls, *, entrypoint: str = "") -> dict[str, Any]:
-        return build_widget_manifest(
-            widget_id=cls.widget_id(),
+        return build_app_manifest(
+            app_id=cls.app_id(),
             name=cls.name,
             version=cls.version,
             summary=cls.summary,
@@ -215,10 +215,10 @@ class GameWidget:
 
 
 #: Games were called ``Game`` before the contract moved into the SDK.
-Game = GameWidget
+Game = GameApp
 
 __all__ = [
-    "GameWidget",
+    "GameApp",
     "Game",
     "PLAYING",
     "PAUSED",

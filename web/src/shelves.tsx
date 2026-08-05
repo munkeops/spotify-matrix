@@ -1,6 +1,6 @@
 import { Chip, Stack, Tab, Tabs } from "@mui/material";
 
-// The Store and the Plugins page use the same three shelves so a game is in
+// The Store and the Apps page use the same three shelves so a game is in
 // the same place whether you are browsing or managing what you already have.
 export const SHELVES = [
   { key: "apps", label: "Apps", blurb: "Music, time, weather and the assistant face." },

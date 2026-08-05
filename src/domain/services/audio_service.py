@@ -27,7 +27,7 @@ class AudioService:
     def devices(self) -> list[dict[str, Any]]:
         """Outputs that could actually play something.
 
-        The bluealsa PCM is listed by ALSA whenever the plugin is installed,
+        The bluealsa PCM is listed by ALSA whenever the app is installed,
         whether or not the daemon behind it is up. Offering it while the
         daemon is down is offering a choice that can only fail, which is
         exactly what it did.

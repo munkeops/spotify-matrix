@@ -6,7 +6,7 @@ Two modes, chosen by what is on the panel:
   declares its own action list, so the binding picks the closest fit rather
   than assuming a d-pad.
 * **Shell** — anything else is on the panel, so the stick shuffles through
-  plugins and OK applies the highlighted one.
+  apps and OK applies the highlighted one.
 """
 
 from __future__ import annotations
@@ -245,7 +245,7 @@ def shell_action(event: JoystickEvent, menu_open: bool = False) -> ShellAction |
             if event.direction in (Direction.UP, Direction.LEFT):
                 return ShellAction(kind="cursorPrevious")
             return None
-        # Closed, the stick still flicks through plugins directly.
+        # Closed, the stick still flicks through apps directly.
         if event.direction in (Direction.RIGHT, Direction.DOWN):
             return ShellAction(kind="next")
         if event.direction in (Direction.LEFT, Direction.UP):

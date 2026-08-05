@@ -1,7 +1,7 @@
-"""Pixel drawing primitives for 64x64 matrix widgets and games.
+"""Pixel drawing primitives for 64x64 matrix apps and games.
 
 Everything here is plain Pillow work with no dependency on the host app, so a
-plugin can import it and draw exactly the way the built-in games do.
+app can import it and draw exactly the way the built-in games do.
 """
 
 from __future__ import annotations

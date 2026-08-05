@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 from matrix_audio.synth import layer, sequence, silence, tone, write_wav  # noqa: E402
 
-PACKAGES = ROOT / "store_widgets"
+PACKAGES = ROOT / "store_apps"
 
 
 def blip(frequency: float, seconds: float = 0.06, **kwargs) -> array:

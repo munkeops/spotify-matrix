@@ -1,12 +1,12 @@
 """Playable games for the Assistant Matrix panel.
 
-Games are not built into the app. Each one is a widget package with a
-``widget.toml`` declaring ``kind = "game"`` and a Python entrypoint exposing a
-:class:`assistant_matrix_sdk.game.GameWidget` subclass. The ones that ship with
-Assistant Matrix live in ``store_widgets/``; anything you install lands in
-``<data>/widgets/packages/`` and is picked up the same way.
+Games are not built into the app. Each one is a app package with a
+``app.toml`` declaring ``kind = "game"`` and a Python entrypoint exposing a
+:class:`assistant_matrix_sdk.game.GameApp` subclass. The ones that ship with
+Assistant Matrix live in ``store_apps/``; anything you install lands in
+``<data>/apps/packages/`` and is picked up the same way.
 
-Adding a game is dropping in a folder. See ``docs/game-plugins.md``.
+Adding a game is dropping in a folder. See ``docs/game-apps.md``.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from assistant_matrix_sdk.game import GAME_OVER, PAUSED, PLAYING, WON, GameWidget
+from assistant_matrix_sdk.game import GAME_OVER, PAUSED, PLAYING, WON, GameApp
 from assistant_matrix_sdk.manifest import COMMON_GAME_ACTIONS, GAME_LAYOUTS
 from assistant_matrix_sdk.pixels import PANEL, encode_frame, frame_to_pixels
 from assistant_matrix_sdk.store import GameStore
@@ -24,7 +24,7 @@ from matrix_games.registry import BUNDLED_DIR, GAME_KIND, GameSpec, demo_instanc
 # Layout names, re-exported so callers do not reach into the SDK for them.
 DPAD, HORIZONTAL, VERTICAL, TAP, TETRIS_PAD = GAME_LAYOUTS
 
-Game = GameWidget
+Game = GameApp
 
 
 def games(installed_dir: Path | None = None) -> dict[str, GameSpec]:
@@ -43,14 +43,14 @@ def create_game(
     installed_dir: Path | None = None,
     store: GameStore | None = None,
     audio: Any = None,
-) -> GameWidget:
+) -> GameApp:
     spec = get_spec(game_id, installed_dir)
     if spec is None:
         raise ValueError(f"Unknown game {game_id}.")
     return spec.create(config, seed, store, audio)
 
 
-def plugin_module(game_id: str, installed_dir: Path | None = None):
+def app_module(game_id: str, installed_dir: Path | None = None):
     """The imported module behind a game, for its constants and helpers."""
     spec = get_spec(game_id, installed_dir)
     if spec is None:
@@ -58,14 +58,14 @@ def plugin_module(game_id: str, installed_dir: Path | None = None):
     return load_module(spec)
 
 
-def game_class(game_id: str, installed_dir: Path | None = None) -> type[GameWidget]:
+def game_class(game_id: str, installed_dir: Path | None = None) -> type[GameApp]:
     spec = get_spec(game_id, installed_dir)
     if spec is None:
         raise ValueError(f"Unknown game {game_id}.")
     return spec.load()
 
 
-def demo_game(game_id: str, installed_dir: Path | None = None) -> GameWidget:
+def demo_game(game_id: str, installed_dir: Path | None = None) -> GameApp:
     spec = get_spec(game_id, installed_dir)
     if spec is None:
         raise ValueError(f"Unknown game {game_id}.")
@@ -73,7 +73,7 @@ def demo_game(game_id: str, installed_dir: Path | None = None) -> GameWidget:
 
 
 class _GameMapping(dict):
-    """``GAMES`` reads as a dict but re-scans the plugin directories on use.
+    """``GAMES`` reads as a dict but re-scans the app directories on use.
 
     Keeping it live means installing a game makes it appear without a restart.
     """
@@ -128,7 +128,7 @@ def game_modes() -> tuple[str, ...]:
 __all__ = [
     "GAMES",
     "GameSpec",
-    "GameWidget",
+    "GameApp",
     "GameStore",
     "Game",
     "BUNDLED_DIR",
@@ -153,7 +153,7 @@ __all__ = [
     "discover",
     "load_game_class",
     "load_module",
-    "plugin_module",
+    "app_module",
     "game_class",
     "read_commands",
     "write_state",

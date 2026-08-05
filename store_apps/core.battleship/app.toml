@@ -1,0 +1,38 @@
+[app]
+id = "core.battleship"
+name = "Battleship"
+version = "1.0.0"
+summary = "Hunt the hidden fleet before the computer sinks yours."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:BattleshipGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "dpad"
+actions = ["up", "down", "left", "right", "fire", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "difficulty"
+label = "Computer"
+type = "select"
+required = false
+default = "hunt"
+placeholder = ""
+options = [{ label = "Random shots", value = "easy" }, { label = "Hunts your ships", value = "hunt" }]
+helpText = "Hunting narrows in after a hit, the way a person plays."
+
+[[config]]
+key = "revealEnemy"
+label = "Show enemy ships"
+type = "boolean"
+required = false
+default = false
+placeholder = ""
+helpText = "Practice mode."

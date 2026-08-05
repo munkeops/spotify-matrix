@@ -158,10 +158,10 @@ mini-joystick, so one pad works everywhere without per-game setup.
 | **Select** | Restart |
 | **Start** held | Open the quick wheel |
 
-When no game is on the panel, **Start** opens a plugin menu on the matrix
+When no game is on the panel, **Start** opens a app menu on the matrix
 itself: the d-pad moves the highlight, **Start** or **A** picks, **B** cancels.
 With the menu closed, **A** and **B** step the brightness up and down live, and
-the d-pad flicks straight between plugins.
+the d-pad flicks straight between apps.
 
 Only movement auto-repeats when a direction is held, so holding the stick never
 spins a Tetris piece or machine-guns a drop.

@@ -20,7 +20,7 @@ GALLERY_SUFFIXES = (".png", ".gif", ".jpg", ".jpeg", ".webp")
 class AssetService:
     @property
     def assets_dir(self) -> Path:
-        return config_service.data_dir / "widgets" / "assets"
+        return config_service.data_dir / "apps" / "assets"
 
     def safe_asset_name(self, name: str) -> str:
         candidate = Path(name).name

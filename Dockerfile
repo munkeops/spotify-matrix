@@ -76,8 +76,8 @@ COPY matrix_games ./matrix_games
 COPY mini_joystick ./mini_joystick
 COPY matrix_input ./matrix_input
 COPY matrix_audio ./matrix_audio
-# Bundled game plugins, discovered at runtime alongside anything installed.
-COPY store_widgets ./store_widgets
+# Bundled game apps, discovered at runtime alongside anything installed.
+COPY store_apps ./store_apps
 COPY store_server ./store_server
 COPY spotify_matrix.py requirements.txt ./
 

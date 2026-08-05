@@ -1,6 +1,6 @@
 """Tetris gameplay rules.
 
-Tetris is a game plugin like every other, so the queue, registry and runtime
+Tetris is a game app like every other, so the queue, registry and runtime
 plumbing are covered generically in ``test_games.py``. What stays here is the
 behaviour specific to Tetris, plus the Tetris-only API that predates the
 shared games layer.
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import matrix_games as mg
 
-tetris = mg.plugin_module("tetris")
+tetris = mg.app_module("tetris")
 
 TetrisGame = tetris.TetrisGame
 TETRIS_COLS = tetris.TETRIS_COLS

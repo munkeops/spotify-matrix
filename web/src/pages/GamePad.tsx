@@ -14,7 +14,7 @@ import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
-import { GameFrame, GameScores, GameSummary, applyWidget, getGameScores, getGameState, listGames, sendGameInput } from "../api";
+import { GameFrame, GameScores, GameSummary, applyApp, getGameScores, getGameState, listGames, sendGameInput } from "../api";
 import PanelMirror from "../components/PanelMirror";
 
 const POLL_MS = 200;
@@ -138,7 +138,7 @@ export default function GamePad() {
     if (!game) return;
     setStarting(true);
     try {
-      await applyWidget(game.widgetId, null);
+      await applyApp(game.appId, null);
       await refresh();
     } catch (e) {
       setError((e as Error).message);
