@@ -1691,3 +1691,17 @@ def test_chess_shows_whose_move_it_is_without_a_header():
     theirs = frame_to_pixels(game.render(PANEL))
 
     assert yours != theirs, "the panel has to change when the engine takes over"
+
+
+@pytest.mark.parametrize("game_id", ALL_GAMES)
+def test_every_direction_a_game_declares_has_a_button(game_id):
+    """Road Rash declared a throttle and a brake under a layout that draws
+    only left and right, so the game could not be accelerated at all."""
+    from assistant_matrix_sdk.manifest import LAYOUT_DIRECTIONS
+
+    game = mg.game_class(game_id)
+    drawn = LAYOUT_DIRECTIONS[game.layout]
+    directions = {"up", "down", "left", "right", "p2Up", "p2Down"}
+
+    missing = sorted((set(game.all_actions()) & directions) - drawn)
+    assert not missing, f"{game_id} ({game.layout}) has no button for {missing}"

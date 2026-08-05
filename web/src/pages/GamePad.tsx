@@ -228,10 +228,17 @@ export default function GamePad() {
       return <Stack direction="row" spacing={1}>{primaryButton}</Stack>;
     }
 
+    // Horizontal is also the fallback, so honour up and down when a game
+    // declares them. Road Rash asked for a throttle and a brake and got a
+    // row with neither, which is a game you cannot accelerate in.
     return (
       <>
+        {actions.has("up") ? (
+          <Stack direction="row" justifyContent="center">{pad("up", <ArrowUpwardRoundedIcon />, "Up")}</Stack>
+        ) : null}
         <Stack direction="row" spacing={1} justifyContent="center">
           {pad("left", <ArrowBackRoundedIcon />, "Left")}
+          {actions.has("down") ? pad("down", <ArrowDownwardRoundedIcon />, "Down") : null}
           {pad("right", <ArrowForwardRoundedIcon />, "Right")}
         </Stack>
         {primaryButton ? <Stack direction="row" spacing={1}>{primaryButton}</Stack> : null}

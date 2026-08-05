@@ -43,6 +43,18 @@ AppKind = Literal["app", "game"]
 #: Control layouts a game can ask a controller to render.
 GAME_LAYOUTS = ("dpad", "horizontal", "vertical", "tap", "tetris")
 
+#: Directions each layout puts a button behind, mirroring the web pad. A game
+#: declaring a direction its layout does not draw is a control the player has
+#: no way to press, which is how Road Rash shipped without a throttle. Keep
+#: this in step with GamePad.tsx.
+LAYOUT_DIRECTIONS: dict[str, frozenset[str]] = {
+    "dpad": frozenset({"up", "down", "left", "right"}),
+    "horizontal": frozenset({"up", "down", "left", "right"}),
+    "vertical": frozenset({"up", "down", "p2Up", "p2Down"}),
+    "tap": frozenset(),
+    "tetris": frozenset({"up", "down", "left", "right"}),
+}
+
 #: Controls every game understands regardless of what else it declares.
 COMMON_GAME_ACTIONS = ("pause", "resume", "togglePause", "restart")
 

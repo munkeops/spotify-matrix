@@ -60,7 +60,7 @@ class RoadRashGame(GameApp):
     id = "core.roadrash"
     name = "Road Rash"
     summary = "Race the pack, and throw an elbow when you draw level."
-    layout = "horizontal"
+    layout = "dpad"
     actions = ("left", "right", "up", "down", "fire")
     config_fields = [
         ConfigField.number("distance", label="Race length", default=1500, minimum=400, maximum=5000, step=100, help_text="Metres to the finish."),

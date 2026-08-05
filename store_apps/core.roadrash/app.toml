@@ -10,7 +10,7 @@ entrypoint = "renderer.app:RoadRashGame"
 matrix_size = "64x64"
 license = "MIT"
 kind = "game"
-layout = "horizontal"
+layout = "dpad"
 actions = ["left", "right", "up", "down", "fire", "pause", "resume", "togglePause", "restart"]
 
 [preview]
