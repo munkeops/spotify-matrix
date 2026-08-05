@@ -12,6 +12,11 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - not POSIX
+    fcntl = None  # type: ignore[assignment]
 import threading
 import time
 from typing import Any
@@ -289,6 +294,24 @@ class AlsaOutput:
     def running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
 
+    def _shrink_pipe(self) -> None:
+        """Ask the kernel for a small pipe to aplay.
+
+        The default is 64KB, a second and a half at this rate, and audio
+        sitting in it is audio you hear late. One buffer's worth is all the
+        slack the feeder needs.
+        """
+        stream = getattr(self._process, "stdin", None)
+        if stream is None or fcntl is None or not hasattr(fcntl, "F_SETPIPE_SZ"):
+            return
+        try:
+            # The kernel rounds up to a page and enforces its own minimum.
+            wanted = max(4096, BUFFER_FRAMES * 2 * 2)
+            fcntl.fcntl(stream.fileno(), fcntl.F_SETPIPE_SZ, wanted)
+        except (OSError, AttributeError, ValueError):
+            # Not permitted or not supported; the pacing alone still holds.
+            pass
+
     def _command(self) -> list[str]:
         buffer_us = self.buffer_ms * 1000
         command = [
@@ -350,7 +373,16 @@ class AlsaOutput:
 
     def _run(self) -> None:
         try:
-            self._process = subprocess.Popen(self._command(), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            self._process = subprocess.Popen(
+                self._command(),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                # Unbuffered on our side too: Python's own buffering would
+                # bank audio exactly the way the kernel pipe did.
+                bufsize=0,
+            )
+            self._shrink_pipe()
         except OSError as exc:
             self.error = f"Could not start audio output: {exc}"
             logger.warning("[audio] {}", self.error)
@@ -358,6 +390,11 @@ class AlsaOutput:
 
         self.error = ""
         interval = BUFFER_FRAMES / SAMPLE_RATE
+        # Pace against a clock rather than a sleep. There is a kernel pipe
+        # between here and aplay, and it holds 64KB - a second and a half at
+        # this rate - so writing faster than real time does not block, it just
+        # fills the pipe and every effect after that is heard late.
+        due = time.monotonic()
         try:
             while not self._stop.is_set():
                 process = self._process
@@ -376,9 +413,14 @@ class AlsaOutput:
                 except (BrokenPipeError, OSError) as exc:
                     self.error = f"Audio output closed: {exc}"
                     return
-                # write() blocks once ALSA's buffer is full, which paces us, but
-                # sleep a little anyway so a huge buffer does not spin the CPU.
-                self._stop.wait(interval / 2)
+                due += interval
+                delay = due - time.monotonic()
+                if delay > 0:
+                    self._stop.wait(delay)
+                else:
+                    # Fell behind, so start counting again from now instead of
+                    # sprinting to catch up and refilling the pipe.
+                    due = time.monotonic()
         finally:
             self._close()
 

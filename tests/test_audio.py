@@ -1007,3 +1007,38 @@ def test_the_buffer_reaches_the_runtime():
 
     source = inspect.getsource(module.RuntimeService._args)
     assert "--audio-buffer-ms" in source
+
+
+def test_the_feeder_writes_at_real_time_not_faster():
+    """It slept half a chunk per chunk, so it produced audio twice as fast as
+    it plays. There is a 64KB kernel pipe to aplay - a second and a half at
+    this rate - so the surplus did not block, it queued, and every effect
+    after that was heard late."""
+    import inspect
+
+    from matrix_audio import output
+
+    source = inspect.getsource(output.AlsaOutput._run)
+
+    assert "interval / 2" not in source, "half-interval sleeps outrun playback"
+    assert "due" in source, "paced against a clock"
+
+
+def test_the_pipe_to_aplay_is_kept_small():
+    import inspect
+
+    from matrix_audio import output
+
+    assert hasattr(output.AlsaOutput, "_shrink_pipe")
+    source = inspect.getsource(output.AlsaOutput.start.__globals__["AlsaOutput"]._run.__globals__["AlsaOutput"]._shrink_pipe)
+    assert "F_SETPIPE_SZ" in source
+
+
+def test_shrinking_the_pipe_never_raises():
+    """It is a tuning step, not a requirement; pacing alone still holds."""
+    from matrix_audio.mixer import Mixer
+    from matrix_audio.output import AlsaOutput
+
+    output = AlsaOutput(Mixer())
+    output._process = None
+    output._shrink_pipe()
