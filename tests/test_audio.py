@@ -851,3 +851,27 @@ def test_a_busy_device_is_explained_not_quoted():
 
     assert "busy" not in explained.lower() or "Something else" in explained
     assert "RW_INTERLEAVED" not in explained
+
+
+def test_the_runtime_reports_whether_it_can_make_a_noise():
+    """A failed sound card and a quiet game look identical from outside the
+    runtime, which is the only process that knows."""
+    from src.domain.models.api_schemas import GameFrame
+
+    assert "audio" in GameFrame.model_fields
+
+    frame = GameFrame(
+        game="tetris",
+        audio={"enabled": True, "device": "bluealsa", "error": "Device or resource busy", "sounds": 10},
+    )
+    payload = frame.model_dump()
+
+    assert payload["audio"]["error"] == "Device or resource busy"
+    assert payload["audio"]["sounds"] == 10
+
+
+def test_a_frame_without_audio_still_validates():
+    """Anything written by a runtime from before this reports nothing."""
+    from src.domain.models.api_schemas import GameFrame
+
+    assert GameFrame.model_validate({"game": "tetris"}).audio is None

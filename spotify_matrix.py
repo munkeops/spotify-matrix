@@ -2124,6 +2124,15 @@ def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
 
             if state_path is not None and started >= next_state_write:
                 snapshot = game.snapshot(frame, size)
+                # Whether this game can actually make a noise. Without it a
+                # failed sound card is indistinguishable from a quiet game,
+                # and the only place that knows is this process.
+                snapshot["audio"] = {
+                    "enabled": bool(getattr(args, "audio", False)),
+                    "device": str(getattr(args, "audio_device", "") or ""),
+                    "error": str(getattr(game.audio, "error", "") or ""),
+                    "sounds": len(getattr(game.audio, "known", list)() or []),
+                }
                 serialized = json.dumps(snapshot, sort_keys=True)
                 if serialized != last_written or started - last_write_at >= GAME_HEARTBEAT_SECONDS:
                     write_game_state(state_path, snapshot)

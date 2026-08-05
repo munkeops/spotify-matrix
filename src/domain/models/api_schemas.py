@@ -354,6 +354,16 @@ class GameInputRequest(BaseModel):
     action: GameAction
 
 
+class GameAudioState(BaseModel):
+    """Whether the runtime can actually make a noise for this game."""
+
+    enabled: bool = False
+    device: str = ""
+    error: str = ""
+    #: How many effects were loaded. Zero with sound on means none were found.
+    sounds: int = 0
+
+
 class GameFrame(BaseModel):
     """A rendered panel frame: a colour palette plus one index string per row."""
 
@@ -363,6 +373,8 @@ class GameFrame(BaseModel):
     palette: list[str] = Field(default_factory=list)
     pixels: list[str] = Field(default_factory=list)
     updatedAt: float = 0.0
+    #: Reported by the runtime, which is the only process that knows.
+    audio: GameAudioState | None = None
 
 
 class GameSummary(BaseModel):

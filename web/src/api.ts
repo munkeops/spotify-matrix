@@ -228,6 +228,13 @@ export interface GameSummary {
   active: boolean;
 }
 
+export interface GameAudioState {
+  enabled: boolean;
+  device: string;
+  error: string;
+  sounds: number;
+}
+
 export interface GameFrame {
   game: string;
   status: "playing" | "paused" | "gameOver" | "won";
@@ -235,6 +242,8 @@ export interface GameFrame {
   palette: string[];
   pixels: string[];
   updatedAt: number;
+  /** Reported by the runtime, the only process that knows. */
+  audio?: GameAudioState;
 }
 
 export interface GameStateResponse {

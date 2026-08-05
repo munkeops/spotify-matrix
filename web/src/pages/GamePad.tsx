@@ -265,6 +265,14 @@ export default function GamePad() {
         <Chip size="small" color={live ? "success" : "default"} label={live ? "Live" : "Idle"} />
       </Stack>
 
+      {frame?.audio && frame.audio.enabled && (frame.audio.error || frame.audio.sounds === 0) ? (
+        <Alert severity="warning">
+          {frame.audio.error
+            ? `Sound is on but the runtime could not open ${frame.audio.device || "the output"}: ${frame.audio.error}`
+            : "Sound is on but this app shipped no effects to play."}
+        </Alert>
+      ) : null}
+
       {!active ? (
         <Alert severity="info" action={<Button size="small" onClick={startGame} disabled={starting}>Start</Button>}>
           {game.name} is not on the matrix right now.
