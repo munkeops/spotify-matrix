@@ -852,3 +852,51 @@ def test_the_panel_cannot_be_dimmed_into_darkness(tmp_path, monkeypatch):
 
     level = config_module.config_service.get_config().matrix.brightness
     assert level == joystick_module.BRIGHTNESS_MIN >= 20, f"dimmed to {level}"
+
+
+def test_saving_brightness_in_settings_reaches_the_panel(tmp_path, monkeypatch):
+    """Saving config used to write the file and stop there, so changing
+    brightness in Settings moved the number and not the matrix."""
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    import asyncio
+    import importlib
+
+    sys.modules.pop("src.api.http.rest.config", None)
+    routes = importlib.import_module("src.api.http.rest.config")
+
+    config = config_module.config_service.get_config()
+    config.matrix.brightness = 40
+    config_module.config_service.save_config(config)
+
+    published: list[int] = []
+    monkeypatch.setattr(joystick_module.joystick_service, "publish_brightness", published.append)
+    monkeypatch.setattr(routes, "config_service", config_module.config_service)
+
+    updated = config_module.config_service.get_config().model_copy(deep=True)
+    updated.matrix.brightness = 100
+    asyncio.run(routes.save_config(updated))
+
+    assert published == [100], "the running panel was told"
+
+
+def test_saving_a_driver_setting_restarts_the_runtime(tmp_path, monkeypatch):
+    """pwmBits and friends are constructor arguments; only a restart takes
+    them, and saving silently did neither."""
+    config_module, _, _, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    import asyncio
+    import importlib
+
+    sys.modules.pop("src.api.http.rest.config", None)
+    routes = importlib.import_module("src.api.http.rest.config")
+    monkeypatch.setattr(routes, "config_service", config_module.config_service)
+
+    applied: list[bool] = []
+    from src.domain.services import runtime_service as runtime_module
+
+    monkeypatch.setattr(runtime_module.runtime_service, "apply", lambda: applied.append(True))
+
+    updated = config_module.config_service.get_config().model_copy(deep=True)
+    updated.matrix.pwmBits = 8
+    asyncio.run(routes.save_config(updated))
+
+    assert applied, "the runtime was restarted for a driver change"

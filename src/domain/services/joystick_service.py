@@ -441,6 +441,15 @@ class JoystickService:
             },
         )
 
+    def publish_brightness(self, level: int) -> None:
+        """Push a level at the running panel without restarting it.
+
+        The binding takes brightness live, so a change made in Settings
+        should land as fast as one made on the joystick.
+        """
+        self._brightness_nonce += 1
+        self._publish_shell(int(level))
+
     def _adjust_brightness(self, delta: int) -> None:
         config = config_service.get_config()
         level = max(BRIGHTNESS_MIN, min(BRIGHTNESS_MAX, int(config.matrix.brightness) + delta))
