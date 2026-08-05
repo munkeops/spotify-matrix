@@ -2,7 +2,7 @@
 
 Race the pack, and throw an elbow when you draw level.
 
-A playable Assistant Matrix game app. Control layout: `horizontal`.
+A playable Assistant Matrix game plugin. Control layout: `horizontal`.
 
 Actions: `left`, `right`, `up`, `down`, `fire`, `pause`, `resume`, `togglePause`, `restart`
 

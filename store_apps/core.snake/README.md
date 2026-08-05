@@ -2,7 +2,7 @@
 
 Eat, grow, and do not bite yourself.
 
-A playable Assistant Matrix game app. Control layout: `dpad`.
+A playable Assistant Matrix game plugin. Control layout: `dpad`.
 
 Actions: `up`, `down`, `left`, `right`, `pause`, `resume`, `togglePause`, `restart`
 

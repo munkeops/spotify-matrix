@@ -2,7 +2,7 @@
 
 Stack falling tetrominoes and clear lines.
 
-A playable Assistant Matrix game app. Control layout: `tetris`.
+A playable Assistant Matrix game plugin. Control layout: `tetris`.
 
 Actions: `left`, `right`, `softDrop`, `hardDrop`, `rotateCw`, `rotateCcw`, `hold`, `pause`, `resume`, `togglePause`, `restart`
 

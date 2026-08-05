@@ -1657,3 +1657,37 @@ def test_roadrash_never_drops_a_rider_into_your_lane():
     for _ in range(30):
         game._recycle(rival, ahead=False)
         assert abs(rival.offset - game.offset) >= 0.35
+
+
+def test_chess_uses_the_whole_panel():
+    """The board was 48 pixels in a 64 pixel panel, so nearly half the screen
+    was header and margin."""
+    chess = _chess()
+
+    assert chess.CELL * 8 == PANEL, "eight squares should fill the panel"
+    assert chess.ORIGIN == (0, 0)
+    for name, sprite in chess.SPRITES.items():
+        assert len(sprite) == chess.CELL, f"{name} sprite is the wrong height"
+        assert all(len(row) == chess.CELL for row in sprite), f"{name} sprite is ragged"
+
+
+def test_chess_every_square_is_reachable_on_screen():
+    chess = _chess()
+    game = mg.create_game("chess", {}, seed=1)
+
+    corners = [game._screen_square(r, c) for r, c in ((0, 0), (0, 7), (7, 0), (7, 7))]
+
+    assert (0, 0) in corners, "a1 or a8 sits at the panel corner"
+    assert all(0 <= x <= PANEL - chess.CELL and 0 <= y <= PANEL - chess.CELL for x, y in corners)
+
+
+def test_chess_shows_whose_move_it_is_without_a_header():
+    """The turn used to be a line of text; it is the cursor colour now."""
+    chess = _chess()
+    game = mg.create_game("chess", {"side": "w"}, seed=1)
+
+    yours = frame_to_pixels(game.render(PANEL))
+    game.thinking = True
+    theirs = frame_to_pixels(game.render(PANEL))
+
+    assert yours != theirs, "the panel has to change when the engine takes over"

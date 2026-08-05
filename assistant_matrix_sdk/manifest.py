@@ -135,3 +135,13 @@ def build_app_manifest(
         "config": [field.to_manifest() for field in config or []],
         "triggers": [trigger.to_manifest() for trigger in triggers or []],
     }
+
+
+# The names these had before apps were called apps.
+#
+# Kept on the module as well as the package, because importing
+# straight from the module is just as common as importing from the
+# package, and both used to work.
+WidgetPermission = AppPermission
+WidgetPreview = AppPreview
+WidgetTrigger = AppTrigger

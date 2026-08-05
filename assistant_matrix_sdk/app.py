@@ -61,3 +61,11 @@ class App:
             config=cls.config,
             triggers=cls.triggers,
         )
+
+
+# The names these had before apps were called apps.
+#
+# Kept on the module as well as the package, because importing
+# straight from the module is just as common as importing from the
+# package, and both used to work.
+Widget = App

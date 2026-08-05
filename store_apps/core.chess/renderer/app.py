@@ -20,8 +20,14 @@ from assistant_matrix_sdk.config import ConfigField
 from assistant_matrix_sdk.game import GameApp
 from assistant_matrix_sdk.pixels import PANEL, draw_banner, draw_pixel_text, fit_panel, new_frame
 
-CELL = 6
-ORIGIN = (8, 12)
+# 8 squares of 8 pixels is the whole panel, which is the only layout that
+# wastes none of it. Everything that used to live in a header - whose move,
+# the move number, the material count - is in hud() for the app to show, and
+# the states that matter at a glance are on the board itself: the cursor is
+# tinted by whose turn it is, a king in check is red, and a result arrives as
+# a banner.
+CELL = 8
+ORIGIN = (0, 0)
 BOARD = 8 * CELL
 
 WHITE, BLACK = "w", "b"
@@ -31,21 +37,77 @@ DARK_SQUARE = (108, 88, 68)
 WHITE_PIECE = (250, 250, 245)
 BLACK_PIECE = (24, 22, 30)
 CURSOR = (110, 230, 255)
+#: The cursor turns amber while the engine has the move, which is how you
+#: can tell it is thinking without a line of text to say so.
+CURSOR_BUSY = (250, 190, 80)
 PICKED = (120, 240, 150)
 TARGET = (250, 220, 90)
 CHECK = (230, 80, 80)
 TEXT = (206, 216, 236)
-DIM = (122, 132, 158)
 
-# 6x6 silhouettes. Small, but the crown, the cross and the castellation are
-# what make queen, king and rook readable at this size.
+# 8x8 silhouettes. The extra two pixels each way are what let the crown, the
+# cross, the mitre and the castellation actually read as different pieces.
 SPRITES = {
-    "p": ("......", "..##..", ".####.", "..##..", ".####.", "......"),
-    "r": ("......", "#.##.#", "######", ".####.", "######", "......"),
-    "n": ("......", ".####.", "##.##.", "..###.", ".####.", "......"),
-    "b": ("..##..", ".####.", "..##..", ".####.", ".####.", "......"),
-    "q": ("#.##.#", "######", ".####.", "..##..", "######", "......"),
-    "k": ("..##..", "######", "..##..", ".####.", "######", "......"),
+    "p": (
+        "........",
+        "...##...",
+        "..####..",
+        "..####..",
+        "...##...",
+        "..####..",
+        ".######.",
+        "........",
+    ),
+    "r": (
+        "........",
+        ".#.##.#.",
+        ".######.",
+        "..####..",
+        "..####..",
+        "..####..",
+        ".######.",
+        "........",
+    ),
+    "n": (
+        "........",
+        "..####..",
+        ".#####..",
+        ".##.###.",
+        ".#..###.",
+        "....##..",
+        "...####.",
+        "..#####.",
+    ),
+    "b": (
+        "...##...",
+        "..####..",
+        "..#.##..",
+        "..####..",
+        "...##...",
+        "..####..",
+        ".######.",
+        "........",
+    ),
+    "q": (
+        "........",
+        "#..##..#",
+        "#.####.#",
+        "########",
+        ".######.",
+        "..####..",
+        ".######.",
+        "........",
+    ),
+    "k": (
+        "...##...",
+        "...##...",
+        ".######.",
+        "...##...",
+        "..####..",
+        ".######.",
+        ".######.",
+        "........",
+    ),
 }
 
 VALUES = {"p": 100, "n": 320, "b": 330, "r": 500, "q": 900, "k": 20000}
@@ -710,10 +772,6 @@ class ChessGame(GameApp):
     def render(self, size: int = PANEL) -> Image.Image:
         image, draw = new_frame()
 
-        turn = "YOUR MOVE" if self.board.to_move == self.side else "THINKING"
-        draw_pixel_text(draw, 1, 1, self.result or (self.message or turn), TEXT, 1)
-        draw_pixel_text(draw, PANEL - 19, 1, f"M{self.board.fullmoves}", DIM, 1)
-
         check_square = None
         if self.board.in_check(self.board.to_move):
             check_square = self.board.king_square(self.board.to_move)
@@ -744,8 +802,12 @@ class ChessGame(GameApp):
             left, top = self._screen_square(*self.picked)
             draw.rectangle((left, top, left + CELL - 1, top + CELL - 1), outline=PICKED)
 
+        yours = self.board.to_move == self.side and not self.thinking
         left, top = self._screen_square(self.cursor[0], self.cursor[1])
-        draw.rectangle((left, top, left + CELL - 1, top + CELL - 1), outline=CURSOR)
+        draw.rectangle(
+            (left, top, left + CELL - 1, top + CELL - 1),
+            outline=CURSOR if yours else CURSOR_BUSY,
+        )
 
         if self.promoting is not None:
             self._draw_promotion(draw)
@@ -765,15 +827,19 @@ class ChessGame(GameApp):
                     draw.point((left + offset_x, top + offset_y), fill=colour)
 
     def _draw_promotion(self, draw) -> None:
-        top = ORIGIN[1] + BOARD // 2 - 6
-        draw.rectangle((6, top, PANEL - 7, top + 13), fill=(16, 18, 28), outline=(80, 88, 116))
-        draw_pixel_text(draw, 9, top + 2, "PROMOTE", TEXT, 1)
+        """A picker centred over the board, which is now the whole panel."""
+        height = CELL + 10
+        top = (PANEL - height) // 2
+        draw.rectangle((1, top, PANEL - 2, top + height), fill=(16, 18, 28), outline=(80, 88, 116))
+        draw_pixel_text(draw, 3, top + 2, "PROMOTE", TEXT, 1)
+        row = top + 9
+        spacing = (PANEL - 4) // len(PROMOTIONS)
         for index, name in enumerate(PROMOTIONS):
-            left = 10 + index * 11
+            left = 2 + index * spacing + (spacing - CELL) // 2
             piece = name.upper() if self.side == WHITE else name
-            self._draw_piece(draw, left, top + 7, piece)
+            self._draw_piece(draw, left, row, piece)
             if index == self.promotion_choice:
-                draw.rectangle((left - 1, top + 6, left + CELL, top + 6 + CELL), outline=CURSOR)
+                draw.rectangle((left - 1, row - 1, left + CELL, row + CELL), outline=CURSOR)
 
 
 def demo_snapshot() -> ChessGame:

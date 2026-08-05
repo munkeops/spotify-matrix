@@ -2,7 +2,7 @@
 
 Clear the maze while four ghosts hunt you down.
 
-A playable Assistant Matrix game app. Control layout: `dpad`.
+A playable Assistant Matrix game plugin. Control layout: `dpad`.
 
 Actions: `up`, `down`, `left`, `right`, `pause`, `resume`, `togglePause`, `restart`
 

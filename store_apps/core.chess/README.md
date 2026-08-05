@@ -2,7 +2,7 @@
 
 Full chess against a searching engine, on 64 by 64 pixels.
 
-A playable Assistant Matrix game app. Control layout: `dpad`.
+A playable Assistant Matrix game plugin. Control layout: `dpad`.
 
 Actions: `up`, `down`, `left`, `right`, `fire`, `pause`, `resume`, `togglePause`, `restart`
 

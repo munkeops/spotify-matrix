@@ -218,6 +218,7 @@ class GameApp:
 Game = GameApp
 
 __all__ = [
+    "GameWidget",
     "GameApp",
     "Game",
     "PLAYING",
@@ -227,3 +228,11 @@ __all__ = [
     "RESTART_ACTIONS",
     "RESTART_GRACE_SECONDS",
 ]
+
+
+# The names these had before apps were called apps.
+#
+# Kept on the module as well as the package, because importing
+# straight from the module is just as common as importing from the
+# package, and both used to work.
+GameWidget = GameApp

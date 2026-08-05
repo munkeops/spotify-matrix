@@ -2,7 +2,7 @@
 
 One button, endless pipes.
 
-A playable Assistant Matrix game app. Control layout: `tap`.
+A playable Assistant Matrix game plugin. Control layout: `tap`.
 
 Actions: `flap`, `pause`, `resume`, `togglePause`, `restart`
 

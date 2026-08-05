@@ -2,7 +2,7 @@
 
 Climb the girders, jump the barrels, reach the top.
 
-A playable Assistant Matrix game app. Control layout: `dpad`.
+A playable Assistant Matrix game plugin. Control layout: `dpad`.
 
 Actions: `left`, `right`, `up`, `down`, `fire`, `pause`, `resume`, `togglePause`, `restart`
 

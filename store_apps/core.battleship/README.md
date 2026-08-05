@@ -2,7 +2,7 @@
 
 Hunt the hidden fleet before the computer sinks yours.
 
-A playable Assistant Matrix game app. Control layout: `dpad`.
+A playable Assistant Matrix game plugin. Control layout: `dpad`.
 
 Actions: `up`, `down`, `left`, `right`, `fire`, `pause`, `resume`, `togglePause`, `restart`
 

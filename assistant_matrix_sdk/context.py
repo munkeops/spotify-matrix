@@ -31,3 +31,11 @@ class AppContext:
         if self.assets_dir is None:
             raise RuntimeError("AppContext.assets_dir is not set.")
         return Asset(path=self.assets_dir / relative_path)
+
+
+# The names these had before apps were called apps.
+#
+# Kept on the module as well as the package, because importing
+# straight from the module is just as common as importing from the
+# package, and both used to work.
+WidgetContext = AppContext

@@ -2,7 +2,7 @@
 
 Rally against the computer or a second phone.
 
-A playable Assistant Matrix game app. Control layout: `vertical`.
+A playable Assistant Matrix game plugin. Control layout: `vertical`.
 
 Actions: `up`, `down`, `p2Up`, `p2Down`, `pause`, `resume`, `togglePause`, `restart`
 
