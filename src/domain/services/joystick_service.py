@@ -101,6 +101,7 @@ class JoystickService:
         settings = self.settings()
         return {
             "enabled": bool(settings.enabled),
+            "role": str(settings.role or "system"),
             "running": self.running(),
             "connected": self.connected,
             "bus": settings.bus,
@@ -285,10 +286,20 @@ class JoystickService:
             self._open_wheel(bool(active))
             return
 
-        if active:
+        # The module is bolted to the matrix; a gamepad is what you play with.
+        # Left on system duty it never touches the game, so you can open the
+        # wheel, switch app or change brightness mid-game without putting the
+        # controller down.
+        if active and self._plays_games(event):
             self._dispatch_game(active, event)
         else:
             self._dispatch_shell(event)
+
+    def _plays_games(self, event) -> bool:
+        """May the device this event came from drive the running game?"""
+        if getattr(self, "_device", MODULE) != MODULE:
+            return True
+        return config_service.get_config().joystick.role == "player"
 
     def _wheel_opens(self, event) -> bool:
         """Holding OK is the way in, from a game or the shell alike."""

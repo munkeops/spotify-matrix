@@ -16,6 +16,13 @@ from assistant_matrix_sdk import game as base
 from assistant_matrix_sdk.pixels import PANEL, frame_to_pixels
 from src.utils.frame_codec import decode_frame
 
+
+def _queued(path, last=0):
+    """Actions from the queue, dropping the seat most tests do not care about."""
+    commands, seq = mg.read_commands(path, last)
+    return [action for action, _ in commands], seq
+
+
 # Games live in store_apps/ as apps, so the tests load them the same way
 # the host does rather than importing modules that no longer exist.
 breakout = mg.app_module("breakout")
@@ -541,13 +548,13 @@ def test_queue_and_state_are_per_game(tmp_path, monkeypatch):
     assert service.queue_command("pacman", "left") == 1
     assert service.input_path("snake") != service.input_path("pacman")
 
-    actions, seq = mg.read_commands(service.input_path("snake"), 0)
+    actions, seq = _queued(service.input_path("snake"), 0)
     assert actions == ["up"]
-    other, _ = mg.read_commands(service.input_path("pacman"), 0)
+    other, _ = _queued(service.input_path("pacman"), 0)
     assert other == ["left"]
 
     service.queue_command("snake", "down")
-    fresh, _ = mg.read_commands(service.input_path("snake"), seq)
+    fresh, _ = _queued(service.input_path("snake"), seq)
     assert fresh == ["down"]
 
 
@@ -760,7 +767,7 @@ def test_a_dropped_in_package_becomes_a_playable_game(tmp_path, monkeypatch):
 
     # And it accepts controller input on its own queue.
     game_module.game_service.queue_command("dropin", "left")
-    actions, _ = mg.read_commands(game_module.game_service.input_path("dropin"), 0)
+    actions, _ = _queued(game_module.game_service.input_path("dropin"), 0)
     assert actions == ["left"]
 
 

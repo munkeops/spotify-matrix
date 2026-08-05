@@ -14,8 +14,13 @@ from pathlib import Path
 from typing import Any
 
 
-def read_commands(path: Path | None, last_seq: int) -> tuple[list[str], int]:
-    """Drain queued controller commands, returning everything newer than ``last_seq``."""
+def read_commands(path: Path | None, last_seq: int) -> tuple[list[tuple[str, int]], int]:
+    """Drain queued controller commands newer than ``last_seq``.
+
+    Each command carries the seat it came from, so a two player game can tell
+    the paddles apart. Anything written before seats existed has no seat and
+    is read as player one.
+    """
     if path is None or not path.exists():
         return [], last_seq
     try:
@@ -25,7 +30,10 @@ def read_commands(path: Path | None, last_seq: int) -> tuple[list[str], int]:
         return [], last_seq
     entries = payload.get("commands", []) if isinstance(payload, dict) else []
     pairs = [
-        (int(entry.get("seq", 0) or 0), str(entry.get("action", "")))
+        (
+            int(entry.get("seq", 0) or 0),
+            (str(entry.get("action", "")), int(entry.get("player", 0) or 0)),
+        )
         for entry in entries
         if isinstance(entry, dict) and entry.get("action")
     ]
@@ -36,7 +44,7 @@ def read_commands(path: Path | None, last_seq: int) -> tuple[list[str], int]:
         # The API restarted and rewound its counter, so replay from the start.
         last_seq = 0
     fresh = sorted((pair for pair in pairs if pair[0] > last_seq), key=lambda pair: pair[0])
-    return [action for _, action in fresh], max(last_seq, highest)
+    return [command for _, command in fresh], max(last_seq, highest)
 
 
 def write_state(path: Path | None, snapshot: dict[str, Any]) -> None:

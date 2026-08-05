@@ -254,6 +254,8 @@ export const sendGameInput = (id: string, action: string) =>
 
 export interface JoystickState {
   enabled: boolean;
+  /** "system" drives the matrix; "player" drives the game. */
+  role: string;
   running: boolean;
   connected: boolean;
   bus: number;

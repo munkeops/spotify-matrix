@@ -124,6 +124,14 @@ class JoystickConfig(BaseModel):
     """Mini-joystick module (I2C 0x5A). See docs/mini-joystick.md for wiring."""
 
     enabled: bool = False
+    #: What the module is for.
+    #:
+    #: "system" - device control: the wheel, switching apps, brightness and
+    #: volume, available even while a game is running on a gamepad. This is
+    #: the default, because the module is bolted to the matrix and a pad is
+    #: what you actually play with.
+    #: "player" - a game controller like any other.
+    role: str = "system"
     bus: int = 1
     address: int = 0x5A
     deadzone: float = 0.35
@@ -426,6 +434,8 @@ class CommandResponse(BaseModel):
 
 class JoystickStateResponse(BaseModel):
     enabled: bool
+    #: "system" (device control) or "player" (a game controller).
+    role: str = "system"
     running: bool
     connected: bool
     bus: int = 1

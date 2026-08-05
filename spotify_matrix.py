@@ -2082,9 +2082,9 @@ def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
             elapsed = started - previous
             previous = started
 
-            actions, last_seq = read_game_commands(input_path, last_seq)
-            for action in actions:
-                game.command(action)
+            commands, last_seq = read_game_commands(input_path, last_seq)
+            for action, player in commands:
+                game.command(action, player=player)
             game.step(elapsed)
             if auto_restart and game.finished() and game.game_over_elapsed >= auto_restart:
                 game.restart()

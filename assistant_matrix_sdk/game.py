@@ -55,6 +55,13 @@ class GameApp:
     layout = "dpad"
     # Actions accepted beyond the universally handled pause/resume/restart set.
     actions: tuple[str, ...] = ()
+    #: How many people can play: a count, or (minimum, maximum).
+    #:
+    #: A game that takes more than one gets its actions tagged with the seat
+    #: they came from, so every player sends plain "up" rather than the game
+    #: inventing a "p2Up". Seats are filled by using a controller, so a second
+    #: pad joins by pressing something.
+    players: int | tuple[int, int] = 1
     preview_media = AppPreview()
     permissions: list[AppPermission] = []
     config_fields: list[ConfigField] = []
@@ -91,7 +98,7 @@ class GameApp:
         """Move the game on by ``elapsed`` seconds. Never called while paused."""
         raise NotImplementedError
 
-    def handle(self, action: str) -> None:
+    def handle(self, action: str, player: int = 0) -> None:
         """Apply a controller action. Never called while paused or finished."""
 
     def render(self, size: int = PANEL) -> Image.Image:
@@ -130,7 +137,42 @@ class GameApp:
             return
         self.advance(elapsed)
 
-    def command(self, action: str) -> None:
+    @classmethod
+    def player_range(cls) -> tuple[int, int]:
+        """Minimum and maximum players, however ``players`` was written."""
+        declared = cls.players
+        if isinstance(declared, (tuple, list)) and len(declared) == 2:
+            low, high = int(declared[0]), int(declared[1])
+        else:
+            low = high = int(declared)  # type: ignore[arg-type]
+        low = max(1, low)
+        return low, max(low, high)
+
+    @classmethod
+    def max_players(cls) -> int:
+        return cls.player_range()[1]
+
+    @classmethod
+    def _handle_takes_player(cls) -> bool:
+        """Does this game's ``handle`` want to know who pressed the button?
+
+        Most do not, and should not have to grow a parameter they ignore, so
+        the seat is only passed to the ones that ask for it.
+        """
+        cached = cls.__dict__.get("_handle_player_cache")
+        if cached is None:
+            import inspect
+
+            try:
+                parameters = inspect.signature(cls.handle).parameters
+            except (TypeError, ValueError):
+                cached = False
+            else:
+                cached = "player" in parameters
+            cls._handle_player_cache = cached  # type: ignore[attr-defined]
+        return bool(cached)
+
+    def command(self, action: str, player: int = 0) -> None:
         if action == "restart":
             self.restart()
             return
@@ -143,7 +185,10 @@ class GameApp:
             return
         if self.paused:
             return
-        self.handle(action)
+        if self._handle_takes_player():
+            self.handle(action, player=player)
+        else:
+            self.handle(action)
 
     def final_score(self) -> int | None:
         """The number worth remembering, or None for a game without a score.

@@ -100,7 +100,7 @@ class GameService:
                 return game_id
         return ""
 
-    def queue_command(self, game_id: str, action: str) -> int:
+    def queue_command(self, game_id: str, action: str, player: int = 0) -> int:
         # Reject unknown games here rather than leaving a queue file nothing reads.
         self.require_spec(game_id)
         path = self.input_path(game_id)
@@ -108,7 +108,7 @@ class GameService:
         commands = payload.get("commands", []) if isinstance(payload, dict) else []
         commands = [command for command in commands if isinstance(command, dict) and command.get("action")]
         seq = max((int(command.get("seq", 0) or 0) for command in commands), default=0) + 1
-        commands.append({"seq": seq, "action": action, "at": time.time()})
+        commands.append({"seq": seq, "action": action, "player": int(player), "at": time.time()})
         self._write_json(path, {"seq": seq, "commands": commands[-QUEUE_LIMIT:]})
         return seq
 

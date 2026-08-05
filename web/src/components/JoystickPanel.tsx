@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
 import { JoystickDiagnostics, JoystickState, getJoystick, getJoystickDiagnostics, saveJoystickConfig } from "../api";
 
 export default function JoystickPanel() {
@@ -73,6 +73,23 @@ export default function JoystickPanel() {
             control={<Switch checked={state.enabled} disabled={busy} onChange={(e) => update({ enabled: e.target.checked })} />}
             label="Use the joystick module"
           />
+
+          <TextField
+            select
+            size="small"
+            label="Use for"
+            value={state.role || "system"}
+            disabled={busy || !state.enabled}
+            onChange={(e) => update({ role: e.target.value })}
+            helperText={
+              state.role === "player"
+                ? "Drives the game like a controller."
+                : "Device control: the wheel, switching apps and brightness, even mid-game."
+            }
+          >
+            <MenuItem value="system">Device control</MenuItem>
+            <MenuItem value="player">Game controller</MenuItem>
+          </TextField>
 
           {state.enabled ? (
             <>

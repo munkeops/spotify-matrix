@@ -32,6 +32,13 @@ from matrix_input.gamepad import (
 from mini_joystick.bindings import game_action, shell_action
 from mini_joystick.protocol import Button, ButtonEvent, Direction
 
+
+def _queued(path, last=0):
+    """Actions from the queue, dropping the seat most tests do not care about."""
+    commands, seq = mg.read_commands(path, last)
+    return [action for action, _ in commands], seq
+
+
 GAMES = mg.discover()
 
 
@@ -196,7 +203,7 @@ def test_the_pad_drives_the_running_game(tmp_path, monkeypatch):
     for event in pad.poll():
         gamepad_module.gamepad_service._dispatch(event)
 
-    actions, _ = mg.read_commands(game_module.game_service.input_path("invaders"), 0)
+    actions, _ = _queued(game_module.game_service.input_path("invaders"), 0)
     assert actions == ["left", "fire"]
 
 
@@ -400,5 +407,5 @@ def test_holding_left_keeps_moving_the_paddle(tmp_path, monkeypatch):
         for event in pad.poll(now=moment):
             gamepad_module.gamepad_service._dispatch(event)
 
-    actions, _ = mg.read_commands(game_module.game_service.input_path("breakout"), 0)
+    actions, _ = _queued(game_module.game_service.input_path("breakout"), 0)
     assert actions.count("left") >= 3, f"a held stick should keep moving, got {actions}"

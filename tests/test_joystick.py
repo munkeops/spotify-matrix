@@ -27,6 +27,13 @@ from mini_joystick.events import JoystickEvent
 from mini_joystick.protocol import I2C_ADDRESS, REG_LEFT_X, REG_LEFT_Y
 
 
+def _queued(path, last=0):
+    """Actions from the queue, dropping the seat most tests do not care about."""
+    commands, seq = mg.read_commands(path, last)
+    return [action for action, _ in commands], seq
+
+
+
 def make(stick: tuple[int, int] = (AXIS_CENTER, AXIS_CENTER), **buttons: int) -> tuple[MiniJoystick, FakeTransport]:
     transport = FakeTransport({REG_LEFT_X: stick[0], REG_LEFT_Y: stick[1]})
     for button, register in BUTTON_REGISTERS.items():
@@ -300,15 +307,14 @@ def test_service_drives_the_active_game(tmp_path, monkeypatch):
     config = config_module.config_service.get_config()
     config.display.mode = "app"
     config.display.appId = "core.snake"
+    config.joystick.role = "player"
     config_module.config_service.save_config(config)
 
     service = joystick_module.joystick_service
     service._dispatch(direction_event(Direction.UP))
     service._dispatch(button_event(Button.OK, ButtonEvent.PRESS_DOWN))
 
-    from matrix_games import read_commands
-
-    actions, _ = read_commands(game_module.game_service.input_path("snake"), 0)
+    actions, _ = _queued(game_module.game_service.input_path("snake"))
     assert actions == ["up", "togglePause"]
     assert service.last_action == "snake:togglePause"
 
@@ -448,7 +454,9 @@ def test_brightness_stops_at_the_limits(tmp_path, monkeypatch):
     assert config_module.config_service.get_config().matrix.brightness == joystick_module.BRIGHTNESS_MIN
 
 
-def test_the_menu_is_not_reachable_while_a_game_runs(tmp_path, monkeypatch):
+def test_the_module_reaches_the_menu_while_a_game_runs(tmp_path, monkeypatch):
+    """The module is device control: it must work without putting the pad
+    down, which is the whole point of having it bolted to the matrix."""
     config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
     config = config_module.config_service.get_config()
     config.display.mode = "app"
@@ -458,9 +466,40 @@ def test_the_menu_is_not_reachable_while_a_game_runs(tmp_path, monkeypatch):
     service = joystick_module.joystick_service
     service._dispatch(button_event(Button.OK, ButtonEvent.SINGLE_CLICK))
 
-    # The click paused the game instead of opening a menu over it.
-    actions, _ = mg.read_commands(game_module.game_service.input_path("snake"), 0)
+    assert service._menu_open, "the menu opened over the running game"
+    actions, _ = _queued(game_module.game_service.input_path("snake"), 0)
+    assert actions == [], "and the game saw nothing from the module"
+
+
+def test_the_module_can_still_be_made_a_game_controller(tmp_path, monkeypatch):
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
+    config.joystick.role = "player"
+    config_module.config_service.save_config(config)
+
+    joystick_module.joystick_service._dispatch(button_event(Button.OK, ButtonEvent.SINGLE_CLICK))
+
+    actions, _ = _queued(game_module.game_service.input_path("snake"), 0)
     assert actions == ["togglePause"]
+
+
+def test_a_gamepad_still_plays_while_the_module_runs_the_system(tmp_path, monkeypatch):
+    """The two devices do different jobs at the same time."""
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    service = joystick_module.joystick_service
+    service.dispatch_event(direction_event(Direction.UP), device="gamepad")
+    service.dispatch_event(button_event(Button.OK, ButtonEvent.SINGLE_CLICK), device="module")
+
+    actions, _ = _queued(game_module.game_service.input_path("snake"), 0)
+    assert actions == ["up"], "the pad played, the module did not"
+    assert service._menu_open
 
 
 def test_the_menu_scrolls_to_keep_the_cursor_visible():
@@ -521,7 +560,7 @@ def test_holding_ok_opens_the_wheel_over_a_game(tmp_path, monkeypatch):
     # Pushing the stick highlights a wedge without doing anything.
     service._dispatch(stick(0, -1))
     assert read_shell_state(shell_path)["wheel"]["selected"] == 0
-    actions, _ = mg.read_commands(game_module.game_service.input_path("snake"), 0)
+    actions, _ = _queued(game_module.game_service.input_path("snake"), 0)
     assert actions == [], "browsing the wheel must not reach the game"
 
 
@@ -539,7 +578,7 @@ def test_the_wheel_sends_the_chosen_action(tmp_path, monkeypatch):
     service._dispatch(stick(0, -1))          # wedge 0 is Pause
     service._dispatch(button_event(Button.OK, ButtonEvent.PRESS_UP))
 
-    actions, _ = mg.read_commands(game_module.game_service.input_path("snake"), 0)
+    actions, _ = _queued(game_module.game_service.input_path("snake"), 0)
     assert actions == ["togglePause"]
     assert read_shell_state(game_module.game_service.state_dir / "shell.json")["wheel"]["open"] is False
 
@@ -650,12 +689,13 @@ def test_the_service_uses_saved_bindings(tmp_path, monkeypatch):
     config = config_module.config_service.get_config()
     config.display.mode = "app"
     config.display.appId = "core.tetris"
+    config.joystick.role = "player"
     config.controller.profiles = {"module": {"core.tetris": {"a": "hold"}}}
     config_module.config_service.save_config(config)
 
     joystick_module.joystick_service.dispatch_event(button_event(Button.A), device="module")
 
-    actions, _ = mg.read_commands(game_module.game_service.input_path("tetris"), 0)
+    actions, _ = _queued(game_module.game_service.input_path("tetris"), 0)
     assert actions == ["hold"]
 
 
@@ -665,6 +705,7 @@ def test_each_device_keeps_its_own_bindings(tmp_path, monkeypatch):
     config = config_module.config_service.get_config()
     config.display.mode = "app"
     config.display.appId = "core.tetris"
+    config.joystick.role = "player"
     config.controller.profiles = {
         "module": {"core.tetris": {"a": "hold"}},
         "gamepad": {"core.tetris": {"a": "rotateCcw"}},
@@ -675,7 +716,7 @@ def test_each_device_keeps_its_own_bindings(tmp_path, monkeypatch):
     service.dispatch_event(button_event(Button.A), device="module")
     service.dispatch_event(button_event(Button.A), device="gamepad")
 
-    actions, _ = mg.read_commands(game_module.game_service.input_path("tetris"), 0)
+    actions, _ = _queued(game_module.game_service.input_path("tetris"), 0)
     assert actions == ["hold", "rotateCcw"]
 
 
