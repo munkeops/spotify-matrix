@@ -281,8 +281,10 @@ class AlsaOutput:
 
     def _command(self) -> list[str]:
         command = ["aplay", "-q", "-t", "raw", "-f", "S16_LE", "-r", str(SAMPLE_RATE), "-c", "1"]
-        if self.device:
-            command += ["-D", plug_device(resolve_device(self.device))]
+        # Always name a device, so the default gets converted too. Leaving it
+        # off sent 22050Hz mono straight at whatever `default` is, and HDMI
+        # refuses that with "Unknown error 524".
+        command += ["-D", plug_device(resolve_device(self.device or "default"))]
         return command + ["-"]
 
     def start(self) -> None:

@@ -778,3 +778,25 @@ def test_a_working_speaker_is_not_blocked(monkeypatch):
     monkeypatch.setattr(bluealsa, "pcms", lambda: [{"name": "bluealsa:DEV=E8:07:BF:12:34:56,PROFILE=a2dp"}])
 
     assert module.audio_service._unusable("bluealsa:DEV=E8:07:BF:12:34:56,PROFILE=a2dp") == ""
+
+
+def test_the_default_device_is_converted_too():
+    """Leaving -D off sent 22050Hz mono straight at whatever `default` is,
+    and HDMI refuses that with "Unknown error 524"."""
+    from matrix_audio.mixer import Mixer
+    from matrix_audio.output import AlsaOutput
+
+    command = AlsaOutput(Mixer(), device="")._command()
+
+    assert "-D" in command, "a device is always named"
+    assert command[command.index("-D") + 1] == 'plug:{SLAVE="default"}'
+
+
+def test_a_soundcore_is_recognised_as_a_speaker():
+    """It was classified by name and "soundcore" was not in the list, so it
+    could be a nameless stranger rather than an audio device."""
+    from src.domain.services.bluetooth_service import classify
+
+    assert classify("", "SoundCore 2") == "audio"
+    assert classify("", "Anker SoundCore") == "audio"
+    assert classify("", "Xbox Wireless Controller") == "controller"

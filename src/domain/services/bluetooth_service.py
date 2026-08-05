@@ -38,7 +38,7 @@ _ROLE_BY_ICON = {
 #: Names that give a device away when BlueZ has not worked out an icon yet.
 _ROLE_BY_NAME = (
     ("controller", ("xbox", "dualshock", "dualsense", "wireless controller", "8bitdo", "gamepad", "joy-con", "stadia")),
-    ("audio", ("speaker", "soundbar", "headphone", "headset", "buds", "airpods", "jbl", "bose", "sony wh", "echo")),
+    ("audio", ("speaker", "soundbar", "headphone", "headset", "buds", "airpods", "jbl", "bose", "sony wh", "echo", "soundcore", "anker", "boom", "flip", "charge")),
 )
 
 
