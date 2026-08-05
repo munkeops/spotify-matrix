@@ -107,6 +107,14 @@ class AudioService:
                 "No ALSA tools in the container, so nothing can reach the sound card. "
                 "Rebuild the image to install them."
             )
+        bridge = bluealsa.status()
+        if bridge.get("running") and not bridge.get("permitted", True):
+            return (
+                f"This runs as uid {bridge.get('uid')} and is not in the audio group, so "
+                "the system bus will refuse it access to bluealsa and Bluetooth "
+                'playback cannot work. In docker-compose set user: "0:0" and '
+                "group_add: [audio], then recreate the container."
+            )
         if not devices:
             return (
                 "No audio output found. Check the Pi has one with 'aplay -l', and that "
@@ -234,11 +242,17 @@ class AudioService:
                 "moment if you just pressed Test."
             )
         if "rejected send message" in lowered or "org.freedesktop.dbus.error.accessdenied" in lowered:
+            from matrix_audio import bluealsa
+
+            who = bluealsa.identity()
             return (
-                "The Pi's D-Bus refused the connection to bluealsa, which only "
-                "accepts root or the audio group. Run the container as root - "
-                'docker-compose sets user: "0:0" for this - or add a policy on '
-                "the Pi permitting the user it runs as."
+                f"The Pi's D-Bus refused the connection to bluealsa. This runs as "
+                f"uid {who['uid']}"
+                + ("" if who["inAudioGroup"] else ", not in the audio group")
+                + ", and bluealsa accepts only root or the audio group. In "
+                'docker-compose set user: "0:0" and group_add: [audio]; under '
+                "systemd set User=root or SupplementaryGroups=audio; then "
+                "recreate rather than restart, so the change takes."
             )
         if "no such device" in lowered or "pcm not found" in lowered:
             return "The output has gone away. Reconnect the speaker and refresh."

@@ -595,6 +595,11 @@ class AudioBridge(BaseModel):
     binary: str = ""
     #: Speakers that have registered a playback PCM, not merely paired.
     speakers: int = 0
+    #: Who this process is to the system bus, which is what bluealsa judges.
+    uid: int = -1
+    inAudioGroup: bool = False
+    #: False when the bus policy would refuse us whatever else is right.
+    permitted: bool = True
 
 
 class AudioStateResponse(BaseModel):

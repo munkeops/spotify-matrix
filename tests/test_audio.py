@@ -929,3 +929,31 @@ def test_the_test_sound_opens_its_own_device_when_nothing_is_running(monkeypatch
     )
 
     assert module.audio_service._play_through_runtime("start") is None
+
+
+def test_the_process_reports_whether_the_bus_would_accept_it():
+    """bluealsa takes root or the audio group; anything else is refused, and
+    the refusal reads as "No such device"."""
+    from matrix_audio import bluealsa
+
+    who = bluealsa.identity()
+
+    assert set(who) >= {"uid", "groups", "inAudioGroup", "permitted"}
+    if who["uid"] == 0:
+        assert who["permitted"], "root is always allowed"
+
+
+def test_a_refusal_names_the_uid_it_was_refused_as(monkeypatch):
+    from matrix_audio import bluealsa
+    from src.domain.services.audio_service import audio_service
+
+    monkeypatch.setattr(
+        bluealsa, "identity",
+        lambda: {"uid": 1, "groups": [1], "inAudioGroup": False, "permitted": False},
+    )
+
+    explained = audio_service._explain("Rejected send message, 1 matched rules")
+
+    assert "uid 1" in explained
+    assert "audio group" in explained
+    assert "recreate" in explained, "a restart does not change the user"

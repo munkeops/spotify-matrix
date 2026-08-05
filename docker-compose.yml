@@ -9,6 +9,11 @@ services:
     # sees. Anything else is refused with "Rejected send message", which
     # surfaces as "audio open error: No such device" and a silent game.
     user: "0:0"
+    # bluealsa's D-Bus policy allows root *or* the audio group. Being in the
+    # group as well means this still works if something else decides what uid
+    # we run as - which is what "Rejected send message ... uid=1" means.
+    group_add:
+      - audio
     network_mode: host
     restart: unless-stopped
     environment:

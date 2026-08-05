@@ -189,6 +189,36 @@ def why_no_speaker() -> str:
     return TAKEN_ADVICE if transports() else NO_PCM_ADVICE
 
 
+def identity() -> dict[str, object]:
+    """Who this process is to the system bus.
+
+    bluealsa accepts root or the audio group and the bus judges by the uid it
+    sees, so when it refuses, this is the thing worth knowing.
+    """
+    try:
+        uid = os.getuid()
+        groups = sorted(os.getgroups())
+    except AttributeError:  # pragma: no cover - not POSIX
+        return {"uid": -1, "groups": [], "inAudioGroup": False, "permitted": True}
+
+    audio_gid = None
+    try:
+        import grp
+
+        audio_gid = grp.getgrnam("audio").gr_gid
+    except Exception:
+        audio_gid = None
+
+    in_audio = audio_gid is not None and audio_gid in groups
+    return {
+        "uid": uid,
+        "groups": groups,
+        "inAudioGroup": bool(in_audio),
+        # Whether the bus policy would let us talk to bluealsa at all.
+        "permitted": uid == 0 or bool(in_audio),
+    }
+
+
 def status() -> dict[str, object]:
     """Enough for the panel to say what is wrong, not just that it is."""
     alive = running()
@@ -201,6 +231,7 @@ def status() -> dict[str, object]:
         "speakers": len(pcms()) if alive else 0,
         #: Addresses BlueZ has a live audio link for, ours or not.
         "transports": transports() if alive else [],
+        **identity(),
     }
 
 
@@ -289,6 +320,7 @@ __all__ = [
     "binary",
     "pcms",
     "transports",
+    "identity",
     "why_no_speaker",
     "PROFILES",
     "BINARIES",
