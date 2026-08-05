@@ -900,3 +900,83 @@ def test_saving_a_driver_setting_restarts_the_runtime(tmp_path, monkeypatch):
     asyncio.run(routes.save_config(updated))
 
     assert applied, "the runtime was restarted for a driver change"
+
+
+def test_system_buttons_can_be_rebound(tmp_path, monkeypatch):
+    """Which button sits where under a thumb is not something the silkscreen
+    order knows, so brightness up and down landed on buttons that are not a
+    pair and could not be swapped."""
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+    config = config_module.config_service.get_config()
+    config.matrix.brightness = 50
+    config.joystick.systemBindings = {"a": "brightnessDown", "b": "brightnessUp"}
+    config_module.config_service.save_config(config)
+
+    service._dispatch(button_event(Button.A, ButtonEvent.PRESS_DOWN))
+    assert config_module.config_service.get_config().matrix.brightness == 40, "A now dims"
+
+    service._dispatch(button_event(Button.B, ButtonEvent.PRESS_DOWN))
+    assert config_module.config_service.get_config().matrix.brightness == 50, "B now brightens"
+
+
+def test_volume_can_be_driven_from_the_module(tmp_path, monkeypatch):
+    """There was no way to change volume from the device at all."""
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+    config = config_module.config_service.get_config()
+    config.audio.volume = 50
+    config_module.config_service.save_config(config)
+
+    service._dispatch(button_event(Button.C, ButtonEvent.PRESS_DOWN))
+    assert config_module.config_service.get_config().audio.volume == 60
+
+    service._dispatch(button_event(Button.D, ButtonEvent.PRESS_DOWN))
+    assert config_module.config_service.get_config().audio.volume == 50
+
+
+def test_an_unbound_control_does_nothing(tmp_path, monkeypatch):
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    service = joystick_module.joystick_service
+    config = config_module.config_service.get_config()
+    config.matrix.brightness = 50
+    config.joystick.systemBindings = {"a": "none"}
+    config_module.config_service.save_config(config)
+
+    service._dispatch(button_event(Button.A, ButtonEvent.PRESS_DOWN))
+
+    assert config_module.config_service.get_config().matrix.brightness == 50
+
+
+def test_the_system_controls_route_round_trips(tmp_path, monkeypatch):
+    import asyncio
+    import importlib
+
+    config_module, _, _, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    sys.modules.pop("src.api.http.rest.system_controls", None)
+    routes = importlib.import_module("src.api.http.rest.system_controls")
+    monkeypatch.setattr(routes, "config_service", config_module.config_service)
+
+    swapped = asyncio.run(
+        routes.save_system_controls(routes.SystemControlsRequest(bindings={"a": "brightnessDown", "b": "brightnessUp"}))
+    )
+    assert swapped.bindings["a"] == "brightnessDown"
+    assert set(swapped.customised) == {"a", "b"}
+
+    back = asyncio.run(routes.reset_system_controls())
+    assert back.bindings == back.defaults and back.customised == []
+
+
+def test_the_system_controls_route_refuses_nonsense(tmp_path, monkeypatch):
+    import asyncio
+    import importlib
+
+    config_module, _, _, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    sys.modules.pop("src.api.http.rest.system_controls", None)
+    routes = importlib.import_module("src.api.http.rest.system_controls")
+    monkeypatch.setattr(routes, "config_service", config_module.config_service)
+
+    with pytest.raises(ValueError):
+        asyncio.run(routes.save_system_controls(routes.SystemControlsRequest(bindings={"a": "selfDestruct"})))
+    with pytest.raises(ValueError):
+        asyncio.run(routes.save_system_controls(routes.SystemControlsRequest(bindings={"z": "brightnessUp"})))

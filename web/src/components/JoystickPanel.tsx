@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
 import { JoystickDiagnostics, JoystickState, getJoystick, getJoystickDiagnostics, saveJoystickConfig } from "../api";
+import SystemControls from "./SystemControls";
 
 export default function JoystickPanel() {
   const [state, setState] = useState<JoystickState | null>(null);
@@ -90,6 +91,8 @@ export default function JoystickPanel() {
             <MenuItem value="system">Device control</MenuItem>
             <MenuItem value="player">Game controller</MenuItem>
           </TextField>
+
+          {state.role !== "player" ? <SystemControls /> : null}
 
           {state.enabled ? (
             <>

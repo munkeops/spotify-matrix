@@ -24,7 +24,15 @@ from mini_joystick import (
     Transport,
     TransportError,
 )
-from mini_joystick.bindings import DEFAULT_PROFILE, GAMEPAD, MODULE, ShellAction, game_action, shell_action
+from mini_joystick.bindings import (
+    DEFAULT_PROFILE,
+    DEFAULT_SYSTEM_BINDINGS,
+    GAMEPAD,
+    MODULE,
+    ShellAction,
+    game_action,
+    shell_action,
+)
 from mini_joystick.transport import available_buses, scan_bus, smbus_available
 from src.domain.services.config_service import config_service
 from src.domain.services.game_service import game_service
@@ -42,6 +50,10 @@ BRIGHTNESS_STEP = 10
 #: you cannot see to find.
 BRIGHTNESS_MIN = 20
 BRIGHTNESS_MAX = 100
+
+VOLUME_STEP = 10
+VOLUME_MIN = 0
+VOLUME_MAX = 100
 
 # Wheel entries. `action` is handled below; `short` is what fits a wedge.
 WHEEL_IN_GAME = (
@@ -90,6 +102,7 @@ class JoystickService:
         self._wheel_open = False
         self._device = DEFAULT_PROFILE
         self._brightness_nonce = 0
+        self._volume_nonce = 0
         self._wheel_items: list = []
         self._wheel_selected = None
         self._last_non_game = ""
@@ -432,6 +445,8 @@ class JoystickService:
                 # Changes on every brightness press, including one that is
                 # already at the limit, so the runtime can show the bar.
                 "brightnessSeq": self._brightness_nonce,
+                "volume": int(config.audio.volume),
+                "volumeSeq": self._volume_nonce,
                 "menu": {"open": self._menu_open, "cursor": self._cursor, "items": items},
                 "wheel": {
                     "open": self._wheel_open,
@@ -449,6 +464,17 @@ class JoystickService:
         """
         self._brightness_nonce += 1
         self._publish_shell(int(level))
+
+    def _adjust_volume(self, delta: int) -> None:
+        """Sound effect volume, on the same live path as brightness."""
+        config = config_service.get_config()
+        level = max(VOLUME_MIN, min(VOLUME_MAX, int(config.audio.volume) + delta))
+        self._volume_nonce += 1
+        if level != config.audio.volume:
+            config.audio.volume = level
+            config_service.save_config(config)
+        self._publish_shell()
+        self._record(f"volume:{level}")
 
     def _adjust_brightness(self, delta: int) -> None:
         config = config_service.get_config()
@@ -505,8 +531,14 @@ class JoystickService:
             "items": [{"id": w.manifest.id, "name": w.manifest.name, "active": w.active} for w in apps],
         }
 
+    def _system_bindings(self) -> dict[str, str]:
+        saved = config_service.get_config().joystick.systemBindings
+        bindings = dict(DEFAULT_SYSTEM_BINDINGS)
+        bindings.update({key: value for key, value in saved.items() if value})
+        return bindings
+
     def _dispatch_shell(self, event) -> None:
-        action = shell_action(event, self._menu_open)
+        action = shell_action(event, self._menu_open, self._system_bindings())
         if action is None:
             return
 
@@ -530,6 +562,21 @@ class JoystickService:
             return
         if action.kind == "brightnessDown":
             self._adjust_brightness(-BRIGHTNESS_STEP)
+            return
+        if action.kind == "volumeUp":
+            self._adjust_volume(VOLUME_STEP)
+            return
+        if action.kind == "volumeDown":
+            self._adjust_volume(-VOLUME_STEP)
+            return
+        if action.kind == "exitApp":
+            self._exit_game()
+            return
+        if action.kind == "nextApp":
+            self._step_app(1)
+            return
+        if action.kind == "previousApp":
+            self._step_app(-1)
             return
         apps = self._apps()
         if not apps:
@@ -561,6 +608,22 @@ class JoystickService:
             else:
                 runtime_service.start()
             self._record("power")
+
+    def _step_app(self, step: int) -> None:
+        """Move to the next or previous app, from a bound button.
+
+        The stick already does this; a button bound to it should reach the
+        same code rather than a second copy of the cursor arithmetic.
+        """
+        apps = self._apps()
+        if not apps:
+            return
+        ids = [app.manifest.id for app in apps]
+        active_id = next((app.manifest.id for app in apps if app.active), "")
+        if active_id in ids:
+            self._cursor = ids.index(active_id)
+        self._cursor = (self._cursor + step) % len(ids)
+        self._apply_app(ids[self._cursor])
 
     def _apply_app(self, app_id: str) -> None:
         from src.domain.services.app_registry_service import app_registry_service

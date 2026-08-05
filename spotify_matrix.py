@@ -1668,6 +1668,10 @@ class OverlayDisplay:
         self._brightness_until = 0.0
         self._brightness_level = 0
         self._brightness_nonce = 0
+        self._volume_nonce = 0
+        # Set once a game builds its engine, so a bound button can change the
+        # volume of whatever is playing without restarting it.
+        self._audio = None
         self._applied_brightness: int | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -1691,6 +1695,22 @@ class OverlayDisplay:
             self._thread.join(timeout=1.0)
         self._display.clear()
 
+    def attach_audio(self, audio) -> None:
+        self._audio = audio
+
+    def _apply_volume(self, state: dict) -> None:
+        nonce = int(state.get("volumeSeq", 0) or 0)
+        if nonce == self._volume_nonce:
+            return
+        self._volume_nonce = nonce
+        setter = getattr(self._audio, "set_volume", None)
+        if setter is None:
+            return
+        try:
+            setter(max(0, min(100, int(state.get("volume", 80) or 0))) / 100.0)
+        except Exception:  # pragma: no cover - depends on the engine
+            pass
+
     def _apply_brightness(self, level: int) -> None:
         if level <= 0 or level == self._applied_brightness:
             return
@@ -1706,6 +1726,7 @@ class OverlayDisplay:
             except Exception:
                 continue
             self._apply_brightness(int(state.get("brightness", 0) or 0))
+            self._apply_volume(state)
 
             menu = state.get("menu", {})
             level = int(state.get("brightness", 0) or 0)
@@ -2070,6 +2091,11 @@ def run_game(args: argparse.Namespace, display: MatrixDisplay | MockDisplay, siz
         )
     input_path = args.game_input
     state_path = args.game_state
+    # Hand the engine to the overlay, so a button bound to volume changes the
+    # sound of what is actually playing rather than only the saved setting.
+    attach = getattr(display, "attach_audio", None)
+    if attach is not None:
+        attach(getattr(game, "audio", None))
     auto_restart = max(0, int(getattr(args, "tetris_auto_restart_seconds", 0) or 0))
     frame_time = 1.0 / max(1.0, float(args.fps))
     # Ignore anything queued before this game started.

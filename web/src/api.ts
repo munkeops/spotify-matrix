@@ -394,3 +394,18 @@ export const saveGameBindings = (gameId: string, profile: string, bindings: Reco
 
 export const resetGameBindings = (gameId: string, device: string) =>
   apiDelete<GameBindings>(`/api/games/${gameId}/bindings?device=${encodeURIComponent(device)}`).then(withLabels);
+
+
+export interface SystemControlsState {
+  controls: string[];
+  labels: Record<string, string>;
+  actions: { action: string; label: string }[];
+  bindings: Record<string, string>;
+  defaults: Record<string, string>;
+  customised: string[];
+}
+
+export const getSystemControls = () => apiGet<SystemControlsState>("/api/joystick/system-controls");
+export const saveSystemControls = (bindings: Record<string, string>) =>
+  apiPost<SystemControlsState>("/api/joystick/system-controls", { bindings });
+export const resetSystemControls = () => apiDelete<SystemControlsState>("/api/joystick/system-controls");

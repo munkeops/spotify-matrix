@@ -46,6 +46,37 @@ BUTTON_FALLBACKS: dict[Button, tuple[str, ...]] = {
 REPEATABLE = frozenset({"left", "right", "up", "down", "softDrop", "p2Up", "p2Down"})
 
 
+#: What a control can be set to do while the module is on system duty.
+#:
+#: Which physical button is which is the owner's business - the silkscreen
+#: order has nothing to do with where the buttons sit under a thumb, so
+#: brightness up and down landed on buttons that are not a pair.
+SYSTEM_ACTIONS: tuple[tuple[str, str], ...] = (
+    ("brightnessUp", "Brighter"),
+    ("brightnessDown", "Dimmer"),
+    ("volumeUp", "Louder"),
+    ("volumeDown", "Quieter"),
+    ("openMenu", "App menu"),
+    ("nextApp", "Next app"),
+    ("previousApp", "Previous app"),
+    ("exitApp", "Exit app"),
+    ("power", "Power"),
+    ("none", "Nothing"),
+)
+
+#: Controls a person can put a system action on.
+SYSTEM_CONTROLS = ("a", "b", "c", "d", "ok")
+
+#: Where they sit before anyone changes them.
+DEFAULT_SYSTEM_BINDINGS: dict[str, str] = {
+    "a": "brightnessUp",
+    "b": "brightnessDown",
+    "c": "volumeUp",
+    "d": "volumeDown",
+    "ok": "openMenu",
+}
+
+
 @dataclass(frozen=True)
 class ShellAction:
     """A joystick action while no game is on the panel."""
@@ -232,7 +263,11 @@ def game_action(event: JoystickEvent, actions: set[str], overrides: dict[str, st
 PRESS_EVENTS = (ButtonEvent.PRESS_DOWN, ButtonEvent.SINGLE_CLICK)
 
 
-def shell_action(event: JoystickEvent, menu_open: bool = False) -> ShellAction | None:
+def shell_action(
+    event: JoystickEvent,
+    menu_open: bool = False,
+    bindings: dict[str, str] | None = None,
+) -> ShellAction | None:
     """The action ``event`` should take when no game is on the panel.
 
     With the menu closed the buttons are a brightness pair and a way in. With
@@ -262,6 +297,15 @@ def shell_action(event: JoystickEvent, menu_open: bool = False) -> ShellAction |
     if event.button == Button.D and long_press:
         return ShellAction(kind="power")
 
+    # A control the owner has bound wins over anything below, except while the
+    # menu is open, where the buttons have to mean pick and cancel.
+    if not menu_open and bindings:
+        chosen = bindings.get(control_name(event), "")
+        if chosen == "none":
+            return None
+        if chosen:
+            return ShellAction(kind=chosen)
+
     if menu_open:
         if event.button in (Button.OK, Button.A, Button.START):
             return ShellAction(kind="select")
@@ -290,6 +334,9 @@ __all__ = [
     "MODULE",
     "GAMEPAD",
     "DEFAULT_PROFILE",
+    "SYSTEM_ACTIONS",
+    "SYSTEM_CONTROLS",
+    "DEFAULT_SYSTEM_BINDINGS",
     "game_action",
     "shell_action",
     "ShellAction",

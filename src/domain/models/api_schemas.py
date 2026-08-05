@@ -132,6 +132,11 @@ class JoystickConfig(BaseModel):
     #: what you actually play with.
     #: "player" - a game controller like any other.
     role: str = "system"
+    #: Which control does which system action, by control id.
+    #:
+    #: Empty means the defaults. Which button is where under a thumb is not
+    #: something the silkscreen order knows, so this is the owner's to set.
+    systemBindings: dict[str, str] = Field(default_factory=dict)
     bus: int = 1
     address: int = 0x5A
     deadzone: float = 0.35
@@ -444,6 +449,21 @@ class JoystickStateResponse(BaseModel):
     lastAction: str = ""
     lastActionAt: float = 0.0
     eventsSeen: int = 0
+
+
+class SystemControlsResponse(BaseModel):
+    """The module's buttons and what each is set to do."""
+
+    controls: list[str] = Field(default_factory=list)
+    labels: dict[str, str] = Field(default_factory=dict)
+    actions: list[dict[str, str]] = Field(default_factory=list)
+    bindings: dict[str, str] = Field(default_factory=dict)
+    defaults: dict[str, str] = Field(default_factory=dict)
+    customised: list[str] = Field(default_factory=list)
+
+
+class SystemControlsRequest(BaseModel):
+    bindings: dict[str, str] = Field(default_factory=dict)
 
 
 class JoystickConfigRequest(BaseModel):
