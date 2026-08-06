@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Card, CardActionArea, Typography, Box, CircularProgress, Alert, Chip, IconButton, Stack } from "@mui/material";
+import { Button, Card, CardActionArea, Typography, Box, CircularProgress, Alert, Chip, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, Stack } from "@mui/material";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
-import { canPreview, gameIdOf, isGame, LocalApp, listLocalApps, applyApp, getAppConfig, previewApp } from "../api";
+import { canPreview, gameIdOf, isGame, LocalApp, listLocalApps, applyApp, getAppConfig, previewApp, uninstallApp } from "../api";
 import AppConfigDrawer from "../components/AppConfigDrawer";
 import DisplayPolicyPanel from "../components/DisplayPolicyPanel";
 import { SHELVES, ShelfKey, ShelfTabs, colorFor, groupByShelf } from "../shelves";
@@ -27,6 +28,10 @@ export default function Apps() {
   const [selected, setSelected] = useState<LocalApp | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [applyingId, setApplyingId] = useState("");
+  //: The app awaiting confirmation. Uninstalling deletes its files and its
+  //: saved settings, so it asks first.
+  const [removing, setRemoving] = useState<LocalApp | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
 
   const requested = params.get("tab") as ShelfKey | null;
   const tab: ShelfKey = SHELVES.some((shelf) => shelf.key === requested) ? (requested as ShelfKey) : "apps";
@@ -62,6 +67,20 @@ export default function Apps() {
   }, [loadPreviews]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  const confirmRemove = async () => {
+    if (!removing) return;
+    setRemovingBusy(true);
+    try {
+      await uninstallApp(removing.manifest.id);
+      setRemoving(null);
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRemovingBusy(false);
+    }
+  };
 
   const runNow = async (app: LocalApp) => {
     setApplyingId(app.manifest.id);
@@ -139,6 +158,16 @@ export default function Apps() {
                 </Box>
               </CardActionArea>
               {app.active ? <Chip size="small" label="Active" color="primary" sx={{ position: "absolute", top: 6, left: 6, height: 20 }} /> : null}
+              {app.builtIn ? null : (
+                <IconButton
+                  size="small"
+                  onClick={() => setRemoving(app)}
+                  aria-label={`Uninstall ${app.manifest.name}`}
+                  sx={{ position: "absolute", bottom: 4, right: 4, bgcolor: "rgba(0,0,0,0.55)", "&:hover": { bgcolor: "rgba(0,0,0,0.75)", color: "error.main" } }}
+                >
+                  <DeleteOutlineRoundedIcon fontSize="small" sx={{ color: "#fff" }} />
+                </IconButton>
+              )}
               <IconButton
                 size="small"
                 onClick={() => runNow(app)}
@@ -170,6 +199,22 @@ export default function Apps() {
       </Box>
 
       <AppConfigDrawer app={selected} open={drawerOpen} onClose={() => setDrawerOpen(false)} onApplied={refresh} />
+
+      <Dialog open={removing !== null} onClose={() => setRemoving(null)}>
+        <DialogTitle>Uninstall {removing?.manifest.name}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Its files and anything you configured for it are deleted. It stays in the
+            store, so you can install it again - but its settings will not come back.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemoving(null)} disabled={removingBusy}>Keep</Button>
+          <Button color="error" variant="contained" disabled={removingBusy} onClick={confirmRemove}>
+            {removingBusy ? "Uninstalling…" : "Uninstall"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

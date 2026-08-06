@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Alert, Box, Button, Card, Chip, CircularProgress, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, Stack, Typography } from "@mui/material";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import {
   LocalApp,
   StoreApp,
   installApp,
+  uninstallApp,
   isGame,
   listLocalApps,
   listStoreApps,
@@ -22,6 +24,8 @@ interface StoreItem {
   author: string;
   version: string;
   installed: boolean;
+  /** Shipped with the image, so it cannot be uninstalled. */
+  builtIn: boolean;
   active: boolean;
   isGame: boolean;
   configurable: boolean;
@@ -41,6 +45,7 @@ function mergeCatalogue(local: LocalApp[], store: StoreApp[]): StoreItem[] {
       author: app.manifest.author,
       version: app.manifest.version,
       installed: true,
+      builtIn: app.builtIn,
       active: app.active,
       isGame: isGame(app),
       configurable: app.configurable,
@@ -62,6 +67,7 @@ function mergeCatalogue(local: LocalApp[], store: StoreApp[]): StoreItem[] {
       author: app.author,
       version: app.version,
       installed: app.installed,
+      builtIn: false,
       active: false,
       isGame: app.category === "games",
       configurable: false,
@@ -84,6 +90,8 @@ export default function Store() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [installed, setInstalled] = useState("");
+  const [removing, setRemoving] = useState<StoreItem | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
   const [busy, setBusy] = useState("");
 
   const requested = params.get("tab") as ShelfKey | null;
@@ -137,6 +145,20 @@ export default function Store() {
       setError((e as Error).message);
     } finally {
       setBusy("");
+    }
+  };
+
+  const confirmRemove = async () => {
+    if (!removing) return;
+    setRemovingBusy(true);
+    try {
+      await uninstallApp(removing.id);
+      setRemoving(null);
+      await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRemovingBusy(false);
     }
   };
 
@@ -216,15 +238,26 @@ export default function Store() {
                       {busy === item.id ? "Installing…" : "Install"}
                     </Button>
                   ) : (
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      color="success"
-                      startIcon={<CheckCircleRoundedIcon />}
-                      onClick={() => navigate("/apps")}
-                    >
-                      Installed
-                    </Button>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="success"
+                        startIcon={<CheckCircleRoundedIcon />}
+                        onClick={() => navigate("/apps")}
+                      >
+                        Installed
+                      </Button>
+                      {item.builtIn ? null : (
+                        <IconButton
+                          aria-label={`Uninstall ${item.name}`}
+                          onClick={() => setRemoving(item)}
+                          sx={{ border: "1px solid", borderColor: "divider", "&:hover": { color: "error.main" } }}
+                        >
+                          <DeleteOutlineRoundedIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Stack>
                   )}
                 </Box>
               </Box>
@@ -244,6 +277,22 @@ export default function Store() {
           </Card>
         ) : null}
       </Box>
+
+      <Dialog open={removing !== null} onClose={() => setRemoving(null)}>
+        <DialogTitle>Uninstall {removing?.name}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Its files and anything you configured for it are deleted. It stays here, so
+            you can install it again - but its settings will not come back.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemoving(null)} disabled={removingBusy}>Keep</Button>
+          <Button color="error" variant="contained" disabled={removingBusy} onClick={confirmRemove}>
+            {removingBusy ? "Uninstalling…" : "Uninstall"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

@@ -5,6 +5,7 @@ import json
 import sys
 import tarfile
 from pathlib import Path
+import pytest
 
 
 SERVICE_MODULES = [
@@ -390,3 +391,30 @@ def test_the_old_api_routes_still_answer():
 
     assert "/api/apps/local" in paths
     assert "/api/widgets/local" in paths, "the old prefix is still served"
+
+
+def test_a_bundled_app_cannot_be_uninstalled(tmp_path, monkeypatch):
+    """They live in the image, so removing one would either fail or break
+    the install until the next rebuild."""
+    import importlib
+    import sys
+
+    monkeypatch.setenv("SPOTIFY_MATRIX_DATA_DIR", str(tmp_path / "data"))
+    for name in ("src.domain.services.config_service", "src.domain.services.app_store_service"):
+        sys.modules.pop(name, None)
+    module = importlib.import_module("src.domain.services.app_store_service")
+
+    with pytest.raises(ValueError, match="not installed"):
+        module.app_store_service.uninstall_app("core.tetris")
+
+
+def test_uninstalling_clears_the_panel_if_it_was_showing():
+    """Otherwise the display points at an app whose files have gone."""
+    import inspect
+
+    from src.domain.services import app_store_service as module
+
+    source = inspect.getsource(module.AppStoreService.uninstall_app)
+
+    assert 'config.display.mode = "spotify"' in source
+    assert "remove_app_references" in source, "and any rotation or trigger using it"
