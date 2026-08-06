@@ -5,6 +5,8 @@ import BluetoothPanel from "../components/BluetoothPanel";
 import JoystickPanel from "../components/JoystickPanel";
 import GamepadPanel from "../components/GamepadPanel";
 import AudioPanel from "../components/AudioPanel";
+import DisplayPreview from "../components/DisplayPreview";
+import Field from "../components/Field";
 
 const MATRIX_NUMBERS: { key: string; label: string; help?: string }[] = [
   { key: "rows", label: "Rows" },
@@ -61,22 +63,33 @@ export default function Settings() {
       <Card>
         <CardContent>
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Matrix Hardware</Typography>
+
+          <Box sx={{ mb: 2.5 }}>
+            <DisplayPreview
+              rotation={Number(config.matrix?.rotation ?? 0)}
+              brightness={Number(config.matrix?.brightness ?? 100)}
+              rows={Number(config.matrix?.rows ?? 64)}
+              cols={Number(config.matrix?.cols ?? 64)}
+            />
+          </Box>
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr" }, gap: 1.5 }}>
             {MATRIX_NUMBERS.map((f) => (
-              <TextField
-                key={f.key}
-                label={f.label}
-                type="number"
-                size="small"
-                helperText={f.help}
-                value={config.matrix?.[f.key] ?? ""}
-                onChange={(e) => setMatrix(f.key, Number(e.target.value))}
-              />
+              <Field key={f.key} label={f.label} help={f.help}>
+                <TextField
+                  type="number"
+                  value={config.matrix?.[f.key] ?? ""}
+                  onChange={(e) => setMatrix(f.key, Number(e.target.value))}
+                />
+              </Field>
             ))}
-            <TextField label="Hardware mapping" size="small" value={config.matrix?.hardwareMapping ?? ""} onChange={(e) => setMatrix("hardwareMapping", e.target.value)} />
-            <TextField select label="Rotation" size="small" value={String(config.matrix?.rotation ?? 0)} onChange={(e) => setMatrix("rotation", Number(e.target.value))}>
-              {[0, 90, 180, 270].map((r) => <MenuItem key={r} value={String(r)}>{r}°</MenuItem>)}
-            </TextField>
+            <Field label="Hardware mapping">
+              <TextField value={config.matrix?.hardwareMapping ?? ""} onChange={(e) => setMatrix("hardwareMapping", e.target.value)} />
+            </Field>
+            <Field label="Rotation" help="Previewed above.">
+              <TextField select value={String(config.matrix?.rotation ?? 0)} onChange={(e) => setMatrix("rotation", Number(e.target.value))}>
+                {[0, 90, 180, 270].map((r) => <MenuItem key={r} value={String(r)}>{r}°</MenuItem>)}
+              </TextField>
+            </Field>
           </Box>
           <FormControlLabel
             sx={{ mt: 1 }}

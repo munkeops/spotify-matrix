@@ -105,6 +105,8 @@ class JoystickService:
         self._volume_nonce = 0
         self._test_nonce = 0
         self._test_sound = ""
+        self.last_control = ""
+        self.last_control_at = 0.0
         self._wheel_items: list = []
         self._wheel_selected = None
         self._last_non_game = ""
@@ -131,6 +133,9 @@ class JoystickService:
             "lastError": self.last_error,
             "lastAction": self.last_action,
             "lastActionAt": self.last_action_at,
+            # Which control was physically used, so a diagram can show it.
+            "lastControl": getattr(self, "last_control", ""),
+            "lastControlAt": getattr(self, "last_control_at", 0.0),
             "eventsSeen": self.events_seen,
         }
 
@@ -299,6 +304,7 @@ class JoystickService:
 
         self.connected = True
         self.events_seen += 1
+        self._note_control(event)
         active = game_service.active_game_id()
 
         if self._wheel_open:
@@ -647,6 +653,20 @@ class JoystickService:
         except Exception as exc:
             self.last_error = str(exc)
             logger.warning("[joystick] could not apply {}: {}", app_id, exc)
+
+    def _note_control(self, event) -> None:
+        """Remember which physical control was just used.
+
+        A settings screen can then light up the button you pressed, which is
+        the only reliable way to know which one the silkscreen calls A when
+        the diagram cannot know how your module is laid out.
+        """
+        from mini_joystick.bindings import control_name
+
+        name = control_name(event)
+        if name:
+            self.last_control = name
+            self.last_control_at = time.time()
 
     def _record(self, action: str) -> None:
         self.last_action = action

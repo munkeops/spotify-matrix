@@ -465,6 +465,9 @@ class JoystickStateResponse(BaseModel):
     address: int = 0x5A
     lastError: str = ""
     lastAction: str = ""
+    #: The physical control last used, so a diagram can highlight it.
+    lastControl: str = ""
+    lastControlAt: float = 0.0
     lastActionAt: float = 0.0
     eventsSeen: int = 0
 

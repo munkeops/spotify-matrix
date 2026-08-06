@@ -272,6 +272,9 @@ export interface JoystickState {
   lastError: string;
   lastAction: string;
   lastActionAt: number;
+  /** The control physically last used, for the diagram to highlight. */
+  lastControl: string;
+  lastControlAt: number;
   eventsSeen: number;
 }
 

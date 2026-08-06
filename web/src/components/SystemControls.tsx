@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Button, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
-import { SystemControlsState, getSystemControls, resetSystemControls, saveSystemControls } from "../api";
+import { SystemControlsState, getJoystick, getSystemControls, resetSystemControls, saveSystemControls } from "../api";
+import Field from "./Field";
+import ModuleDiagram, { ModuleControl } from "./ModuleDiagram";
 
 /**
  * What each button on the mini-joystick does while it is on device duty.
@@ -14,6 +16,10 @@ export default function SystemControls() {
   const [state, setState] = useState<SystemControlsState | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<ModuleControl>("a");
+  // Which control the module last reported, so the diagram can light it up.
+  const [pressed, setPressed] = useState("");
+  const seenAt = useRef(0);
 
   const load = useCallback(async () => {
     try {
@@ -27,6 +33,34 @@ export default function SystemControls() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Poll for presses. The module is the only thing that knows which button
+  // is which, so watching it is how the diagram earns its labels.
+  useEffect(() => {
+    let alive = true;
+    const timer = window.setInterval(async () => {
+      try {
+        const joystick = await getJoystick();
+        if (!alive || !joystick.lastControl) return;
+        if (joystick.lastControlAt > seenAt.current) {
+          seenAt.current = joystick.lastControlAt;
+          setPressed(joystick.lastControl);
+          setSelected((current) =>
+            ["a", "b", "c", "d", "ok"].includes(joystick.lastControl)
+              ? (joystick.lastControl as ModuleControl)
+              : current,
+          );
+          window.setTimeout(() => alive && setPressed(""), 350);
+        }
+      } catch {
+        // The module may be absent; the editor still works by tapping.
+      }
+    }, 400);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   if (!state) return error ? <Alert severity="error">{error}</Alert> : null;
 
@@ -77,27 +111,29 @@ export default function SystemControls() {
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.5 }}>
-        {state.controls.map((control) => (
-          <TextField
-            key={control}
-            select
-            size="small"
-            label={state.labels[control] ?? control.toUpperCase()}
-            value={state.bindings[control] ?? "none"}
-            disabled={busy}
-            onChange={(e) => rebind(control, e.target.value)}
-            focused={state.customised.includes(control) || undefined}
-            color={state.customised.includes(control) ? "primary" : undefined}
-          >
-            {state.actions.map((action) => (
-              <MenuItem key={action.action} value={action.action}>
-                {action.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        ))}
-      </Box>
+      <ModuleDiagram
+        bindings={state.bindings}
+        labels={state.labels}
+        actionLabels={Object.fromEntries(state.actions.map((a) => [a.action, a.label]))}
+        selected={selected}
+        pressed={pressed}
+        onSelect={(control) => setSelected(control)}
+      />
+
+      <Field label={`What ${state.labels[selected] ?? selected.toUpperCase()} does`}>
+        <TextField
+          select
+          value={state.bindings[selected] ?? "none"}
+          disabled={busy}
+          onChange={(e) => rebind(selected, e.target.value)}
+        >
+          {state.actions.map((action) => (
+            <MenuItem key={action.action} value={action.action}>
+              {action.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Field>
     </Stack>
   );
 }
