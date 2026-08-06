@@ -1712,3 +1712,63 @@ def test_every_direction_a_game_declares_has_a_button(game_id):
 
     missing = sorted((set(game.all_actions()) & directions) - drawn)
     assert not missing, f"{game_id} ({game.layout}) has no button for {missing}"
+
+
+def _centipede():
+    return importlib.import_module(mg.game_class("centipede").__module__)
+
+
+def test_centipede_body_follows_the_head():
+    """Each segment moving under its own rules makes a swarm of bugs that
+    happen to have started together, not a centipede."""
+    game = mg.create_game("centipede", {"mushrooms": 0}, seed=1)
+    for _ in range(40):
+        game.advance(1.0 / game.speed())
+
+    chain = game.chains[0]
+    for ahead, behind in zip(chain, chain[1:]):
+        gap = abs(ahead.x - behind.x) + abs(ahead.y - behind.y)
+        assert gap <= 1, f"the body broke apart: {gap} cells between segments"
+
+
+def test_centipede_splits_where_it_is_shot():
+    game = mg.create_game("centipede", {"mushrooms": 0}, seed=1)
+    for _ in range(30):
+        game.advance(1.0 / game.speed())
+    middle = len(game.chains[0]) // 2
+    target = game.chains[0][middle]
+
+    game._hit_segment(target.x, target.y)
+
+    assert len(game.chains) == 2, "one centipede became two"
+    assert all(chain[0].head for chain in game.chains), "each has its own head"
+
+
+def test_centipede_leaves_a_mushroom_where_a_segment_died():
+    """Which is what makes clearing one a race against the field."""
+    game = mg.create_game("centipede", {"mushrooms": 0}, seed=1)
+    for _ in range(30):
+        game.advance(1.0 / game.speed())
+    target = game.chains[0][0]
+    x, y = target.x, target.y
+
+    game._hit_segment(x, y)
+
+    assert game.mushrooms[y][x] > 0
+
+
+def test_centipede_descends_rather_than_circling_forever():
+    game = mg.create_game("centipede", {"mushrooms": 0}, seed=1)
+    for _ in range(200):
+        game.advance(1.0 / game.speed())
+
+    assert max(s.y for s in game.segments) > 0, "it worked its way down the field"
+
+
+def test_centipede_clearing_every_segment_starts_a_wave():
+    game = mg.create_game("centipede", {}, seed=1)
+    game.chains = [[_centipede().Segment(x=5, y=5, direction=1, head=True)]]
+
+    game._hit_segment(5, 5)
+
+    assert game.wave == 2 and game.segments

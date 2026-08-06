@@ -1,0 +1,67 @@
+[app]
+id = "core.centipede"
+name = "Centipede"
+version = "1.0.0"
+summary = "Shoot it apart before it reaches you. Every hit leaves a mushroom."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:CentipedeGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "dpad"
+actions = ["left", "right", "up", "down", "fire", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "lives"
+label = "Lives"
+type = "number"
+required = false
+default = 3
+placeholder = ""
+helpText = ""
+min = 1
+max = 5
+step = 1
+
+[[config]]
+key = "length"
+label = "Centipede length"
+type = "number"
+required = false
+default = 10
+placeholder = ""
+helpText = ""
+min = 4
+max = 16
+step = 1
+
+[[config]]
+key = "mushrooms"
+label = "Mushrooms"
+type = "number"
+required = false
+default = 28
+placeholder = ""
+helpText = ""
+min = 0
+max = 60
+step = 4
+
+[[config]]
+key = "speed"
+label = "Speed"
+type = "number"
+required = false
+default = 8
+placeholder = ""
+helpText = "Steps a second. Rises each wave."
+min = 3
+max = 16
+step = 1

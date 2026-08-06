@@ -106,6 +106,14 @@ SOUNDS: dict[str, dict[str, object]] = {
         "crash": lambda: sequence(noise(0.24, 1.0), sweep(340, 60, 0.36, wave_shape="triangle")),
         "win": lambda: sequence(blip(523, 0.09), blip(659, 0.09), blip(880, 0.09), blip(1046, 0.22)),
     },
+    "core.centipede": {
+        "shoot": lambda: sweep(880, 380, 0.05, wave_shape="square", volume=0.6),
+        "hit": lambda: sequence(noise(0.05, 0.7), blip(300, 0.04, wave_shape="triangle")),
+        "mushroom": lambda: blip(220, 0.035, wave_shape="triangle", volume=0.5),
+        "player_hit": lambda: sequence(noise(0.16, 0.9), sweep(320, 70, 0.34, wave_shape="triangle")),
+        "wave": lambda: sequence(blip(440, 0.07), blip(660, 0.07), blip(880, 0.16)),
+        "win": lambda: sequence(blip(523, 0.09), blip(784, 0.09), blip(1046, 0.22)),
+    },
     "core.kong": {
         "jump": lambda: sweep(300, 620, 0.09, volume=0.6),
         "climb": lambda: blip(240, 0.03, volume=0.35),
