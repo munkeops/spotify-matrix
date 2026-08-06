@@ -89,7 +89,7 @@ class ShellAction:
 CONTROLS = ("up", "down", "left", "right", "a", "b", "c", "d", "ok")
 
 #: Everything a gamepad can offer, on top of what the module has.
-PAD_CONTROLS = CONTROLS + ("lb", "rb", "lt", "rt", "start", "select", "l3", "r3")
+PAD_CONTROLS = CONTROLS + ("lb", "rb", "lt", "rt", "start", "select", "l3", "r3", "home")
 
 MODULE, GAMEPAD = "module", "gamepad"
 
@@ -148,6 +148,7 @@ PROFILES: dict[str, Profile] = {
             "select": "Select",
             "l3": "L3",
             "r3": "R3",
+            "home": "Home",
         },
     ),
 }
@@ -171,6 +172,8 @@ PAD_FALLBACKS: dict[Button, tuple[str, ...]] = {
     Button.SELECT: ("restart",),
     Button.L3: ("togglePause",),
     Button.R3: ("fire", "flap"),
+    # Home is the way out, never a game action.
+    Button.HOME: (),
 }
 
 
@@ -309,13 +312,15 @@ def shell_action(
     if menu_open:
         if event.button in (Button.OK, Button.A, Button.START):
             return ShellAction(kind="select")
+        if event.button == Button.HOME:
+            return ShellAction(kind="closeMenu")
         if event.button in (Button.B, Button.D, Button.SELECT):
             return ShellAction(kind="closeMenu")
         return None
 
     # Start now has its own control rather than collapsing onto the stick
     # press, so the way into the menu has to name both.
-    if event.button in (Button.OK, Button.START):
+    if event.button in (Button.OK, Button.START, Button.HOME):
         return ShellAction(kind="openMenu")
     if event.button == Button.A:
         return ShellAction(kind="brightnessUp")

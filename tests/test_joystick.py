@@ -980,3 +980,65 @@ def test_the_system_controls_route_refuses_nonsense(tmp_path, monkeypatch):
         asyncio.run(routes.save_system_controls(routes.SystemControlsRequest(bindings={"a": "selfDestruct"})))
     with pytest.raises(ValueError):
         asyncio.run(routes.save_system_controls(routes.SystemControlsRequest(bindings={"z": "brightnessUp"})))
+
+
+def test_the_stick_cannot_swap_the_app_out_from_under_a_game(tmp_path, monkeypatch):
+    """Nudging left while playing switched apps, because with the menu closed
+    a push is a shortcut for "next app" - which is fine on an idle panel and
+    not fine mid-game."""
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    service = joystick_module.joystick_service
+    applied: list[str] = []
+    monkeypatch.setattr(service, "_apply_app", applied.append)
+
+    for _ in range(4):
+        service._dispatch(direction_event(Direction.LEFT))
+        service._dispatch(direction_event(Direction.RIGHT))
+
+    assert applied == [], "the running game stayed on the panel"
+
+
+def test_the_stick_still_walks_apps_on_an_idle_panel(tmp_path, monkeypatch):
+    config_module, _, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "clock"
+    config_module.config_service.save_config(config)
+
+    service = joystick_module.joystick_service
+    applied: list[str] = []
+    monkeypatch.setattr(service, "_apply_app", applied.append)
+
+    service._dispatch(direction_event(Direction.RIGHT))
+
+    assert applied, "with nothing playing the shortcut is still useful"
+
+
+def test_home_opens_the_menu_from_a_pad_mid_game(tmp_path, monkeypatch):
+    """A dedicated button beats a stick nudge, and it must not reach the
+    game the way every other pad button does."""
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    config = config_module.config_service.get_config()
+    config.display.mode = "app"
+    config.display.appId = "core.snake"
+    config_module.config_service.save_config(config)
+
+    service = joystick_module.joystick_service
+    service.dispatch_event(button_event(Button.HOME, ButtonEvent.PRESS_DOWN), device="gamepad")
+
+    assert service._menu_open
+    actions, _ = _queued(game_module.game_service.input_path("snake"))
+    assert actions == [], "Home never reaches the game"
+
+
+def test_home_closes_the_menu_again():
+    from mini_joystick.bindings import shell_action
+
+    event = button_event(Button.HOME, ButtonEvent.PRESS_DOWN)
+
+    assert shell_action(event, False).kind == "openMenu"
+    assert shell_action(event, True).kind == "closeMenu"

@@ -314,6 +314,11 @@ class JoystickService:
             self._open_wheel(bool(active))
             return
 
+        # Home is the way out from any device, and it must not reach the game.
+        if self._opens_menu(event):
+            self._dispatch_shell(event)
+            return
+
         # The module is bolted to the matrix; a gamepad is what you play with.
         # Left on system duty it never touches the game, so you can open the
         # wheel, switch app or change brightness mid-game without putting the
@@ -322,6 +327,13 @@ class JoystickService:
             self._dispatch_game(active, event)
         else:
             self._dispatch_shell(event)
+
+    def _opens_menu(self, event) -> bool:
+        return (
+            event.kind == "button"
+            and event.button == Button.HOME
+            and event.event in (ButtonEvent.PRESS_DOWN, ButtonEvent.SINGLE_CLICK)
+        )
 
     def _plays_games(self, event) -> bool:
         """May the device this event came from drive the running game?"""
@@ -556,6 +568,13 @@ class JoystickService:
     def _dispatch_shell(self, event) -> None:
         action = shell_action(event, self._menu_open, self._system_bindings())
         if action is None:
+            return
+
+        # With a game on the panel, the stick must not walk off it. Nudging
+        # left while playing swapped the app out from under you, because the
+        # closed-menu shortcut treats a push as "next app". Open the menu
+        # first - Home, the stick press, or the wheel - and it works as before.
+        if action.kind in ("next", "previous") and game_service.active_game_id():
             return
 
         if action.kind == "openMenu":

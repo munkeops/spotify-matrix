@@ -57,7 +57,7 @@ BUTTON_MAP = {
     BTN_TL2: Button.LT,
     BTN_TR2: Button.RT,
     BTN_START: Button.START,
-    BTN_MODE: Button.START,
+    BTN_MODE: Button.HOME,
     BTN_SELECT: Button.SELECT,
     BTN_THUMBL: Button.L3,
     BTN_THUMBR: Button.R3,

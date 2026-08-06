@@ -59,6 +59,9 @@ class Button(str, Enum):
     SELECT = "select"
     L3 = "l3"
     R3 = "r3"
+    #: The Guide/PS button. A dedicated way into the menu, so a stick nudge
+    #: does not have to be one.
+    HOME = "home"
 
 
 BUTTON_REGISTERS: dict[Button, int] = {
