@@ -1,5 +1,7 @@
+import SettingsSection from "./SettingsSection";
+import GamepadRoundedIcon from "@mui/icons-material/GamepadRounded";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
 import { JoystickDiagnostics, JoystickState, getJoystick, getJoystickDiagnostics, saveJoystickConfig } from "../api";
 import SystemControls from "./SystemControls";
 
@@ -53,19 +55,17 @@ export default function JoystickPanel() {
   if (!state) return null;
 
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={1.5}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography variant="overline" color="text.secondary" sx={{ flex: 1 }}>Mini-joystick</Typography>
-            {state.enabled ? (
+    <SettingsSection
+      title="Mini-joystick"
+      icon={<GamepadRoundedIcon fontSize="small" color="primary" />}
+      action={state.enabled ? (
               <Chip
                 size="small"
                 color={state.connected ? "success" : "warning"}
                 label={state.connected ? "Connected" : state.running ? "Searching" : "Stopped"}
               />
             ) : null}
-          </Stack>
+    >
 
           {error ? <Alert severity="error">{error}</Alert> : null}
           {state.enabled && state.lastError ? <Alert severity="warning">{state.lastError}</Alert> : null}
@@ -146,8 +146,6 @@ export default function JoystickPanel() {
               ) : null}
             </>
           ) : null}
-        </Stack>
-      </CardContent>
-    </Card>
+    </SettingsSection>
   );
 }

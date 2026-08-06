@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, Typography, Stack, TextField, MenuItem, Switch, FormControlLabel, Button, Box, Alert, Snackbar, CircularProgress } from "@mui/material";
+import { Typography, Stack, TextField, MenuItem, Switch, FormControlLabel, Button, Box, Alert, Snackbar, CircularProgress } from "@mui/material";
 import { getConfig, saveConfig } from "../api";
 import BluetoothPanel from "../components/BluetoothPanel";
 import JoystickPanel from "../components/JoystickPanel";
@@ -7,6 +7,9 @@ import GamepadPanel from "../components/GamepadPanel";
 import AudioPanel from "../components/AudioPanel";
 import DisplayPreview from "../components/DisplayPreview";
 import Field from "../components/Field";
+import SettingsSection from "../components/SettingsSection";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
 
 const MATRIX_NUMBERS: { key: string; label: string; help?: string }[] = [
   { key: "rows", label: "Rows" },
@@ -60,9 +63,7 @@ export default function Settings() {
     <Stack spacing={2}>
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Card>
-        <CardContent>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Matrix Hardware</Typography>
+      <SettingsSection title="Matrix Hardware" icon={<TuneRoundedIcon fontSize="small" color="primary" />}>
 
           <Box sx={{ mb: 2.5 }}>
             <DisplayPreview
@@ -108,15 +109,11 @@ export default function Settings() {
             panel at full white pulls close to 4A at 5V, and thin wiring drops enough
             volts to grey the whites out.
           </Typography>
-        </CardContent>
-      </Card>
+      </SettingsSection>
 
-      <Card>
-        <CardContent>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>App Store</Typography>
+      <SettingsSection title="App Store" icon={<StorefrontRoundedIcon fontSize="small" color="primary" />}>
           <TextField fullWidth size="small" label="Store index URL" value={config.store?.indexUrl ?? ""} onChange={(e) => setStore(e.target.value)} />
-        </CardContent>
-      </Card>
+      </SettingsSection>
 
       <AudioPanel />
       <GamepadPanel />

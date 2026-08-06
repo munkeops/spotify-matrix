@@ -1,5 +1,7 @@
+import SettingsSection from "./SettingsSection";
+import { RADIUS } from "../theme";
 import { useEffect, useState, useCallback } from "react";
-import { Card, CardContent, Stack, Typography, Button, Chip, Box, Alert, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { Stack, Typography, Button, Chip, Box, Alert, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import BluetoothRoundedIcon from "@mui/icons-material/BluetoothRounded";
 import { BtDevice, btStatus, btDevices, btScan, btConnect, btDisconnect, btRemove } from "../api";
 
@@ -75,35 +77,35 @@ export default function BluetoothPanel() {
     .filter((d) => showUnnamed || d.named || d.paired || d.connected);
 
   return (
-    <Card>
-      <CardContent>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <BluetoothRoundedIcon color="primary" />
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Bluetooth</Typography>
-          </Stack>
+    <SettingsSection
+      title="Bluetooth"
+      icon={<BluetoothRoundedIcon fontSize="small" color="primary" />}
+      action={
+        <>
           <Button size="small" variant="outlined" onClick={scan} disabled={!available || scanning}>
             {scanning ? "Scanning…" : "Scan"}
           </Button>
-        </Stack>
+        </>
+      }
+    >
 
-        {error ? <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert> : null}
+        {error ? <Alert severity="error">{error}</Alert> : null}
 
         {connectAdvice ? (
-          <Alert severity="warning" sx={{ mb: 1 }} onClose={() => setConnectAdvice("")}>
+          <Alert severity="warning" onClose={() => setConnectAdvice("")}>
             {connectAdvice}
           </Alert>
         ) : null}
 
         {advice ? (
-          <Alert severity={!available || blocked ? "warning" : powered ? "info" : "warning"} sx={{ mb: 1 }}>
+          <Alert severity={!available || blocked ? "warning" : powered ? "info" : "warning"}>
             {advice}
           </Alert>
         ) : null}
 
         {!available ? null : (
           <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary">
               Adapter {adapter || "ready"} · power {powered ? "on" : "off"}
             </Typography>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1, flexWrap: "wrap" }} useFlexGap>
@@ -135,7 +137,7 @@ export default function BluetoothPanel() {
                 </Typography>
               ) : null}
               {sorted.map((device) => (
-                <Box key={device.mac} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, p: 1, border: "1px solid", borderColor: device.connected ? "primary.main" : "divider", borderRadius: 2 }}>
+                <Box key={device.mac} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, p: 1, border: "1px solid", borderColor: device.connected ? "primary.main" : "divider", borderRadius: `${RADIUS}px` }}>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>{device.name || device.mac}</Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -158,7 +160,6 @@ export default function BluetoothPanel() {
             </Stack>
           </>
         )}
-      </CardContent>
-    </Card>
+    </SettingsSection>
   );
 }

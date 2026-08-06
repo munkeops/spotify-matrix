@@ -1,5 +1,7 @@
+import SettingsSection from "./SettingsSection";
+import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Card, CardContent, Chip, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Alert, Box, Chip, FormControlLabel, MenuItem, Stack, Switch, TextField, Typography } from "@mui/material";
 import { GamepadState, getGamepad, saveGamepadConfig } from "../api";
 
 export default function GamepadPanel() {
@@ -38,19 +40,17 @@ export default function GamepadPanel() {
   if (!state) return null;
 
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={1.5}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography variant="overline" color="text.secondary" sx={{ flex: 1 }}>Game controller</Typography>
-            {state.enabled ? (
+    <SettingsSection
+      title="Game controller"
+      icon={<SportsEsportsRoundedIcon fontSize="small" color="primary" />}
+      action={state.enabled ? (
               <Chip
                 size="small"
                 color={state.connected ? "success" : "warning"}
                 label={state.connected ? state.deviceName || "Connected" : state.running ? "Searching" : "Stopped"}
               />
             ) : null}
-          </Stack>
+    >
 
           {error ? <Alert severity="error">{error}</Alert> : null}
           {state.lastError ? <Alert severity="warning">{state.lastError}</Alert> : null}
@@ -111,8 +111,6 @@ export default function GamepadPanel() {
             D-pad or left stick moves, A is the action button, B and X rotate or hold, Start pauses.
             Pair the pad under Bluetooth below first.
           </Typography>
-        </Stack>
-      </CardContent>
-    </Card>
+    </SettingsSection>
   );
 }

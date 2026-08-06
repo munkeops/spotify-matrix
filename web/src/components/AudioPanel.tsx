@@ -1,5 +1,7 @@
+import SettingsSection from "./SettingsSection";
+import VolumeUpRoundedIcon from "@mui/icons-material/VolumeUpRounded";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Box, Button, Card, CardContent, Chip, FormControlLabel, MenuItem, Slider, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, FormControlLabel, MenuItem, Slider, Stack, Switch, TextField, Typography } from "@mui/material";
 import BluetoothAudioRoundedIcon from "@mui/icons-material/BluetoothAudioRounded";
 import HeadphonesRoundedIcon from "@mui/icons-material/HeadphonesRounded";
 import SettingsInputHdmiRoundedIcon from "@mui/icons-material/SettingsInputHdmiRounded";
@@ -16,7 +18,6 @@ const KIND_ICON: Record<string, JSX.Element> = {
   other: <SpeakerRoundedIcon fontSize="small" />,
   default: <SpeakerRoundedIcon fontSize="small" />,
 };
-import VolumeUpRoundedIcon from "@mui/icons-material/VolumeUpRounded";
 import { AudioState, getAudio, saveAudioConfig, testAudio } from "../api";
 
 export default function AudioPanel() {
@@ -72,14 +73,11 @@ export default function AudioPanel() {
   if (!state) return null;
 
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={1.5}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <VolumeUpRoundedIcon fontSize="small" color="primary" />
-            <Typography variant="overline" color="text.secondary" sx={{ flex: 1 }}>Game sound</Typography>
-            {state.enabled ? <Chip size="small" color={state.available ? "success" : "warning"} label={state.available ? "Ready" : "No output"} /> : null}
-          </Stack>
+    <SettingsSection
+      title="Game sound"
+      icon={<VolumeUpRoundedIcon fontSize="small" color="primary" />}
+      action={state.enabled ? <Chip size="small" color={state.available ? "success" : "warning"} label={state.available ? "Ready" : "No output"} /> : null}
+    >
 
           {error ? <Alert severity="error">{error}</Alert> : null}
           {result ? <Alert severity="info" onClose={() => setResult("")}>{result}</Alert> : null}
@@ -155,8 +153,6 @@ export default function AudioPanel() {
             Effects are generated chiptune, bundled with each game. Turning this on restarts whatever is
             playing, because the runtime opens the sound card at launch.
           </Typography>
-        </Stack>
-      </CardContent>
-    </Card>
+    </SettingsSection>
   );
 }

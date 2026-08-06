@@ -1,3 +1,4 @@
+import { RADIUS } from "../theme";
 import { useEffect, useState } from "react";
 import {
   Accordion, AccordionSummary, AccordionDetails, Typography, Stack, TextField, MenuItem,
@@ -43,7 +44,7 @@ export default function DisplayPolicyPanel() {
   };
 
   return (
-    <Accordion disableGutters sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: 2, "&:before": { display: "none" } }}>
+    <Accordion disableGutters sx={{ bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: `${RADIUS}px`, "&:before": { display: "none" } }}>
       <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
         <Typography sx={{ fontWeight: 600 }}>Display Policy</Typography>
       </AccordionSummary>
