@@ -3,13 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Alert, Box, Button, Card, Chip, CircularProgress, Stack, Typography } from "@mui/material";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
-import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
-import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
 import {
   LocalApp,
   StoreApp,
-  applyApp,
-  gameIdFromAppId,
   installApp,
   isGame,
   listLocalApps,
@@ -72,7 +68,12 @@ function mergeCatalogue(local: LocalApp[], store: StoreApp[]): StoreItem[] {
       artwork: app.matrixPreviewUrl,
     });
   }
-  return [...items.values()].sort((a, b) => a.name.localeCompare(b.name));
+  // What you can still get comes first. Something already installed is not
+  // what you came to a store for, so it sinks to the bottom rather than
+  // taking a slot near the top forever.
+  return [...items.values()].sort(
+    (a, b) => Number(a.installed) - Number(b.installed) || a.name.localeCompare(b.name),
+  );
 }
 
 export default function Store() {
@@ -82,6 +83,7 @@ export default function Store() {
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [installed, setInstalled] = useState("");
   const [busy, setBusy] = useState("");
 
   const requested = params.get("tab") as ShelfKey | null;
@@ -124,27 +126,13 @@ export default function Store() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const install = async (id: string) => {
-    setBusy(id);
-    try {
-      await installApp(id);
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy("");
-    }
-  };
-
-  const run = async (item: StoreItem) => {
+  const install = async (item: StoreItem) => {
     setBusy(item.id);
     try {
-      await applyApp(item.id, null);
-      if (item.isGame) {
-        navigate(`/play/${gameIdFromAppId(item.id)}`);
-        return;
-      }
+      await installApp(item.id);
       await refresh();
+      // Installing does not put it on the panel, so say where it went.
+      setInstalled(item.name);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -175,9 +163,18 @@ export default function Store() {
       />
 
       {error ? <Alert severity="error">{error}</Alert> : null}
+      {installed ? (
+        <Alert
+          severity="success"
+          onClose={() => setInstalled("")}
+          action={<Button size="small" onClick={() => navigate("/apps")}>Open Apps</Button>}
+        >
+          {installed} is installed. Open it from Apps.
+        </Alert>
+      ) : null}
       {shelf.length === 0 ? (
         <Alert severity="info">
-          Nothing here yet. {tab === "play" ? "Game apps appear once installed." : "Check the store URL in Settings."}
+          Nothing here yet. Check the store URL in Settings.
         </Alert>
       ) : null}
 
@@ -215,23 +212,18 @@ export default function Store() {
                 <Typography variant="caption" color="text.secondary">{item.author} · v{item.version}</Typography>
                 <Box sx={{ mt: 1 }}>
                   {!item.installed ? (
-                    <Button fullWidth variant="contained" startIcon={<DownloadRoundedIcon />} disabled={busy === item.id} onClick={() => install(item.id)}>
+                    <Button fullWidth variant="contained" startIcon={<DownloadRoundedIcon />} disabled={busy === item.id} onClick={() => install(item)}>
                       {busy === item.id ? "Installing…" : "Install"}
-                    </Button>
-                  ) : item.isGame ? (
-                    <Button fullWidth variant="contained" startIcon={<SportsEsportsRoundedIcon />} disabled={busy === item.id} onClick={() => run(item)}>
-                      {busy === item.id ? "Starting…" : "Play"}
                     </Button>
                   ) : (
                     <Button
                       fullWidth
-                      variant={item.active ? "outlined" : "contained"}
-                      color={item.active ? "success" : "primary"}
-                      startIcon={item.active ? <CheckCircleRoundedIcon /> : <PlayArrowRoundedIcon />}
-                      disabled={busy === item.id}
-                      onClick={() => run(item)}
+                      variant="outlined"
+                      color="success"
+                      startIcon={<CheckCircleRoundedIcon />}
+                      onClick={() => navigate("/apps")}
                     >
-                      {item.active ? "On screen" : busy === item.id ? "Starting…" : "Put on matrix"}
+                      Installed
                     </Button>
                   )}
                 </Box>

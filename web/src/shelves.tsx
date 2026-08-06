@@ -4,7 +4,8 @@ import { Chip, Stack, Tab, Tabs } from "@mui/material";
 // the same place whether you are browsing or managing what you already have.
 export const SHELVES = [
   { key: "apps", label: "Apps", blurb: "Music, time, weather and the assistant face." },
-  { key: "play", label: "Play", blurb: "Games for the panel. Install one, then grab the gamepad." },
+  // The key stays "play" because it is in URLs; the label is what people read.
+  { key: "play", label: "Games", blurb: "Games for the panel. Install one, then open it from Apps." },
   { key: "creative", label: "Creative", blurb: "Make something of your own for the matrix." },
 ] as const;
 
