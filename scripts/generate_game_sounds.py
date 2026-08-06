@@ -106,6 +106,12 @@ SOUNDS: dict[str, dict[str, object]] = {
         "crash": lambda: sequence(noise(0.24, 1.0), sweep(340, 60, 0.36, wave_shape="triangle")),
         "win": lambda: sequence(blip(523, 0.09), blip(659, 0.09), blip(880, 0.09), blip(1046, 0.22)),
     },
+    "core.2048": {
+        "slide": lambda: sweep(300, 420, 0.05, wave_shape="triangle", volume=0.45),
+        "merge": lambda: sequence(blip(520, 0.04), blip(780, 0.07)),
+        "blocked": lambda: blip(150, 0.05, wave_shape="square", volume=0.35),
+        "win": lambda: sequence(blip(523, 0.09), blip(659, 0.09), blip(784, 0.09), blip(1046, 0.24)),
+    },
     "core.centipede": {
         "shoot": lambda: sweep(880, 380, 0.05, wave_shape="square", volume=0.6),
         "hit": lambda: sequence(noise(0.05, 0.7), blip(300, 0.04, wave_shape="triangle")),

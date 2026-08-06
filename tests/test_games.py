@@ -1772,3 +1772,72 @@ def test_centipede_clearing_every_segment_starts_a_wave():
     game._hit_segment(5, 5)
 
     assert game.wave == 2 and game.segments
+
+
+@pytest.mark.parametrize(
+    "line,expected,scored",
+    [
+        ([2, 2, 4, 0], [4, 4, 0, 0], 4),
+        ([2, 2, 2, 2], [4, 4, 0, 0], 8),
+        ([4, 4, 8, 8], [8, 16, 0, 0], 24),
+        ([2, 0, 0, 2], [4, 0, 0, 0], 4),
+        ([2, 4, 2, 4], [2, 4, 2, 4], 0),
+        ([0, 0, 0, 0], [0, 0, 0, 0], 0),
+    ],
+)
+def test_2048_merges_each_tile_once_per_move(line, expected, scored):
+    """2 2 2 2 goes to 4 4, not to 8: a tile that has just merged is done
+    for the move."""
+    game = mg.create_game("2048", {}, seed=1)
+
+    assert game._slide(list(line)) == (expected, scored)
+
+
+def test_2048_a_push_that_changes_nothing_is_not_a_move():
+    game = mg.create_game("2048", {}, seed=1)
+    game.grid = [[2, 4, 8, 16], [4, 8, 16, 32], [8, 16, 32, 64], [16, 32, 64, 128]]
+    before = [row[:] for row in game.grid]
+
+    assert game.push("left") is False
+    assert game.grid == before, "and nothing spawned"
+
+
+def test_2048_a_full_board_with_a_pair_is_not_over():
+    game = mg.create_game("2048", {}, seed=1)
+    game.grid = [[2, 4, 8, 16], [4, 8, 16, 32], [8, 16, 32, 64], [16, 32, 64, 64]]
+
+    assert game.can_move(), "the pair at the end can still merge"
+
+    game.grid[3][3] = 128
+    assert not game.can_move()
+
+
+def test_2048_reaching_the_target_wins():
+    game = mg.create_game("2048", {"target": 64}, seed=1)
+    game.grid = [[32, 32, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]]
+
+    game.command("left")
+
+    assert game.won and game.status() == "won"
+
+
+def test_2048_the_board_fits_the_panel():
+    twenty = _module_of("2048")
+
+    assert twenty.ORIGIN[1] + twenty.SIZE * (twenty.CELL + twenty.GAP) <= PANEL
+    assert twenty.ORIGIN[0] + twenty.SIZE * (twenty.CELL + twenty.GAP) <= PANEL
+
+
+def test_2048_every_reachable_tile_has_a_label_that_fits():
+    """Four digits do not fit a 13 pixel tile."""
+    twenty = _module_of("2048")
+
+    value = 2
+    while value <= 8192:
+        label = twenty.LABELS.get(value) or f"{value // 1024}K"
+        assert len(label) * 4 - 1 <= twenty.CELL, f"{value} renders as {label}"
+        value *= 2
+
+
+def _module_of(game_id):
+    return importlib.import_module(mg.game_class(game_id).__module__)
