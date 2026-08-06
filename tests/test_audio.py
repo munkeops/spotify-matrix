@@ -1042,3 +1042,34 @@ def test_shrinking_the_pipe_never_raises():
     output = AlsaOutput(Mixer())
     output._process = None
     output._shrink_pipe()
+
+
+def test_the_effects_use_the_available_headroom():
+    """Synthesised at their natural levels they peaked around a third of full
+    scale, so every game was quiet and the volume control could not make it
+    up past 100."""
+    import math
+
+    loudest = 0
+    for package in Path("store_apps").iterdir():
+        for wav in (package / "sounds").glob("*.wav"):
+            samples = read_wav(wav)
+            if len(samples):
+                loudest = max(loudest, max(abs(value) for value in samples))
+
+    assert loudest > 26000, f"the set only reaches {loudest} of 32767"
+    assert loudest <= 32767, "and never wraps"
+
+
+def test_the_effects_keep_their_relative_levels():
+    """One gain for the whole set, not per file: a move blip is meant to sit
+    under a game-over fanfare rather than match it."""
+    import math
+
+    quiet = read_wav(Path("store_apps/core.snake/sounds/turn.wav"))
+    loud = read_wav(Path("store_apps/core.snake/sounds/game_over.wav"))
+
+    def rms(samples):
+        return math.sqrt(sum(v * v for v in samples) / len(samples))
+
+    assert rms(loud) > rms(quiet) * 2, "the fanfare still stands out"

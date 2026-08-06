@@ -135,23 +135,43 @@ SOUNDS: dict[str, dict[str, object]] = {
 }
 
 
+#: What the loudest effect in the whole set should peak at, of 32767.
+#:
+#: Synthesised at their natural levels the effects topped out around a third
+#: of full scale, so every game was quiet and the volume control had to make
+#: up the difference - which it cannot do past 100.
+TARGET_PEAK = 29000
+
+
+def amplify(samples: array, gain: float) -> array:
+    """Scale a waveform, clipping rather than wrapping."""
+    return array("h", [max(-32768, min(32767, int(value * gain))) for value in samples])
+
+
 def main() -> int:
     if not PACKAGES.is_dir():
         print(f"no packages at {PACKAGES}")
         return 1
 
-    total = 0
+    # Build everything first, so one gain can be found for the whole set. A
+    # per-file normalisation would flatten the dynamics instead: a move blip
+    # is meant to sit under a game-over fanfare, not match it.
+    built: list[tuple[Path, str, array]] = []
     for package in sorted(PACKAGES.iterdir()):
         if not package.is_dir():
             continue
         effects = dict(COMMON)
         effects.update(SOUNDS.get(package.name, {}))  # type: ignore[arg-type]
-        directory = package / "sounds"
         for name, build in effects.items():
-            write_wav(directory / f"{name}.wav", build())  # type: ignore[operator]
-            total += 1
+            built.append((package / "sounds", name, build()))  # type: ignore[operator]
         print(f"  {package.name:20s} {len(effects)} effects")
-    print(f"{total} sound files written")
+
+    peak = max((max((abs(v) for v in samples), default=0) for _, _, samples in built), default=0)
+    gain = TARGET_PEAK / peak if peak else 1.0
+
+    for directory, name, samples in built:
+        write_wav(directory / f"{name}.wav", amplify(samples, gain))
+    print(f"{len(built)} sound files written, gain {gain:.2f}x to peak {TARGET_PEAK}")
     return 0
 
 
