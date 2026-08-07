@@ -184,7 +184,7 @@ class BluetoothService:
         if blocked:
             return "Bluetooth is blocked by rfkill. Unblock it with 'sudo rfkill unblock bluetooth'."
         if not powered:
-            return "The adapter is off. Turn it on above, or run 'bluetoothctl power on'."
+            return "The adapter is off. Use the switch beside Scan, or run 'bluetoothctl power on'."
         return (
             "Ready. Put the device into pairing mode first - most controllers and speakers only "
             "advertise for a minute or two - then press Scan."

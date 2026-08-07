@@ -2,14 +2,15 @@ import SettingsSection from "./SettingsSection";
 import BluetoothDevice from "./BluetoothDevice";
 import { RADIUS } from "../theme";
 import { useEffect, useState, useCallback } from "react";
-import { Stack, Typography, Button, Chip, Box, Alert, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
 import BluetoothRoundedIcon from "@mui/icons-material/BluetoothRounded";
-import { BtDevice, btStatus, btDevices, btScan, btConnect, btPair, btDisconnect, btRemove } from "../api";
+import { BtDevice, btStatus, btDevices, btScan, btConnect, btPair, btPower, btDisconnect, btRemove } from "../api";
 
 export default function BluetoothPanel() {
   const [available, setAvailable] = useState(true);
   const [adapter, setAdapter] = useState("");
   const [powered, setPowered] = useState(false);
+  const [powering, setPowering] = useState(false);
   const [advice, setAdvice] = useState("");
   const [blocked, setBlocked] = useState(false);
   const [devices, setDevices] = useState<BtDevice[]>([]);
@@ -50,6 +51,22 @@ export default function BluetoothPanel() {
     }
   };
 
+  const togglePower = async (on: boolean) => {
+    setPowering(true);
+    setError("");
+    try {
+      const status = await btPower(on);
+      setPowered(status.powered);
+      // Turning it on takes a moment to settle, and the device list is
+      // meaningless until it has.
+      if (status.powered) await refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPowering(false);
+    }
+  };
+
   const act = async (fn: () => Promise<any>, mac: string) => {
     setBusy(mac);
     setConnectAdvice("");
@@ -87,11 +104,18 @@ export default function BluetoothPanel() {
       title="Bluetooth"
       icon={<BluetoothRoundedIcon fontSize="small" color="primary" />}
       action={
-        <>
-          <Button size="small" variant="outlined" onClick={scan} disabled={!available || scanning}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Switch
+            size="small"
+            checked={powered}
+            disabled={!available || powering}
+            onChange={(e) => togglePower(e.target.checked)}
+            inputProps={{ "aria-label": "Bluetooth power" }}
+          />
+          <Button size="small" variant="outlined" onClick={scan} disabled={!available || !powered || scanning}>
             {scanning ? "Scanning…" : "Scan"}
           </Button>
-        </>
+        </Stack>
       }
     >
 
