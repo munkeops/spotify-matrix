@@ -40,6 +40,8 @@ class TronGame(GameApp):
     summary = "Light cycles. Cut them off before they cut you off."
     layout = "dpad"
     actions = ("up", "down", "left", "right")
+    #: Two cycles, so the second one can be a person instead of the machine.
+    players = (1, 2)
     config_fields = [
         ConfigField.number("speed", label="Speed", default=12, minimum=5, maximum=25, step=1, help_text="Cells per second. Rises each round."),
         ConfigField.select(
@@ -58,6 +60,9 @@ class TronGame(GameApp):
         self.player_wins = getattr(self, "player_wins", 0)
         self.rival_wins = getattr(self, "rival_wins", 0)
         self.round_number = getattr(self, "round_number", 1)
+        # Set the moment a second player steers, and kept between rounds so
+        # the machine does not take the wheel back mid-match.
+        self.rival_human = getattr(self, "rival_human", False)
         self.score = getattr(self, "score", 0)
         self._start_round()
 
@@ -70,6 +75,7 @@ class TronGame(GameApp):
         self.player_dir = (0, 1)
         self.rival_dir = (0, -1)
         self.pending: tuple[int, int] | None = None
+        self.rival_pending: tuple[int, int] | None = None
         self.grid[self.player[1]][self.player[0]] = PLAYER
         self.grid[self.rival[1]][self.rival[0]] = RIVAL
         self.move_timer = 0.0
@@ -99,6 +105,10 @@ class TronGame(GameApp):
         return len(seen)
 
     def _rival_direction(self) -> tuple[int, int]:
+        if self.rival_human:
+            # A person is driving; the computer keeps its hands off.
+            step, self.rival_pending = self.rival_pending, None
+            return step or self.rival_dir
         x, y = self.rival
         options = [step for step in TURNS if self._free((x + step[0], y + step[1]))]
         if not options:
@@ -122,14 +132,20 @@ class TronGame(GameApp):
             return self.rival_dir
         return best
 
-    def handle(self, action: str) -> None:
+    def handle(self, action: str, player: int = 0) -> None:
         step = DIRECTIONS.get(action)
         if step is None:
             return
-        # No reversing into your own trail.
-        if (step[0], step[1]) == (-self.player_dir[0], -self.player_dir[1]):
-            return
-        self.pending = step
+        if player == 1:
+            self.rival_human = True
+            # No reversing into your own trail, for either of them.
+            if (step[0], step[1]) == (-self.rival_dir[0], -self.rival_dir[1]):
+                return
+            self.rival_pending = step
+        else:
+            if (step[0], step[1]) == (-self.player_dir[0], -self.player_dir[1]):
+                return
+            self.pending = step
         self.audio.play("turn", 0.4)
 
     def advance(self, elapsed: float) -> None:

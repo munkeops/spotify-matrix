@@ -24,6 +24,7 @@ from mini_joystick import (
     Transport,
     TransportError,
 )
+from matrix_input.seats import Device, Seats
 from mini_joystick.bindings import (
     DEFAULT_PROFILE,
     DEFAULT_SYSTEM_BINDINGS,
@@ -101,6 +102,11 @@ class JoystickService:
         self._shell_seq = 0
         self._wheel_open = False
         self._device = DEFAULT_PROFILE
+        self._device_id = ""
+        #: Who is playing what. Sized to the game on the panel, and cleared
+        #: when it changes, because seat two of Pong means nothing in Snake.
+        self.seats = Seats()
+        self._seated_game = ""
         self._brightness_nonce = 0
         self._volume_nonce = 0
         self._test_nonce = 0
@@ -134,6 +140,7 @@ class JoystickService:
             "lastAction": self.last_action,
             "lastActionAt": self.last_action_at,
             # Which control was physically used, so a diagram can show it.
+            "seats": self.seats.describe() if self.seats.capacity > 1 else [],
             "lastControl": getattr(self, "last_control", ""),
             "lastControlAt": getattr(self, "last_control_at", 0.0),
             "eventsSeen": self.events_seen,
@@ -282,7 +289,7 @@ class JoystickService:
             if not self._stop.is_set():
                 self._stop.wait(RECONNECT_SECONDS)
 
-    def dispatch_event(self, event, device: str = MODULE) -> None:
+    def dispatch_event(self, event, device: str = MODULE, device_id: str = "") -> None:
         """Route one controller event, from ``device``.
 
         The device decides which binding profile applies, so the module's
@@ -290,6 +297,7 @@ class JoystickService:
         same game.
         """
         self._device = device
+        self._device_id = device_id
         self._dispatch(event)
 
     def _dispatch(self, event) -> None:
@@ -437,8 +445,42 @@ class JoystickService:
         action = game_action(event, set(spec.actions), self._game_bindings(spec.app_id))
         if not action:
             return
-        game_service.queue_command(game_id, action)
+
+        player = self._seat_for(game_id)
+        if player is None:
+            # The game is full. Better to ignore a third controller than to
+            # let it drive somebody else's paddle.
+            return
+        game_service.queue_command(game_id, action, player=player)
         self._record(f"{game_id}:{action}")
+
+    def _seat_for(self, game_id: str) -> int | None:
+        """Which player this device is, claiming a seat on first use.
+
+        Seats are per game and filled by playing: press something on a second
+        controller and it takes seat two. That is how an arcade cabinet works
+        and it needs no setup screen to get going.
+        """
+        if game_id != self._seated_game:
+            self._seated_game = game_id
+            self.seats = Seats(self._capacity(game_id))
+
+        # With one player there is nothing to tell apart, so every device
+        # drives it. Allocating a seat here would let whichever controller
+        # was touched first lock the others out of a single player game.
+        if self.seats.capacity <= 1:
+            return 0
+        return self.seats.seat_for(Device(kind=self._device, id=self._device_id))
+
+    def _capacity(self, game_id: str) -> int:
+        spec = game_service.spec(game_id)
+        if spec is None:
+            return 1
+        try:
+            return int(spec.create({}, 0, None, None).max_players())
+        except Exception:
+            # An app that will not build is not one to guess a seat count for.
+            return 1
 
     def _apps(self) -> list:
         from src.domain.services.app_registry_service import app_registry_service

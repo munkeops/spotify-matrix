@@ -406,16 +406,23 @@ def test_pong_reaching_the_target_wins():
 
 
 def test_pong_second_player_only_moves_in_two_player_mode():
+    """Both players send plain "up"; the seat says whose paddle moves. The
+    second player used to need its own p2Up, an action no controller has a
+    button for and nothing could bind."""
     solo = PongGame({"opponent": "ai"}, seed=3)
     start = solo.right_y
-    solo.handle("p2Up")
-    assert solo.right_y == start
+    solo.handle("up", player=1)
+    assert solo.right_y == start, "with no second player the computer keeps the paddle"
 
     duo = PongGame({"opponent": "human"}, seed=3)
     duo.right_y = 30
-    duo.handle("p2Up")
+    duo.handle("up", player=1)
     assert duo.right_y < 30
     assert duo.extra()["twoPlayer"] is True
+
+    duo.left_y = 30
+    duo.handle("up", player=0)
+    assert duo.left_y < 30, "and player one still has the left"
 
 
 def test_pong_paddles_stay_in_the_court():
@@ -1841,3 +1848,38 @@ def test_2048_every_reachable_tile_has_a_label_that_fits():
 
 def _module_of(game_id):
     return importlib.import_module(mg.game_class(game_id).__module__)
+
+
+def test_no_game_still_uses_the_old_p2_actions():
+    """Encoding the player in the action name meant every two player game
+    inventing controls no pad has a button for and nothing could bind."""
+    for game_id in ALL_GAMES:
+        actions = set(mg.game_class(game_id).all_actions())
+        assert not {action for action in actions if action.startswith("p2")}, game_id
+
+
+def test_a_two_player_game_says_so():
+    assert mg.game_class("pong").player_range() == (1, 2)
+    assert mg.game_class("tron").player_range() == (1, 2)
+    assert mg.game_class("tetris").max_players() == 1
+
+
+def test_tron_hands_the_second_cycle_to_a_person_who_steers_it():
+    game = mg.create_game("tron", {}, seed=1)
+    assert not game.rival_human, "the machine drives until somebody takes over"
+
+    game.command("left", player=1)
+
+    assert game.rival_human
+    before = game.rival
+    for _ in range(3):
+        game.advance(1.0 / game.speed())
+    assert game.rival != before
+
+
+def test_a_single_player_game_ignores_a_seat_it_was_given():
+    """Nothing should break if a seat arrives for a game that has one."""
+    game = mg.create_game("snake", {}, seed=1)
+    game.command("up", player=1)
+    game.step(0.1)
+    assert game.status() == "playing"

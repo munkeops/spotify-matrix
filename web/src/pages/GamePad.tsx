@@ -14,7 +14,7 @@ import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
-import { GameFrame, GameScores, GameSummary, applyApp, getGameScores, getGameState, listGames, sendGameInput } from "../api";
+import { GameFrame, GameScores, GameSummary, PlayerSeat, applyApp, getGameScores, getGameState, getJoystick, listGames, sendGameInput } from "../api";
 import PanelMirror from "../components/PanelMirror";
 
 const POLL_MS = 200;
@@ -39,6 +39,9 @@ export default function GamePad() {
   const navigate = useNavigate();
   const [game, setGame] = useState<GameSummary | null>(null);
   const [frame, setFrame] = useState<GameFrame | null>(null);
+  // Who is playing. Empty for a one player game, where there is nothing to
+  // tell apart and every controller drives it.
+  const [seats, setSeats] = useState<PlayerSeat[]>([]);
   const [live, setLive] = useState(false);
   const [active, setActive] = useState(false);
   const [running, setRunning] = useState(false);
@@ -79,6 +82,28 @@ export default function GamePad() {
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  // Who is seated, so joining shows up without a reload. Only a game that
+  // takes more than one player reports any.
+  useEffect(() => {
+    let alive = true;
+    const read = async () => {
+      try {
+        const joystick = await getJoystick();
+        if (alive) setSeats(joystick.seats ?? []);
+      } catch {
+        // The module may be absent; seats are not essential to playing.
+      }
+    };
+    void read();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void read();
+    }, 1500);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [gameId]);
 
   // Reload the saved best when a round ends, so a new record shows up.
   const status = frame?.status ?? "playing";
@@ -264,6 +289,20 @@ export default function GamePad() {
         <Typography variant="h6" sx={{ flex: 1 }} noWrap>{game.name}</Typography>
         <Chip size="small" color={live ? "success" : "default"} label={live ? "Live" : "Idle"} />
       </Stack>
+
+      {seats.length > 1 ? (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {seats.map((seat) => (
+            <Chip
+              key={seat.seat}
+              size="small"
+              variant={seat.taken ? "filled" : "outlined"}
+              color={seat.taken ? "primary" : "default"}
+              label={seat.taken ? `P${seat.player}: ${seat.device}` : `P${seat.player}: press to join`}
+            />
+          ))}
+        </Stack>
+      ) : null}
 
       {frame?.audio && frame.audio.enabled && (frame.audio.error || frame.audio.sounds === 0) ? (
         <Alert severity="warning">

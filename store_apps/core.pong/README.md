@@ -1,10 +1,10 @@
 # Pong
 
-Rally against the computer or a second phone.
+Rally against the computer, or against whoever grabs the second pad.
 
 A playable Assistant Matrix game plugin. Control layout: `vertical`.
 
-Actions: `up`, `down`, `p2Up`, `p2Down`, `pause`, `resume`, `togglePause`, `restart`
+Actions: `up`, `down`, `pause`, `resume`, `togglePause`, `restart`
 
 Install it from the Store, or package it yourself with:
 

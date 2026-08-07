@@ -1,4 +1,4 @@
-"""Pong for the 64x64 matrix, against the computer or a second phone."""
+"""Pong for the 64x64 matrix, against the computer or a second player."""
 
 from __future__ import annotations
 
@@ -29,15 +29,17 @@ class PongGame(GameApp):
     game_id = "pong"
     name = "Pong"
     id = "core.pong"
-    summary = "Rally against the computer or a second phone."
+    summary = "Rally against the computer, or against whoever grabs the second pad."
     layout = "vertical"
     config_fields = [
-        ConfigField.select("opponent", [("Computer", "ai"), ("Second player", "human")], label="Opponent", help_text="Second player uses the P2 buttons, so two phones can share one panel."),
+        ConfigField.select("opponent", [("Computer", "ai"), ("Second player", "human")], label="Opponent", help_text="With a second player, whoever picks up another controller takes the right paddle."),
         ConfigField.number("target", label="Play to", default=7, minimum=1, maximum=21, step=1),
         ConfigField.number("aiSpeed", label="Computer speed", default=34, minimum=10, maximum=60, step=2),
         ConfigField.number("ballSpeed", label="Ball speed", default=32, minimum=18, maximum=60, step=2),
     ]
-    actions = ("up", "down", "p2Up", "p2Down")
+    actions = ("up", "down")
+    #: One or two. The second player is whoever picks up another controller.
+    players = (1, 2)
 
     def reset(self) -> None:
         self.target = max(1, min(21, int(self.config.get("target", 7))))
@@ -62,16 +64,25 @@ class PongGame(GameApp):
     def speed(self) -> float:
         return self.base_speed * (1.0 + min(0.9, self.rally * 0.06))
 
-    def handle(self, action: str) -> None:
+    def handle(self, action: str, player: int = 0) -> None:
+        """Up and down, for whichever paddle this player has.
+
+        Both sides send plain "up" now. The second player used to need its
+        own p2Up and p2Down, which meant every two player game inventing
+        actions no controller has a button for, and no way to bind them.
+        """
         step = 4.0
+        right = player == 1 and self.opponent == "human"
         if action == "up":
-            self.left_y = max(FIELD_TOP, self.left_y - step)
+            if right:
+                self.right_y = max(FIELD_TOP, self.right_y - step)
+            else:
+                self.left_y = max(FIELD_TOP, self.left_y - step)
         elif action == "down":
-            self.left_y = min(PANEL - PADDLE_HEIGHT, self.left_y + step)
-        elif action == "p2Up" and self.opponent == "human":
-            self.right_y = max(FIELD_TOP, self.right_y - step)
-        elif action == "p2Down" and self.opponent == "human":
-            self.right_y = min(PANEL - PADDLE_HEIGHT, self.right_y + step)
+            if right:
+                self.right_y = min(PANEL - PADDLE_HEIGHT, self.right_y + step)
+            else:
+                self.left_y = min(PANEL - PADDLE_HEIGHT, self.left_y + step)
 
     def advance(self, elapsed: float) -> None:
         if self.opponent != "human":

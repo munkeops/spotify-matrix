@@ -28,6 +28,9 @@ class GamepadService:
         self._lock = threading.Lock()
         self.connected = False
         self.device_name = ""
+        #: Which pad this is. Two controllers are two seats, and the event
+        #: itself carries nothing to tell them apart.
+        self.device_path = ""
         self.last_error = ""
         # Injected by the tests; production opens a real evdev device.
         self.reader_factory = None
@@ -194,6 +197,7 @@ class GamepadService:
                 continue
 
             self.device_name = getattr(reader, "name", "")
+            self.device_path = str(getattr(reader, "path", "") or "")
             self.connected = True
             self.last_error = ""
             logger.info("[gamepad] reading {}", self.device_name)
@@ -222,7 +226,7 @@ class GamepadService:
 
         from mini_joystick.bindings import GAMEPAD
 
-        joystick_service.dispatch_event(event, device=GAMEPAD)
+        joystick_service.dispatch_event(event, device=GAMEPAD, device_id=self.device_path)
 
 
 gamepad_service = GamepadService()

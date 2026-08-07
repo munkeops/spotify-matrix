@@ -455,8 +455,21 @@ class CommandResponse(BaseModel):
     appId: str | None = None
 
 
+class PlayerSeat(BaseModel):
+    """One player slot in the game currently on the panel."""
+
+    seat: int
+    player: int
+    device: str = ""
+    kind: str = ""
+    id: str = ""
+    taken: bool = False
+
+
 class JoystickStateResponse(BaseModel):
     enabled: bool
+    #: Empty unless the running game takes more than one player.
+    seats: list[PlayerSeat] = Field(default_factory=list)
     #: "system" (device control) or "player" (a game controller).
     role: str = "system"
     running: bool

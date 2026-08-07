@@ -1042,3 +1042,83 @@ def test_home_closes_the_menu_again():
 
     assert shell_action(event, False).kind == "openMenu"
     assert shell_action(event, True).kind == "closeMenu"
+
+
+def _seat_game(config_module, game_module, app_id="core.pong"):
+    config = config_module.config_service.get_config()
+    config.display.mode = "app"
+    config.display.appId = app_id
+    config.joystick.role = "player"
+    config_module.config_service.save_config(config)
+
+
+def test_two_controllers_take_two_seats(tmp_path, monkeypatch):
+    """The second pad drives player two, which is the whole point: both send
+    plain "up" and the seat says whose paddle moves."""
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    _seat_game(config_module, game_module)
+    service = joystick_module.joystick_service
+
+    service.dispatch_event(direction_event(Direction.UP), device="gamepad", device_id="/dev/input/event4")
+    service.dispatch_event(direction_event(Direction.UP), device="gamepad", device_id="/dev/input/event5")
+
+    commands, _ = mg.read_commands(game_module.game_service.input_path("pong"), 0)
+    assert [player for _, player in commands] == [0, 1]
+
+
+def test_a_device_keeps_its_seat(tmp_path, monkeypatch):
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    _seat_game(config_module, game_module)
+    service = joystick_module.joystick_service
+
+    for _ in range(3):
+        service.dispatch_event(direction_event(Direction.UP), device="gamepad", device_id="/dev/input/event5")
+        service.dispatch_event(direction_event(Direction.DOWN), device="gamepad", device_id="/dev/input/event4")
+
+    commands, _ = mg.read_commands(game_module.game_service.input_path("pong"), 0)
+    seats = {}
+    for action, player in commands:
+        seats.setdefault(action, set()).add(player)
+    assert all(len(players) == 1 for players in seats.values()), "a device does not wander between seats"
+
+
+def test_a_third_controller_does_not_steal_a_paddle(tmp_path, monkeypatch):
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    _seat_game(config_module, game_module)
+    service = joystick_module.joystick_service
+
+    for path in ("/dev/input/event4", "/dev/input/event5", "/dev/input/event6"):
+        service.dispatch_event(direction_event(Direction.UP), device="gamepad", device_id=path)
+
+    commands, _ = mg.read_commands(game_module.game_service.input_path("pong"), 0)
+    assert [player for _, player in commands] == [0, 1], "the third was ignored, not seated"
+
+
+def test_a_single_player_game_lets_every_controller_play(tmp_path, monkeypatch):
+    """With one player there is nothing to tell apart, so seating the first
+    device would lock the others out."""
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    _seat_game(config_module, game_module, "core.snake")
+    service = joystick_module.joystick_service
+
+    service.dispatch_event(direction_event(Direction.UP), device="module")
+    service.dispatch_event(direction_event(Direction.UP), device="gamepad", device_id="/dev/input/event4")
+
+    commands, _ = mg.read_commands(game_module.game_service.input_path("snake"), 0)
+    assert [player for _, player in commands] == [0, 0]
+
+
+def test_seats_are_forgotten_when_the_game_changes(tmp_path, monkeypatch):
+    """Seat two of Pong means nothing in Tron."""
+    config_module, game_module, joystick_module, _ = reload_joystick_stack(monkeypatch, tmp_path / "data")
+    _seat_game(config_module, game_module)
+    service = joystick_module.joystick_service
+
+    service.dispatch_event(direction_event(Direction.UP), device="gamepad", device_id="/dev/input/event5")
+    assert service.seats.occupied()
+
+    _seat_game(config_module, game_module, "core.tron")
+    service.dispatch_event(direction_event(Direction.UP), device="gamepad", device_id="/dev/input/event4")
+
+    seated = service.seats.occupied()
+    assert list(seated) == [0], "the new game starts from an empty board"

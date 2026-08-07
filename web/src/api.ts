@@ -268,8 +268,19 @@ export const getGameState = (id: string) =>
 export const sendGameInput = (id: string, action: string) =>
   apiPost<{ ok: boolean; seq: number }>(`/api/games/${encodeURIComponent(id)}/input`, { action });
 
+export interface PlayerSeat {
+  seat: number;
+  player: number;
+  device: string;
+  kind: string;
+  id: string;
+  taken: boolean;
+}
+
 export interface JoystickState {
   enabled: boolean;
+  /** Empty unless the running game takes more than one player. */
+  seats: PlayerSeat[];
   /** "system" drives the matrix; "player" drives the game. */
   role: string;
   running: boolean;

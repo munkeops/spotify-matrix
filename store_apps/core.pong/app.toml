@@ -2,7 +2,7 @@
 id = "core.pong"
 name = "Pong"
 version = "1.0.0"
-summary = "Rally against the computer or a second phone."
+summary = "Rally against the computer, or against whoever grabs the second pad."
 author = "Assistant Matrix"
 category = "games"
 runtime = "python"
@@ -11,7 +11,7 @@ matrix_size = "64x64"
 license = "MIT"
 kind = "game"
 layout = "vertical"
-actions = ["up", "down", "p2Up", "p2Down", "pause", "resume", "togglePause", "restart"]
+actions = ["up", "down", "pause", "resume", "togglePause", "restart"]
 
 [preview]
 card_gif = "previews/card.gif"
@@ -26,7 +26,7 @@ required = false
 default = "ai"
 placeholder = ""
 options = [{ label = "Computer", value = "ai" }, { label = "Second player", value = "human" }]
-helpText = "Second player uses the P2 buttons, so two phones can share one panel."
+helpText = "With a second player, whoever picks up another controller takes the right paddle."
 
 [[config]]
 key = "target"
