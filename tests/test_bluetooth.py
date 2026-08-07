@@ -86,3 +86,45 @@ def test_scanning_is_refused_while_the_adapter_is_off():
     panel = Path("web/src/components/BluetoothPanel.tsx").read_text(encoding="utf-8")
 
     assert "!powered || scanning" in panel
+
+
+def test_forgetting_disconnects_first(monkeypatch):
+    """A connected device will not be cleanly forgotten."""
+    from src.domain.services import bluetooth_service as module
+
+    calls: list[list[str]] = []
+    monkeypatch.setattr(module.BluetoothService, "_run",
+                        lambda self, args, timeout=20.0: (calls.append(list(args)), (True, ""))[1])
+    monkeypatch.setattr(module.BluetoothService, "available", lambda self: True)
+
+    states = iter([
+        {"mac": "A", "name": "Pad", "named": True, "paired": True, "connected": True, "trusted": True, "icon": "", "role": "controller"},
+        {"mac": "A", "name": "Pad", "named": True, "paired": False, "connected": False, "trusted": False, "icon": "", "role": "controller"},
+    ])
+    monkeypatch.setattr(module.BluetoothService, "_device_info", lambda self, mac: next(states))
+
+    result = module.bluetooth_service.remove("AA:BB:CC:DD:EE:FF")
+
+    verbs = [call[0] for call in calls]
+    assert verbs.index("disconnect") < verbs.index("remove"), "disconnect comes first"
+    assert result["ok"] is True
+
+
+def test_forgetting_reports_what_bluez_says_not_the_exit_code(monkeypatch):
+    """bluetoothctl exits 0 whether or not it removed anything, so a forget
+    that silently did nothing reported success."""
+    from src.domain.services import bluetooth_service as module
+
+    monkeypatch.setattr(module.BluetoothService, "_run", lambda self, args, timeout=20.0: (True, ""))
+    monkeypatch.setattr(module.BluetoothService, "available", lambda self: True)
+    # Still paired afterwards: the remove did not take.
+    monkeypatch.setattr(
+        module.BluetoothService, "_device_info",
+        lambda self, mac: {"mac": mac, "name": "Pad", "named": True, "paired": True,
+                           "connected": False, "trusted": True, "icon": "", "role": "controller"},
+    )
+
+    result = module.bluetooth_service.remove("AA:BB:CC:DD:EE:FF")
+
+    assert result["ok"] is False, "exit 0 is not proof it worked"
+    assert "bluetoothctl remove" in result["advice"]

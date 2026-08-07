@@ -355,11 +355,46 @@ class BluetoothService:
         return {"ok": ok, "message": output, "device": self._device_info(address)}
 
     def remove(self, mac: str) -> dict[str, Any]:
+        """Forget a device: drop the keys so it is no longer paired.
+
+        Two things this has to do that the one-line version did not. A
+        connected device will not be cleanly forgotten, so it is disconnected
+        first. And bluetoothctl exits 0 whether or not it did anything, so
+        the result comes from asking BlueZ afterwards rather than from the
+        exit code.
+        """
         address = self._safe_mac(mac)
         if not self.available():
             return {"ok": False, "message": "Bluetooth is not available on this device."}
-        ok, output = self._run(["remove", address])
-        return {"ok": ok, "message": output}
+
+        info = self._device_info(address)
+        if info["connected"]:
+            self._run(["disconnect", address])
+        _, output = self._run(["remove", address], timeout=30)
+
+        final = self._device_info(address)
+        forgotten = not final["paired"]
+        return {
+            "ok": forgotten,
+            "message": output,
+            "device": final,
+            "advice": "" if forgotten else self._forget_advice(final, output),
+        }
+
+    def _forget_advice(self, device: dict[str, Any], output: str) -> str:
+        lowered = (output or "").lower()
+        if "not available" in lowered:
+            # BlueZ has no record of it, which is what forgotten looks like.
+            return ""
+        if device.get("connected"):
+            return (
+                "It reconnected before it could be forgotten. Turn the device off, "
+                "then forget it."
+            )
+        return (
+            "BlueZ still has the pairing. Turn the device off and try again, or run "
+            f"'bluetoothctl remove {device.get('mac', '')}' on the Pi."
+        )
 
 
 bluetooth_service = BluetoothService()
