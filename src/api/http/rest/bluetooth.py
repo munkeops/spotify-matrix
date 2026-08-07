@@ -39,6 +39,11 @@ async def bluetooth_scan(body: BluetoothScanRequest) -> BluetoothDevicesResponse
     return BluetoothDevicesResponse(available=bluetooth_service.available(), devices=devices)
 
 
+@router.post("/api/bluetooth/pair", response_model=BluetoothActionResponse)
+async def bluetooth_pair(body: BluetoothActionRequest) -> BluetoothActionResponse:
+    return BluetoothActionResponse(**bluetooth_service.pair(body.mac))
+
+
 @router.post("/api/bluetooth/connect", response_model=BluetoothActionResponse)
 async def bluetooth_connect(body: BluetoothActionRequest) -> BluetoothActionResponse:
     return BluetoothActionResponse(**bluetooth_service.connect(body.mac))

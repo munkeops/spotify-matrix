@@ -1,9 +1,10 @@
 import SettingsSection from "./SettingsSection";
+import BluetoothDevice from "./BluetoothDevice";
 import { RADIUS } from "../theme";
 import { useEffect, useState, useCallback } from "react";
 import { Stack, Typography, Button, Chip, Box, Alert, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import BluetoothRoundedIcon from "@mui/icons-material/BluetoothRounded";
-import { BtDevice, btStatus, btDevices, btScan, btConnect, btDisconnect, btRemove } from "../api";
+import { BtDevice, btStatus, btDevices, btScan, btConnect, btPair, btDisconnect, btRemove } from "../api";
 
 export default function BluetoothPanel() {
   const [available, setAvailable] = useState(true);
@@ -76,6 +77,11 @@ export default function BluetoothPanel() {
     // Anything already set up stays visible whatever the filters say.
     .filter((d) => showUnnamed || d.named || d.paired || d.connected);
 
+  // Paired above, everything else below: a device you have set up is not the
+  // same kind of thing as one a scan happened to see.
+  const paired = sorted.filter((device) => device.paired);
+  const nearby = sorted.filter((device) => !device.paired);
+
   return (
     <SettingsSection
       title="Bluetooth"
@@ -128,34 +134,46 @@ export default function BluetoothPanel() {
               />
             </Stack>
 
+            {paired.length ? (
+              <Stack spacing={1}>
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                  MY DEVICES
+                </Typography>
+                {paired.map((device) => (
+                  <BluetoothDevice
+                    key={device.mac}
+                    device={device}
+                    busy={busy === device.mac}
+                    onPair={() => act(() => btPair(device.mac), device.mac)}
+                    onConnect={() => act(() => btConnect(device.mac), device.mac)}
+                    onDisconnect={() => act(() => btDisconnect(device.mac), device.mac)}
+                    onForget={() => act(() => btRemove(device.mac), device.mac)}
+                  />
+                ))}
+              </Stack>
+            ) : null}
+
             <Stack spacing={1}>
-              {sorted.length === 0 ? (
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                AVAILABLE
+              </Typography>
+              {nearby.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   {devices.length === 0
-                    ? "No devices yet. Put the device in pairing mode first, then tap Scan."
-                    : "Nothing on this filter. Devices report their name a moment after they appear, so scan again or show unnamed."}
+                    ? "Nothing found yet. Hold the device's pairing button until its light flashes quickly, then Scan."
+                    : "Nothing new. A device reports its name a moment after it appears, so scan again or show unnamed."}
                 </Typography>
               ) : null}
-              {sorted.map((device) => (
-                <Box key={device.mac} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, p: 1, border: "1px solid", borderColor: device.connected ? "primary.main" : "divider", borderRadius: `${RADIUS}px` }}>
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>{device.name || device.mac}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {device.role !== "other" ? `${device.role} · ` : ""}{device.mac}
-                      {device.connected ? " · Connected" : device.paired ? " · Paired" : ""}
-                    </Typography>
-                  </Box>
-                  <Stack direction="row" spacing={0.5}>
-                    {device.connected ? (
-                      <Button size="small" variant="outlined" disabled={busy === device.mac} onClick={() => act(() => btDisconnect(device.mac), device.mac)}>Disconnect</Button>
-                    ) : (
-                      <Button size="small" variant="contained" disabled={busy === device.mac} onClick={() => act(() => btConnect(device.mac), device.mac)}>Connect</Button>
-                    )}
-                    {device.paired ? (
-                      <Button size="small" color="error" disabled={busy === device.mac} onClick={() => act(() => btRemove(device.mac), device.mac)}>Forget</Button>
-                    ) : null}
-                  </Stack>
-                </Box>
+              {nearby.map((device) => (
+                <BluetoothDevice
+                  key={device.mac}
+                  device={device}
+                  busy={busy === device.mac}
+                  onPair={() => act(() => btPair(device.mac), device.mac)}
+                  onConnect={() => act(() => btConnect(device.mac), device.mac)}
+                  onDisconnect={() => act(() => btDisconnect(device.mac), device.mac)}
+                  onForget={() => act(() => btRemove(device.mac), device.mac)}
+                />
               ))}
             </Stack>
           </>

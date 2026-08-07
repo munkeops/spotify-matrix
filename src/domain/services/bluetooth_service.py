@@ -248,26 +248,80 @@ class BluetoothService:
         self._run(["--timeout", str(seconds), "scan", "on"], timeout=seconds + 10)
         return self.list_devices()
 
-    def connect(self, mac: str) -> dict[str, Any]:
+    def pair(self, mac: str) -> dict[str, Any]:
+        """Pair and trust, without connecting.
+
+        Pairing is the lasting part - it exchanges keys and the device is
+        remembered - and connecting is the part you do and undo. Doing both
+        under one button meant a failure could not say which half went wrong,
+        and there was no way to keep a device without it connecting.
+
+        Trusting is folded in here because an untrusted device has to be
+        authorised by hand every time it reconnects, which on a headless
+        matrix means it silently never comes back.
+        """
         address = self._safe_mac(mac)
         if not self.available():
             return {"ok": False, "message": "Bluetooth is not available on this device."}
         self._run(["power", "on"])
+
         info = self._device_info(address)
-        messages: list[str] = []
-        if not info["paired"]:
-            ok, output = self._run(["pair", address], timeout=30)
-            messages.append(f"pair: {output}")
+        if info["paired"]:
+            self._run(["trust", address])
+            return {"ok": True, "message": "Already paired.", "device": self._device_info(address), "advice": ""}
+
+        _, output = self._run(["pair", address], timeout=30)
         self._run(["trust", address])
-        ok, output = self._run(["connect", address], timeout=30)
-        messages.append(f"connect: {output}")
+        final = self._device_info(address)
+        return {
+            "ok": final["paired"],
+            "message": output,
+            "device": final,
+            "advice": "" if final["paired"] else self._pair_advice(final, output),
+        }
+
+    def connect(self, mac: str) -> dict[str, Any]:
+        """Connect something already paired."""
+        address = self._safe_mac(mac)
+        if not self.available():
+            return {"ok": False, "message": "Bluetooth is not available on this device."}
+        self._run(["power", "on"])
+
+        info = self._device_info(address)
+        if not info["paired"]:
+            return {
+                "ok": False,
+                "message": "Not paired.",
+                "device": info,
+                "advice": "Pair with it first - that is the step that exchanges keys and gets it remembered.",
+            }
+
+        _, output = self._run(["connect", address], timeout=30)
         final = self._device_info(address)
         return {
             "ok": final["connected"],
-            "message": " | ".join(m for m in messages if m),
+            "message": output,
             "device": final,
-            "advice": "" if final["connected"] else self._connect_advice(final, " ".join(messages)),
+            "advice": "" if final["connected"] else self._connect_advice(final, output),
         }
+
+    def _pair_advice(self, device: dict[str, Any], output: str) -> str:
+        """Why a pairing failed, in terms of what to do about it."""
+        lowered = (output or "").lower()
+        if "already exists" in lowered:
+            return "It is already paired. Try connecting instead."
+        if "authentication" in lowered or "rejected" in lowered:
+            return (
+                "The device refused the pairing. Most controllers and speakers only "
+                "accept one for a few minutes after you hold their pairing button, so "
+                "put it back into pairing mode and try again."
+            )
+        if "not available" in lowered or "not found" in lowered:
+            return "It went out of range before pairing finished. Scan again with it close by."
+        return (
+            "Pairing did not complete. Hold the device's pairing button until its light "
+            "flashes quickly, then try again."
+        )
 
     def _connect_advice(self, device: dict[str, Any], output: str) -> str:
         """Why a connect failed, in terms of what to do about it."""

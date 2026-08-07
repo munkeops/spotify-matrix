@@ -177,6 +177,8 @@ export const btStatus = () =>
   apiGet<{ available: boolean; powered: boolean; adapter: string; blocked: boolean; powerState: string; ertmDisabled: boolean | null; advice: string }>("/api/bluetooth/status");
 export const btDevices = () => apiGet<{ available: boolean; devices: BtDevice[] }>("/api/bluetooth/devices");
 export const btScan = (seconds = 8) => apiPost<{ available: boolean; devices: BtDevice[] }>("/api/bluetooth/scan", { seconds });
+export const btPair = (mac: string) =>
+  apiPost<{ ok: boolean; message: string; advice?: string; device?: BtDevice }>("/api/bluetooth/pair", { mac });
 export const btConnect = (mac: string) =>
   apiPost<{ ok: boolean; message: string; advice: string }>("/api/bluetooth/connect", { mac });
 export const btDisconnect = (mac: string) => apiPost("/api/bluetooth/disconnect", { mac });
