@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import time
 from typing import Any
 
 from loguru import logger
@@ -77,7 +78,30 @@ def classify(icon: str, name: str) -> str:
     return "other"
 
 
+#: How long "off-enabling" is a controller coming up, after which it is a
+#: controller that is not coming up. BlueZ leaves the state there when the
+#: kernel refuses the power-on, so without a clock the panel would sit on
+#: "give it a second" for as long as anyone cared to look.
+STUCK_ENABLING_SECONDS = 6.0
+
+#: What to do when the controller itself will not come up. Nothing in this
+#: app can fix it, so the advice is the three checks that identify which
+#: half of the radio is at fault.
+HARDWARE_HELP = (
+    "The controller will not power on, which is the Bluetooth hardware or its firmware "
+    "rather than anything here. On the Pi: 'dmesg | grep -i bluetooth' (a firmware or "
+    "'command tx timeout' line names the fault), 'systemctl status bluetooth hciuart', "
+    "and 'rfkill list bluetooth'. A wedged controller keeps its state across a warm "
+    "reboot - shut down and pull the power for ten seconds to clear it."
+)
+
+
 class BluetoothService:
+    def __init__(self) -> None:
+        #: When the adapter was first seen mid-power-on, to tell coming up
+        #: from stuck.
+        self._enabling_since: float | None = None
+
     def _binary(self) -> str | None:
         return shutil.which("bluetoothctl")
 
@@ -154,6 +178,11 @@ class BluetoothService:
             }
         ok, output = self._run(["show"])
         powered = "Powered: yes" in output
+        # bluetoothctl only prints a Powered line when it actually reached the
+        # adapter. Without one we do not know the state, and reporting "off"
+        # blames the adapter for a query that never landed - a timeout, a dead
+        # bluetoothd or a D-Bus refusal all used to read as "the adapter is off".
+        answered = "Powered:" in output
         name_match = re.search(r"Name:\s*(.+)", output)
         state_match = re.search(r"PowerState:\s*(\S+)", output)
         power_state = state_match.group(1).strip() if state_match else ("on" if powered else "off")
@@ -164,16 +193,69 @@ class BluetoothService:
             "powered": powered,
             "adapter": name_match.group(1).strip() if name_match else "",
             "blocked": blocked,
-            "powerState": power_state,
+            "powerState": power_state if answered else "unknown",
             "ertmDisabled": ertm_disabled(),
-            "advice": self._advice(no_adapter, blocked, powered, power_state),
+            "advice": self._advice(
+                no_adapter, blocked, powered, power_state, answered, output, self._stuck_enabling(power_state)
+            ),
         }
 
-    def _advice(self, no_adapter: bool, blocked: bool, powered: bool, power_state: str = "") -> str:
+    def _stuck_enabling(self, power_state: str) -> bool:
+        """Whether the adapter has been mid-power-on longer than that takes.
+
+        BlueZ reports 'off-enabling' both while the controller is coming up
+        and after the kernel has refused to bring it up, so the difference is
+        only visible over time.
+        """
+        if not power_state.endswith("-enabling"):
+            self._enabling_since = None
+            return False
+        if self._enabling_since is None:
+            self._enabling_since = time.monotonic()
+        return time.monotonic() - self._enabling_since > STUCK_ENABLING_SECONDS
+
+    def ensure_powered(self) -> tuple[bool, str]:
+        """Turn the adapter on at startup if it is off.
+
+        BlueZ only powers an adapter at boot when AutoEnable is set, and a
+        soft rfkill block survives a reboot, so the Pi can come up with
+        perfectly good Bluetooth hardware that answers every scan with
+        nothing. This runs once when the service starts; the switch in the
+        panel still turns it off for as long as you want it off.
+        """
+        state = self.status()
+        if not state["available"] or state["powered"]:
+            return bool(state["powered"]), ""
+        if state["blocked"] or state["powerState"] == "unknown":
+            # Powering on cannot win against rfkill or a bluetoothd that is
+            # not answering, and the advice already says which it is.
+            return False, state["advice"]
+
+        self.set_power(True)
+        after = self.status()
+        return bool(after["powered"]), "" if after["powered"] else after["advice"]
+
+    @staticmethod
+    def _summary(output: str) -> str:
+        """The one line of bluetoothctl output worth putting in front of someone."""
+        lines = [line.strip() for line in (output or "").splitlines() if line.strip()]
+        return lines[-1][:160] if lines else "no output"
+
+    def _advice(
+        self,
+        no_adapter: bool,
+        blocked: bool,
+        powered: bool,
+        power_state: str = "",
+        answered: bool = True,
+        output: str = "",
+        stuck: bool = False,
+    ) -> str:
         # "off-enabling" is the adapter coming up, typically right after an
-        # rfkill unblock. Saying "it is off" there would send you round again.
+        # rfkill unblock. Saying "it is off" there would send you round again -
+        # unless it has been coming up for longer than coming up takes.
         if power_state.endswith("-enabling"):
-            return "The adapter is powering on. Give it a second and this will clear."
+            return HARDWARE_HELP if stuck else "The adapter is powering on. Give it a second and this will clear."
         if power_state.endswith("-disabling"):
             return "The adapter is powering off."
         if no_adapter:
@@ -181,10 +263,19 @@ class BluetoothService:
                 "No Bluetooth adapter is visible. Check the bluetooth service is running "
                 "('sudo systemctl status bluetooth'), and that the container can reach the host D-Bus socket."
             )
+        if not answered:
+            return (
+                f"bluetoothctl did not report the adapter's state, so it is unknown: {self._summary(output)}. "
+                "Check 'systemctl status bluetooth' on the Pi, and that the container can reach the host D-Bus socket."
+            )
         if blocked:
             return "Bluetooth is blocked by rfkill. Unblock it with 'sudo rfkill unblock bluetooth'."
         if not powered:
-            return "The adapter is off. Use the switch beside Scan, or run 'bluetoothctl power on'."
+            return (
+                "The adapter is off. Use the switch beside Scan, or run 'bluetoothctl power on'. "
+                "It is switched on at startup too, so if it is off after every reboot BlueZ is not "
+                "auto-enabling it: set AutoEnable=true under [Policy] in /etc/bluetooth/main.conf."
+            )
         return (
             "Ready. Put the device into pairing mode first - most controllers and speakers only "
             "advertise for a minute or two - then press Scan."
@@ -192,6 +283,24 @@ class BluetoothService:
 
     def set_power(self, on: bool) -> tuple[bool, str]:
         return self._run(["power", "on" if on else "off"])
+
+    def power(self, on: bool) -> dict[str, Any]:
+        """Switch the adapter, and say what happened if it would not switch.
+
+        BlueZ answers a refused power-on with org.bluez.Error.Failed and then
+        leaves the state at 'off-enabling'. Reading the state back on its own
+        would call that "powering on, give it a second" forever, so the reason
+        comes from the attempt rather than from the state afterwards.
+        """
+        _, output = self.set_power(on)
+        state = self.status()
+        if on and not state["powered"] and "org.bluez.Error" in output:
+            state["advice"] = (
+                "Bluetooth is blocked by rfkill. Unblock it with 'sudo rfkill unblock bluetooth'."
+                if "Blocked" in output or state["blocked"]
+                else f"{self._summary(output)}. {HARDWARE_HELP}"
+            )
+        return state
 
     def _device_info(self, mac: str) -> dict[str, Any]:
         ok, output = self._run(["info", mac])

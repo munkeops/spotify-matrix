@@ -94,6 +94,18 @@ def create_app() -> FastAPI:
             logger.exception("[spotify-matrix] joystick startup failed, continuing without it")
 
         try:
+            # BlueZ does not necessarily power the adapter at boot, and a soft
+            # rfkill block survives a reboot, so the matrix could come up with
+            # working hardware that finds nothing.
+            from src.domain.services.bluetooth_service import bluetooth_service
+
+            powered, why = bluetooth_service.ensure_powered()
+            if not powered and why:
+                logger.info("[spotify-matrix] bluetooth adapter not on: {}", why)
+        except Exception:
+            logger.exception("[spotify-matrix] bluetooth startup failed, continuing without it")
+
+        try:
             # Without this a paired speaker is connected but silent, because
             # ALSA has no way to reach it.
             from matrix_audio import bluealsa

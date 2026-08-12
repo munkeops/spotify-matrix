@@ -110,6 +110,99 @@ def test_forgetting_disconnects_first(monkeypatch):
     assert result["ok"] is True
 
 
+def test_an_unanswered_query_is_not_reported_as_the_adapter_being_off(monkeypatch):
+    """A timeout, a dead bluetoothd and a D-Bus refusal all used to read as
+    "The adapter is off", sending you to a switch that could not help."""
+    from src.domain.services import bluetooth_service as module
+
+    service = module.BluetoothService()
+    monkeypatch.setattr(module.BluetoothService, "available", lambda self: True)
+    monkeypatch.setattr(module.BluetoothService, "blocked", lambda self: False)
+    monkeypatch.setattr(
+        module.BluetoothService, "_run",
+        lambda self, args, timeout=20.0: (False, "bluetoothctl show timed out."),
+    )
+
+    state = service.status()
+
+    assert state["powerState"] == "unknown", "we did not learn the state"
+    assert "adapter is off" not in state["advice"].lower()
+    assert "timed out" in state["advice"]
+
+
+def test_an_adapter_stuck_enabling_stops_saying_give_it_a_second(monkeypatch):
+    """BlueZ leaves PowerState at off-enabling when the kernel refuses the
+    power-on, so the reassuring message would never clear."""
+    from src.domain.services import bluetooth_service as module
+
+    service = module.BluetoothService()
+    monkeypatch.setattr(module.BluetoothService, "available", lambda self: True)
+    monkeypatch.setattr(module.BluetoothService, "blocked", lambda self: False)
+    monkeypatch.setattr(
+        module.BluetoothService, "_run",
+        lambda self, args, timeout=20.0: (True, "Powered: no\n\tPowerState: off-enabling"),
+    )
+
+    clock = iter([100.0, 100.0, 200.0, 200.0])
+    monkeypatch.setattr(module.time, "monotonic", lambda: next(clock))
+
+    assert "second" in service.status()["advice"], "just now, it really is coming up"
+    assert "dmesg" in service.status()["advice"], "a minute later, it is not"
+
+
+def test_a_refused_power_on_says_why_rather_than_reading_the_state_back(monkeypatch):
+    """'Failed to set power on: org.bluez.Error.Failed' is the whole answer,
+    and it is gone by the time you ask the adapter how it is."""
+    from src.domain.services import bluetooth_service as module
+
+    service = module.BluetoothService()
+    monkeypatch.setattr(module.BluetoothService, "available", lambda self: True)
+    monkeypatch.setattr(module.BluetoothService, "blocked", lambda self: False)
+    monkeypatch.setattr(
+        module.BluetoothService, "set_power",
+        lambda self, on: (False, "Failed to set power on: org.bluez.Error.Failed"),
+    )
+    monkeypatch.setattr(
+        module.BluetoothService, "status",
+        lambda self: {"available": True, "powered": False, "blocked": False,
+                      "powerState": "off-enabling", "adapter": "matrix", "advice": "coming up"},
+    )
+
+    state = service.power(True)
+
+    assert "org.bluez.Error.Failed" in state["advice"]
+    assert "dmesg" in state["advice"], "and what to look at next"
+
+
+def test_the_adapter_is_switched_on_at_startup():
+    """BlueZ need not power it at boot and an rfkill block survives one, so
+    the matrix could come up with working hardware that finds nothing."""
+    from pathlib import Path
+
+    server = Path("src/server.py").read_text(encoding="utf-8")
+
+    assert "ensure_powered()" in server
+
+
+def test_startup_does_not_fight_rfkill_or_a_silent_daemon(monkeypatch):
+    """Powering on cannot win against either, and retrying just delays boot."""
+    from src.domain.services import bluetooth_service as module
+
+    service = module.BluetoothService()
+    attempts: list[bool] = []
+    monkeypatch.setattr(module.BluetoothService, "set_power", lambda self, on: attempts.append(on))
+    monkeypatch.setattr(
+        module.BluetoothService, "status",
+        lambda self: {"available": True, "powered": False, "blocked": True,
+                      "powerState": "off", "advice": "rfkill"},
+    )
+
+    powered, why = service.ensure_powered()
+
+    assert powered is False and why == "rfkill"
+    assert attempts == [], "it did not try anyway"
+
+
 def test_forgetting_reports_what_bluez_says_not_the_exit_code(monkeypatch):
     """bluetoothctl exits 0 whether or not it removed anything, so a forget
     that silently did nothing reported success."""

@@ -24,8 +24,7 @@ async def bluetooth_status() -> BluetoothStatusResponse:
 
 @router.post("/api/bluetooth/power", response_model=BluetoothStatusResponse)
 async def bluetooth_power(body: BluetoothPowerRequest) -> BluetoothStatusResponse:
-    bluetooth_service.set_power(body.on)
-    return BluetoothStatusResponse(**bluetooth_service.status())
+    return BluetoothStatusResponse(**bluetooth_service.power(body.on))
 
 
 @router.get("/api/bluetooth/devices", response_model=BluetoothDevicesResponse)
