@@ -130,3 +130,18 @@ def test_the_settings_page_offers_the_drivers_the_server_defines():
         # The library's mapping names appearing here would mean a second
         # copy of the definitions, free to drift from the server's.
         assert driver.hardware_mapping not in component
+
+
+def test_an_optional_service_cannot_block_the_default_stack():
+    """Compose interpolates the whole file before it filters profiles, so a
+    required variable on a profiled service fails every build and every up
+    for people who never asked for that service."""
+    from pathlib import Path
+
+    lines = Path("docker-compose.yml").read_text(encoding="utf-8").splitlines()
+    # Comments are free to mention the syntax; compose only reads the rest.
+    settings = [line for line in lines if not line.lstrip().startswith("#")]
+
+    offenders = [line.strip() for line in settings if ":?" in line]
+
+    assert not offenders, f"a required variable breaks compose for everyone: {offenders}"

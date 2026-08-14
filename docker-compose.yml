@@ -69,7 +69,11 @@ services:
     restart: unless-stopped
     profiles:
       - tunnel
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN:?Set CLOUDFLARED_TOKEN in .env}
+    # Not ${CLOUDFLARED_TOKEN:?...}: compose interpolates the whole file
+    # before it filters profiles, so demanding the variable here failed
+    # every build and every up for anyone who never wanted a tunnel. Empty
+    # is fine - cloudflared says what is missing, and only when it runs.
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN:-}
     depends_on:
       - spotify-matrix
 
