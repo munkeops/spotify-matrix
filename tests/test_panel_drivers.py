@@ -152,3 +152,14 @@ def test_an_optional_service_cannot_block_the_default_stack():
     offenders = [line.strip() for line in settings if ":?" in line]
 
     assert not offenders, f"a required variable breaks compose for everyone: {offenders}"
+
+
+def test_the_app_list_does_not_render_a_frame_per_card():
+    """Previewing every app on the page meant a config fetch and a full
+    frame rendered on the Pi for each one, on every refresh - competing for
+    the CPU that clocks the panel, which is visible as a shaking picture."""
+    from pathlib import Path
+
+    for page in ("web/src/pages/Apps.tsx", "web/src/components/AppConfigDrawer.tsx"):
+        source = Path(page).read_text(encoding="utf-8")
+        assert "previewApp(" not in source, f"{page} renders frames on the Pi to draw itself"

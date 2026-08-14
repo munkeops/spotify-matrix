@@ -4,7 +4,7 @@ import { Button, Card, CardActionArea, Typography, Box, CircularProgress, Alert,
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import SportsEsportsRoundedIcon from "@mui/icons-material/SportsEsportsRounded";
-import { canPreview, gameIdOf, isGame, LocalApp, listLocalApps, applyApp, getAppConfig, previewApp, uninstallApp } from "../api";
+import { gameIdOf, isGame, LocalApp, listLocalApps, applyApp, uninstallApp } from "../api";
 import AppConfigDrawer from "../components/AppConfigDrawer";
 import DisplayPolicyPanel from "../components/DisplayPolicyPanel";
 import { SHELVES, ShelfKey, ShelfTabs, colorFor, groupByShelf } from "../shelves";
@@ -22,7 +22,6 @@ export default function Apps() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [apps, setApps] = useState<LocalApp[]>([]);
-  const [previews, setPreviews] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<LocalApp | null>(null);
@@ -37,34 +36,22 @@ export default function Apps() {
   const tab: ShelfKey = SHELVES.some((shelf) => shelf.key === requested) ? (requested as ShelfKey) : "apps";
   const setTab = (next: ShelfKey) => setParams(next === "apps" ? {} : { tab: next }, { replace: true });
 
-  const loadPreviews = useCallback(async (list: LocalApp[]) => {
-    await Promise.all(
-      list
-        .filter((w) => canPreview(w))
-        .map(async (w) => {
-          try {
-            const cfg = await getAppConfig(w.manifest.id);
-            const p = await previewApp(w.manifest.id, cfg.config);
-            setPreviews((prev) => ({ ...prev, [w.manifest.id]: p.dataUrl }));
-          } catch {
-            /* ignore */
-          }
-        }),
-    );
-  }, []);
-
+  // No live previews here. Each one cost a config fetch and a full frame
+  // rendered on the Pi, for every app on the page, every time the list
+  // refreshed - and that render competes for the same CPU that clocks the
+  // panel, which showed up as a shaking picture. The cards carry their
+  // category tile instead; the matrix itself shows the real thing.
   const refresh = useCallback(async () => {
     try {
       const r = await listLocalApps();
       setApps(r.apps || []);
       setError("");
-      loadPreviews(r.apps || []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setLoading(false);
     }
-  }, [loadPreviews]);
+  }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -146,11 +133,7 @@ export default function Apps() {
             <Card key={id} sx={{ position: "relative", borderColor: app.active ? "primary.main" : "divider" }}>
               <CardActionArea onClick={() => openSettings(app)}>
                 <Box sx={{ aspectRatio: "1", bgcolor: "#050607" }}>
-                  {previews[id] ? (
-                    <img src={previews[id]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", imageRendering: "pixelated", display: "block" }} />
-                  ) : (
-                    <Placeholder app={app} />
-                  )}
+                  <Placeholder app={app} />
                 </Box>
                 <Box sx={{ p: 1 }}>
                   <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>{app.manifest.name}</Typography>
