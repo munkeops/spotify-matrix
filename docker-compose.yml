@@ -1,8 +1,23 @@
 services:
   spotify-matrix:
     build: .
+    image: spotify-matrix:local
     container_name: spotify-matrix
     privileged: true
+    # Run as root, explicitly. bluealsa's D-Bus policy only lets root or the
+    # audio group talk to org.bluealsa, and the host bus judges by the uid it
+    # sees. Anything else is refused with "Rejected send message", which
+    # surfaces as "audio open error: No such device" and a silent game.
+    # Opt out of user namespace remapping. With it on, root in here is an
+    # unprivileged uid on the Pi, and the system bus judges by the uid it
+    # sees - so `id` says root while bluealsa is told uid 1 and refuses.
+    userns_mode: "host"
+    user: "0:0"
+    # bluealsa's D-Bus policy allows root *or* the audio group. Being in the
+    # group as well means this still works if something else decides what uid
+    # we run as - which is what "Rejected send message ... uid=1" means.
+    group_add:
+      - audio
     network_mode: host
     restart: unless-stopped
     environment:
@@ -11,8 +26,41 @@ services:
       SPOTIFY_MATRIX_DATA_DIR: /app/data
       SPOTIFY_MATRIX_CONFIG: /app/data/config.json
       SPOTIFY_TOKEN_CACHE: /app/data/spotify_token.json
+      # Install apps from the on-Pi store container.
+      ASSISTANT_MATRIX_APP_STORE_INDEX: http://localhost:8080/store-index.json
+      # Start as a pure app host: no apps until installed from the store.
+      ASSISTANT_MATRIX_BUILTIN_MODE: store
+    # privileged already shares the host /dev, so the I2C bus for the
+    # mini-joystick is visible without mapping it. Do NOT add an explicit
+    # `devices:` entry: compose refuses to start when the node does not exist,
+    # which breaks the app for anyone not using I2C. If you drop privileged,
+    # add `devices: [/dev/i2c-1:/dev/i2c-1]` and `group_add: [i2c]` instead.
     volumes:
       - ./data:/app/data
+      # Bluetooth: reach the host BlueZ daemon over the system D-Bus socket.
+      - /var/run/dbus:/var/run/dbus
+      # Game controllers. privileged usually shares the host /dev already, but
+      # binding the directory guarantees a pad paired *after* the container
+      # started still shows up. Safe to keep: the directory always exists, so
+      # unlike a `devices:` entry this cannot stop the container booting.
+      - /dev/input:/dev/input
+      # Sound card for game effects. Same reasoning as /dev/input.
+      - /dev/snd:/dev/snd
+
+  store:
+    image: spotify-matrix:local
+    container_name: spotify-matrix-store
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - spotify-matrix
+    environment:
+      STORE_DATA_DIR: /store-data
+      STORE_PUBLIC_URL: http://localhost:8080
+      STORE_PORT: "8080"
+    command: ["poetry", "run", "python", "-m", "store_server.app"]
+    volumes:
+      - ./store-data:/store-data
 
   cloudflared:
     image: cloudflare/cloudflared:latest

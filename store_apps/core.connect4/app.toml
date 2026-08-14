@@ -1,0 +1,29 @@
+[app]
+id = "core.connect4"
+name = "Connect Four"
+version = "1.0.0"
+summary = "Line up four discs before your rival does."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:ConnectFourGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "horizontal"
+actions = ["left", "right", "drop", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "opponent"
+label = "Opponent"
+type = "select"
+required = false
+default = "human"
+placeholder = ""
+options = [{ label = "Second player", value = "human" }, { label = "Computer", value = "ai" }]
+helpText = ""

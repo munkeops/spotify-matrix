@@ -6,3 +6,7 @@ logs/
 __pycache__/
 *.pyc
 .venv/
+web/node_modules/
+web/dist/
+web-dist/
+store-data/

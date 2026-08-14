@@ -10,6 +10,7 @@ from pathlib import Path
 from configs import base_config
 from src.domain.models.api_schemas import RuntimeExit, RuntimeState
 from src.domain.services.config_service import config_service
+from src.domain.services.game_service import game_service
 
 
 class RuntimeService:
@@ -65,11 +66,43 @@ class RuntimeService:
             self.last_exit = RuntimeExit(code=self.process.returncode, signal=None, at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
         return self.state()
 
+    def apply(self) -> RuntimeState:
+        was_running = self.process is not None and self.process.poll() is None
+        if was_running:
+            self.stop()
+        return self.start()
+
     def _args(self) -> list[str]:
         config = config_service.get_config()
         matrix = config.matrix
+        http_config = base_config["http"]
+        event_api_url = os.environ.get("ASSISTANT_MATRIX_EVENT_API_URL", f"http://127.0.0.1:{http_config['port']}/api/display/events")
         args = [
             str(self.runtime_script),
+            "--display-mode",
+            "testPattern" if config.runtime.testPattern else config.display.mode,
+            "--clock-face",
+            config.clock.face,
+            "--agent-face-style",
+            config.agent.faceStyle,
+            "--agent-animation-speed",
+            config.agent.animationSpeed,
+            "--weather-label",
+            config.weather.label,
+            "--weather-postal-code",
+            config.weather.postalCode,
+            "--weather-country-code",
+            config.weather.countryCode,
+            "--weather-temperature-unit",
+            config.weather.temperatureUnit,
+            "--weather-face-accessory",
+            config.weather.faceAccessory,
+            "--weather-refresh-minutes",
+            str(config.weather.refreshMinutes),
+            "--weather-metrics-seconds",
+            str(config.weather.metricsSeconds),
+            "--weather-scene-seconds",
+            str(config.weather.sceneSeconds),
             "--config-path",
             str(config_service.config_path),
             "--token-cache",
@@ -98,14 +131,91 @@ class RuntimeService:
             str(matrix.fps),
             "--rpm",
             str(matrix.rpm),
+            "--event-api-url",
+            event_api_url,
+            "--rotation",
+            str(matrix.rotation),
             "--no-browser",
         ]
         if matrix.noHardwarePulse:
             args.append("--no-hardware-pulse")
         if config.runtime.mockOutput:
             args.extend(["--mock-output", config.runtime.mockOutput])
+        # The controller shell draws over whatever app is running.
+        args.extend(["--shell-state", str(game_service.state_dir / "shell.json")])
+        if config.clock.use24Hour:
+            args.append("--clock-24-hour")
+        if config.clock.showSeconds:
+            args.append("--clock-show-seconds")
+        if config.clock.timezone:
+            args.extend(["--clock-timezone", config.clock.timezone])
+        if config.weather.latitude is not None:
+            args.extend(["--weather-latitude", str(config.weather.latitude)])
+        if config.weather.longitude is not None:
+            args.extend(["--weather-longitude", str(config.weather.longitude)])
+        args.extend(
+            [
+                "--text-value",
+                config.text.text,
+                "--text-color",
+                config.text.color,
+                "--text-background",
+                config.text.background,
+                "--text-scroll-speed",
+                config.text.scrollSpeed,
+                "--text-font-size",
+                config.text.fontSize,
+                "--text-align",
+                config.text.align,
+                "--text-font-family",
+                config.text.fontFamily,
+            ]
+        )
+        if config.text.scroll:
+            args.append("--text-scroll")
+        if config.text.bold:
+            args.append("--text-bold")
+        if config.text.italic:
+            args.append("--text-italic")
+        if config.text.wrap:
+            args.append("--text-wrap")
+        if config.text.fit:
+            args.append("--text-fit")
+        if config.audio.enabled:
+            args.extend(["--audio", "--audio-volume", str(config.audio.volume)])
+            args.extend(["--audio-buffer-ms", str(config.audio.bufferMs)])
+            if config.audio.device:
+                args.extend(["--audio-device", config.audio.device])
+        active_game = game_service.active_game_id()
+        if active_game:
+            args.extend(
+                [
+                    "--game-input",
+                    str(game_service.input_path(active_game)),
+                    "--game-state",
+                    str(game_service.state_path(active_game)),
+                    "--game-scores",
+                    str(game_service.scores_path(active_game)),
+                ]
+            )
+        args.extend(["--image-fit", config.image.fit, "--image-background", config.image.background, "--image-rotate", str(config.image.rotate)])
+        if config.image.assetPath:
+            asset_file = config_service.data_dir / "apps" / "assets" / config.image.assetPath
+            args.extend(["--image-asset", str(asset_file)])
         if config.runtime.testPattern:
             args.append("--test-pattern")
+        if config.display.mode == "app" and config.display.appId:
+            app_id = config.display.appId
+            args.extend(
+                [
+                    "--app-id",
+                    app_id,
+                    "--app-dir",
+                    str(game_service.app_package_dir(app_id)),
+                    "--app-config",
+                    str(config_service.data_dir / "apps" / "config" / f"{app_id}.json"),
+                ]
+            )
         return args
 
 

@@ -1,0 +1,55 @@
+[app]
+id = "core.flappy"
+name = "Flappy"
+version = "1.0.0"
+summary = "One button, endless pipes."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:FlappyGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "tap"
+actions = ["flap", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "gap"
+label = "Pipe gap"
+type = "number"
+required = false
+default = 20
+placeholder = ""
+helpText = "Smaller is harder."
+min = 14
+max = 30
+step = 1
+
+[[config]]
+key = "speed"
+label = "Scroll speed"
+type = "number"
+required = false
+default = 22
+placeholder = ""
+helpText = ""
+min = 10
+max = 40
+step = 2
+
+[[config]]
+key = "gravity"
+label = "Gravity"
+type = "number"
+required = false
+default = 110
+placeholder = ""
+helpText = ""
+min = 40
+max = 200
+step = 10

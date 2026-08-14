@@ -6,3 +6,6 @@ uvicorn>=0.30.0
 pydantic>=2.10.0
 toml>=0.10.2
 loguru>=0.7.3
+# Mini-joystick module (Linux only, imported lazily). Safe to omit.
+smbus2>=0.4.3; sys_platform == 'linux'
+evdev>=1.6; sys_platform == 'linux'

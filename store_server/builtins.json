@@ -1,0 +1,155 @@
+[
+  {
+    "id": "core.spotify",
+    "name": "Spotify",
+    "version": "1.0.0",
+    "summary": "Shows the current Spotify album art as a spinning record.",
+    "category": "media",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.clock",
+    "name": "Clock",
+    "version": "1.0.0",
+    "summary": "Displays analog, digital, or minimal clock faces.",
+    "category": "time",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.agent",
+    "name": "Agent Face",
+    "version": "1.0.0",
+    "summary": "Animated assistant face with blinking and idle motion.",
+    "category": "assistant",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.weather",
+    "name": "Weather",
+    "version": "1.0.0",
+    "summary": "Shows weather metrics, AQI, UV, wind, and animated assistant weather scenes.",
+    "category": "information",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.text",
+    "name": "Custom Message",
+    "version": "1.0.0",
+    "summary": "Show your own static or scrolling text message.",
+    "category": "custom",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.image",
+    "name": "Image",
+    "version": "1.0.0",
+    "summary": "Upload an image and display it on the matrix.",
+    "category": "custom",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.draw",
+    "name": "Draw",
+    "version": "1.0.0",
+    "summary": "Compose shapes and text into a custom matrix drawing.",
+    "category": "custom",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.slideshow",
+    "name": "Slideshow",
+    "version": "1.0.0",
+    "summary": "Cycle through a gallery of images and memes.",
+    "category": "media",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.tetris",
+    "name": "Tetris",
+    "version": "1.0.0",
+    "summary": "Play Tetris on the matrix with the phone or browser gamepad.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.pacman",
+    "name": "Pac-Man",
+    "version": "1.0.0",
+    "summary": "Clear the maze while four ghosts hunt you down.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.snake",
+    "name": "Snake",
+    "version": "1.0.0",
+    "summary": "Eat, grow, and do not bite yourself.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.breakout",
+    "name": "Breakout",
+    "version": "1.0.0",
+    "summary": "Bounce the ball and clear every brick.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.invaders",
+    "name": "Space Invaders",
+    "version": "1.0.0",
+    "summary": "Hold off descending waves of aliens.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.flappy",
+    "name": "Flappy",
+    "version": "1.0.0",
+    "summary": "One button, endless pipes.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.pong",
+    "name": "Pong",
+    "version": "1.0.0",
+    "summary": "Rally against the computer or a second phone.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.connect4",
+    "name": "Connect Four",
+    "version": "1.0.0",
+    "summary": "Line up four discs before your rival does.",
+    "category": "games",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  },
+  {
+    "id": "core.testPattern",
+    "name": "Test Pattern",
+    "version": "1.0.0",
+    "summary": "Displays a diagnostic matrix test pattern.",
+    "category": "diagnostics",
+    "author": "Assistant Matrix",
+    "runtime": "builtin"
+  }
+]

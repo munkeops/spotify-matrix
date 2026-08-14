@@ -1,0 +1,65 @@
+[app]
+id = "core.pong"
+name = "Pong"
+version = "1.0.0"
+summary = "Rally against the computer, or against whoever grabs the second pad."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:PongGame"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "vertical"
+actions = ["up", "down", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "opponent"
+label = "Opponent"
+type = "select"
+required = false
+default = "ai"
+placeholder = ""
+options = [{ label = "Computer", value = "ai" }, { label = "Second player", value = "human" }]
+helpText = "With a second player, whoever picks up another controller takes the right paddle."
+
+[[config]]
+key = "target"
+label = "Play to"
+type = "number"
+required = false
+default = 7
+placeholder = ""
+helpText = ""
+min = 1
+max = 21
+step = 1
+
+[[config]]
+key = "aiSpeed"
+label = "Computer speed"
+type = "number"
+required = false
+default = 34
+placeholder = ""
+helpText = ""
+min = 10
+max = 60
+step = 2
+
+[[config]]
+key = "ballSpeed"
+label = "Ball speed"
+type = "number"
+required = false
+default = 32
+placeholder = ""
+helpText = ""
+min = 18
+max = 60
+step = 2

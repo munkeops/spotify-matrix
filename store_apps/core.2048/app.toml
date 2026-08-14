@@ -1,0 +1,40 @@
+[app]
+id = "core.2048"
+name = "2048"
+version = "1.0.0"
+summary = "Slide the board, merge matching tiles, reach 2048."
+author = "Assistant Matrix"
+category = "games"
+runtime = "python"
+entrypoint = "renderer.app:Game2048"
+matrix_size = "64x64"
+license = "MIT"
+kind = "game"
+layout = "dpad"
+actions = ["up", "down", "left", "right", "pause", "resume", "togglePause", "restart"]
+
+[preview]
+card_gif = "previews/card.gif"
+matrix_png = "previews/matrix-64.png"
+description = ""
+
+[[config]]
+key = "target"
+label = "Win at"
+type = "number"
+required = false
+default = 2048
+placeholder = ""
+helpText = ""
+min = 64
+max = 8192
+step = 64
+
+[[config]]
+key = "fours"
+label = "Spawn fours"
+type = "boolean"
+required = false
+default = true
+placeholder = ""
+helpText = "One tile in ten arrives as a 4."

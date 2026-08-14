@@ -3,111 +3,489 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Spotify Matrix Setup</title>
-    <link rel="stylesheet" href="/styles.css?v=restored-20260709b">
+    <title>Assistant Matrix</title>
+    <link rel="stylesheet" href="/styles.css?v=assistant-20260723i">
   </head>
   <body>
-    <main class="shell">
-      <section class="hero">
-        <div>
-          <p class="eyebrow">Raspberry Pi controller</p>
-          <h1>Spotify Matrix</h1>
-          <p class="lede">Configure Spotify, pair OAuth from your laptop, and run the HUB75 display service from one local UI.</p>
+    <main class="app-frame">
+      <aside class="sidebar">
+        <div class="sidebar-head">
+          <div class="brand-mark">
+            <span class="brand-dot"></span>
+            <div class="brand-copy">
+              <strong>Assistant Matrix</strong>
+              <small>Smart display</small>
+            </div>
+          </div>
+          <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Collapse sidebar" aria-expanded="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
         </div>
-        <div class="status-panel" id="statusPanel">
+        <nav class="nav-list" aria-label="Main navigation">
+          <button class="nav-item active" type="button" data-page="home"><span class="nav-icon">H</span><span class="nav-label">Home</span></button>
+          <button class="nav-item" type="button" data-page="apps"><span class="nav-icon">P</span><span class="nav-label">Apps</span></button>
+          <button class="nav-item" type="button" data-page="store"><span class="nav-icon">W</span><span class="nav-label">Store</span></button>
+          <button class="nav-item" type="button" data-page="settings"><span class="nav-icon">S</span><span class="nav-label">Settings</span></button>
+        </nav>
+        <section class="sidebar-status" aria-live="polite">
           <span class="status-dot" id="statusDot"></span>
           <div>
-            <strong id="statusTitle">Checking status</strong>
-            <p id="statusText">Loading runtime state...</p>
+            <strong id="statusTitle">Checking runtime</strong>
+            <p id="statusText">Loading device state...</p>
           </div>
-        </div>
-      </section>
+        </section>
+      </aside>
 
-      <section class="grid">
-        <form class="panel" id="configForm">
-          <div class="panel-heading">
-            <h2>Spotify</h2>
-            <button type="submit">Save</button>
-          </div>
-          <label>
-            Client ID
-            <input name="clientId" autocomplete="off" required>
-          </label>
-          <label>
-            Client Secret
-            <input name="clientSecret" type="password" autocomplete="off" placeholder="Leave masked value to keep existing secret">
-          </label>
-          <label>
-            Redirect URI
-            <input name="redirectUri" autocomplete="off" required>
-          </label>
-          <div class="actions">
-            <button type="button" id="directAuthButton">Open Spotify Login</button>
-            <button type="button" id="pairButton">Create Pairing Token</button>
-          </div>
-          <pre class="command" id="pairCommand">For Cloudflare/domain auth, save an HTTPS redirect URI ending in /api/auth/callback, then open Spotify Login. For local setup, create a pairing token.</pre>
-        </form>
+      <section class="page-shell">
+        <section class="page active" data-page-panel="home">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">Live display</p>
+              <h1>Assistant Matrix</h1>
+            </div>
+            <button type="button" id="displayPowerButton" class="power-switch" aria-pressed="false">
+              <span>Off</span>
+              <span>On</span>
+            </button>
+          </header>
 
-        <form class="panel" id="matrixForm">
-          <div class="panel-heading">
-            <h2>Matrix</h2>
-            <button type="submit">Save</button>
-          </div>
-          <div class="split">
-            <label>Rows <input name="rows" type="number" min="1"></label>
-            <label>Cols <input name="cols" type="number" min="1"></label>
-          </div>
-          <div class="split">
-            <label>Chain <input name="chainLength" type="number" min="1"></label>
-            <label>Parallel <input name="parallel" type="number" min="1"></label>
-          </div>
-          <div class="split">
-            <label>Brightness <input name="brightness" type="number" min="1" max="100"></label>
-            <label>GPIO slowdown <input name="gpioSlowdown" type="number" min="0" max="10"></label>
-          </div>
-          <label>
-            Hardware mapping
-            <input name="hardwareMapping" autocomplete="off">
-          </label>
-          <div class="split">
-            <label>PWM bits <input name="pwmBits" type="number" min="1" max="11"></label>
-            <label>Refresh cap <input name="limitRefreshRateHz" type="number" min="1"></label>
-          </div>
-          <div class="split">
-            <label>Poll seconds <input name="pollSeconds" type="number" min="0.1" step="0.1"></label>
-            <label>FPS <input name="fps" type="number" min="1" step="0.1"></label>
-          </div>
-          <div class="split">
-            <label>RPM <input name="rpm" type="number" min="1" step="0.1"></label>
-            <label>Mock output <input name="mockOutput" placeholder="Optional PNG path"></label>
-          </div>
-          <label class="check">
-            <input name="noHardwarePulse" type="checkbox">
-            Disable hardware pulsing
-          </label>
-          <label class="check">
-            <input name="testPattern" type="checkbox">
-            Run test pattern
-          </label>
-        </form>
+          <section class="home-layout">
+            <article class="live-stage">
+              <div class="matrix-replica" id="matrixPreview" aria-label="Current matrix preview">
+                <div class="replica-content">
+                  <span class="eye eye-left"></span>
+                  <span class="eye eye-right"></span>
+                  <span class="smile"></span>
+                </div>
+              </div>
+            </article>
 
-        <section class="panel runtime-panel">
-          <div class="panel-heading">
-            <h2>Runtime</h2>
-            <span id="runtimePill" class="pill">Stopped</span>
-          </div>
-          <div class="runtime-actions">
-            <button id="startButton" type="button">Start Matrix</button>
-            <button id="stopButton" type="button" class="secondary">Stop</button>
-          </div>
-          <dl>
-            <div><dt>Token</dt><dd id="tokenState">Unknown</dd></div>
-            <div><dt>Data</dt><dd id="dataDir">Unknown</dd></div>
-            <div><dt>Process</dt><dd id="processState">Unknown</dd></div>
-          </dl>
+            <aside class="live-details">
+              <p class="eyebrow">Active app</p>
+              <h2 id="activeMode">Spotify</h2>
+              <p class="home-app-state" id="processState">Runtime state unknown</p>
+              <div class="button-stack">
+                <button type="button" id="editActiveAppButton" class="secondary">Edit</button>
+                <button type="button" id="applyButton">Apply</button>
+              </div>
+            </aside>
+          </section>
+        </section>
+
+        <section class="page" data-page-panel="apps">
+          <header class="page-heading compact">
+            <div>
+              <p class="eyebrow">App library</p>
+              <h1>Choose what runs</h1>
+            </div>
+          </header>
+
+          <section class="policy-panel" id="displayPolicyPanel">
+            <div class="panel-heading">
+              <div>
+                <h2>Display Policy</h2>
+                <p>Choose one app to run, or rotate through selected local apps.</p>
+              </div>
+              <div class="button-row">
+                <button type="button" id="savePolicyButton" class="secondary">Save Policy</button>
+                <button type="button" id="applyPolicyButton">Apply Policy</button>
+              </div>
+            </div>
+            <div class="policy-controls">
+              <label>
+                Mode
+                <select id="policyModeSelect">
+                  <option value="single">Single app</option>
+                  <option value="rotation">Rotate apps</option>
+                </select>
+              </label>
+              <label>
+                Active app
+                <select id="policyActiveAppSelect"></select>
+              </label>
+            </div>
+            <div class="rotation-list" id="rotationList" aria-label="Rotation apps"></div>
+            <div class="trigger-list-heading">
+              <div>
+                <h3>Event Triggers</h3>
+                <p>Temporarily show a app when an event is submitted to the display API.</p>
+              </div>
+              <button type="button" id="addTriggerButton" class="secondary">Add Trigger</button>
+            </div>
+            <div class="trigger-list" id="triggerList" aria-label="Event trigger rules"></div>
+          </section>
+
+          <section class="app-grid" id="appGrid" aria-label="Display apps">
+            <article class="app-card active" data-app="spotify" role="button" tabindex="0">
+              <span class="app-meta">Music</span>
+              <strong>Spotify</strong>
+              <small>Spin the current album art while music is playing.</small>
+              <span class="app-preview preview-spotify" aria-hidden="true"></span>
+              <button class="app-settings-button" type="button" data-app-settings="spotify">Settings</button>
+            </article>
+            <article class="app-card" data-app="clock" role="button" tabindex="0">
+              <span class="app-meta">Ambient</span>
+              <strong>Clock</strong>
+              <small>Show time with swappable matrix clock faces.</small>
+              <span class="app-preview preview-clock" aria-hidden="true">
+                <span class="app-clock-face">
+                  <span class="app-clock-tick tick-12"></span>
+                  <span class="app-clock-tick tick-3"></span>
+                  <span class="app-clock-tick tick-6"></span>
+                  <span class="app-clock-tick tick-9"></span>
+                  <span class="app-clock-hand app-hour-hand"></span>
+                  <span class="app-clock-hand app-minute-hand"></span>
+                  <span class="app-clock-pin"></span>
+                </span>
+              </span>
+              <button class="app-settings-button" type="button" data-app-settings="clock">Settings</button>
+            </article>
+            <article class="app-card" data-app="agent" role="button" tabindex="0">
+              <span class="app-meta">Assistant</span>
+              <strong>Agent Face</strong>
+              <small>Animated idle face for future voice-agent behavior.</small>
+              <span class="app-preview preview-agent" aria-hidden="true"></span>
+              <button class="app-settings-button" type="button" data-app-settings="agent">Settings</button>
+            </article>
+            <article class="app-card" data-app="weather" role="button" tabindex="0">
+              <span class="app-meta">Weather</span>
+              <strong>Weather</strong>
+              <small>Postal-code weather dashboard with playful assistant scenes.</small>
+              <span class="app-preview preview-weather weather-metric-preview" aria-hidden="true">
+                <span><strong>TEMP</strong><em>72F</em></span>
+                <span><strong>UV</strong><em>4</em></span>
+                <span><strong>AQI</strong><em>38</em></span>
+                <span><strong>WIND</strong><em>8</em></span>
+              </span>
+              <button class="app-settings-button" type="button" data-app-settings="weather">Settings</button>
+            </article>
+            <article class="app-card" data-app="testPattern" role="button" tabindex="0">
+              <span class="app-meta">Diagnostic</span>
+              <strong>Test Pattern</strong>
+              <small>Moving color bars for panel tuning.</small>
+              <span class="app-preview preview-test" aria-hidden="true"></span>
+              <button class="app-settings-button" type="button" data-app-settings="testPattern">Settings</button>
+            </article>
+          </section>
+        </section>
+
+        <section class="page" data-page-panel="store">
+          <header class="page-heading compact">
+            <div>
+              <p class="eyebrow">App store</p>
+              <h1>Discover apps</h1>
+            </div>
+          </header>
+
+          <section class="store-note">
+            <strong>Catalog preview</strong>
+            <span>Install, update, and uninstall apps from the configured store index.</span>
+          </section>
+
+          <section class="app-grid" id="storeGrid" aria-label="App store">
+            <article class="app-card planned" aria-disabled="true">
+              <span class="app-meta">Loading</span>
+              <strong>Store catalog</strong>
+              <small>Loading available apps...</small>
+              <span class="app-preview preview-board" aria-hidden="true"></span>
+            </article>
+          </section>
+        </section>
+
+        <section class="page" data-page-panel="settings">
+          <header class="page-heading compact">
+            <div>
+              <p class="eyebrow">Device settings</p>
+              <h1>RGB matrix</h1>
+            </div>
+          </header>
+
+          <section class="settings-grid">
+            <form class="settings-panel" id="matrixPanel">
+              <div class="panel-heading">
+                <h2>Matrix Hardware</h2>
+                <button type="submit">Save</button>
+              </div>
+              <div class="form-grid dense">
+                <label>Rows <input name="rows" type="number" min="1"></label>
+                <label>Cols <input name="cols" type="number" min="1"></label>
+                <label>Chain <input name="chainLength" type="number" min="1"></label>
+                <label>Parallel <input name="parallel" type="number" min="1"></label>
+                <label>Brightness <input name="brightness" type="number" min="1" max="100"></label>
+                <label>GPIO slowdown <input name="gpioSlowdown" type="number" min="0" max="10"></label>
+                <label>Hardware mapping <input name="hardwareMapping" autocomplete="off"></label>
+                <label>PWM bits <input name="pwmBits" type="number" min="1" max="11"></label>
+                <label>Refresh cap <input name="limitRefreshRateHz" type="number" min="1"></label>
+                <label>Poll seconds <input name="pollSeconds" type="number" min="0.1" step="0.1"></label>
+                <label>FPS <input name="fps" type="number" min="1" step="0.1"></label>
+                <label>RPM <input name="rpm" type="number" min="1" step="0.1"></label>
+                <label>Rotation <select name="rotation"><option value="0">0 deg</option><option value="90">90 deg</option><option value="180">180 deg</option><option value="270">270 deg</option></select></label>
+                <label class="check-row wide"><input name="noHardwarePulse" type="checkbox"><span>Disable hardware pulsing</span></label>
+              </div>
+            </form>
+            <form class="settings-panel" id="storeSettingsPanel">
+              <div class="panel-heading">
+                <h2>App Store</h2>
+                <button type="submit">Save</button>
+              </div>
+              <div class="form-grid dense">
+                <label class="wide">Store index URL <input name="storeIndexUrl" autocomplete="off" placeholder="https://store.example.com/store-index.json"></label>
+              </div>
+            </form>
+            <section class="settings-panel" id="bluetoothPanel">
+              <div class="panel-heading">
+                <h2>Bluetooth Audio</h2>
+                <button type="button" id="bluetoothScanButton" class="secondary">Scan</button>
+              </div>
+              <p class="muted" id="bluetoothStatus">Checking Bluetooth…</p>
+              <div class="bt-device-list" id="bluetoothDeviceList"></div>
+            </section>
+          </section>
         </section>
       </section>
     </main>
-    <script src="/app.js?v=restored-20260709b"></script>
+
+    <dialog class="app-dialog" id="appDialog">
+      <form method="dialog" class="dialog-card">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow" id="dialogKicker">App setup</p>
+            <h2 id="dialogTitle">App</h2>
+          </div>
+          <button type="button" class="icon-button" id="closeDialogButton" aria-label="Close">x</button>
+        </div>
+
+        <section class="app-config active" data-config-panel="spotify" id="spotifyPanel">
+          <div class="form-grid clock-settings-grid">
+            <label>Client ID <input name="clientId" autocomplete="off" required></label>
+            <label>Client Secret <input name="clientSecret" type="password" autocomplete="off" placeholder="Leave masked value to keep existing secret"></label>
+            <label class="wide">Redirect URI <input name="redirectUri" autocomplete="off" required></label>
+          </div>
+          <div class="button-row">
+            <button type="button" id="directAuthButton" class="secondary">Open Spotify Login</button>
+            <button type="button" id="pairButton" class="secondary">Create Pairing Token</button>
+          </div>
+          <pre class="command" id="pairCommand">Save an HTTPS redirect URI ending in /api/auth/callback for tunnel auth, or create a pairing token for local loopback setup.</pre>
+        </section>
+
+        <section class="app-config" data-config-panel="clock" id="clockPanel">
+          <div class="clock-config-layout">
+            <div class="clock-settings-stack">
+              <label>
+                Timezone
+                <select name="clockTimezone" id="clockTimezoneSelect">
+                  <option value="">System timezone</option>
+                </select>
+              </label>
+              <label class="switch-row">
+                <span>Time format</span>
+                <input name="clock24Hour" type="checkbox">
+                <span class="switch-track"><span>12 hr</span><span>24 hr</span></span>
+              </label>
+              <label class="switch-row">
+                <span>Seconds</span>
+                <input name="clockShowSeconds" type="checkbox">
+                <span class="switch-track"><span>Off</span><span>On</span></span>
+              </label>
+            </div>
+            <fieldset class="choice-grid clock-choice-grid">
+              <label class="choice-card clock-choice">
+                <input type="radio" name="clockFace" value="analog">
+                <span class="clock-preview-small analog-preview" aria-hidden="true">
+                  <span class="analog-face">
+                    <span class="tick tick-12"></span>
+                    <span class="tick tick-3"></span>
+                    <span class="tick tick-6"></span>
+                    <span class="tick tick-9"></span>
+                    <span class="hand hour-hand"></span>
+                    <span class="hand minute-hand"></span>
+                    <span class="clock-pin"></span>
+                  </span>
+                </span>
+                <span>Analog</span>
+                <small>Round face with hands.</small>
+              </label>
+              <label class="choice-card clock-choice">
+                <input type="radio" name="clockFace" value="digital">
+                <span class="clock-preview-small digital-preview" aria-hidden="true">
+                  <span class="digital-screen">12:48</span>
+                </span>
+                <span>Digital</span>
+                <small>Segmented HH:MM.</small>
+              </label>
+              <label class="choice-card clock-choice">
+                <input type="radio" name="clockFace" value="minimal">
+                <span class="clock-preview-small minimal-preview" aria-hidden="true">
+                  <span class="minimal-ring"></span>
+                  <span class="minimal-time">8:42</span>
+                </span>
+                <span>Minimal</span>
+                <small>Time with progress ring.</small>
+              </label>
+            </fieldset>
+          </div>
+        </section>
+
+        <section class="app-config" data-config-panel="agent" id="agentPanel">
+          <fieldset class="choice-grid agent-choice-grid">
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="classic">
+              <span class="agent-preview-small agent-classic-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Classic</span>
+              <small>Square eyes and a simple smile.</small>
+            </label>
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="wide">
+              <span class="agent-preview-small agent-wide-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Wide eyes</span>
+              <small>More alert idle face.</small>
+            </label>
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="sleepy">
+              <span class="agent-preview-small agent-sleepy-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Sleepy blink</span>
+              <small>Relaxed face with slow blink.</small>
+            </label>
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="happy">
+              <span class="agent-preview-small agent-happy-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Happy</span>
+              <small>Bigger smile and brighter idle expression.</small>
+            </label>
+            <label class="choice-card agent-choice">
+              <input type="radio" name="agentFaceStyle" value="cool">
+              <span class="agent-preview-small agent-cool-preview" aria-hidden="true">
+                <span class="agent-eye left"></span>
+                <span class="agent-eye right"></span>
+                <span class="agent-smile"></span>
+              </span>
+              <span>Cool</span>
+              <small>Sunglasses-style idle face.</small>
+            </label>
+          </fieldset>
+          <div class="form-grid agent-settings-grid">
+            <label>Animation speed <select name="agentAnimationSpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
+          </div>
+        </section>
+
+        <section class="app-config" data-config-panel="weather" id="weatherPanel">
+          <div class="weather-config-layout">
+            <div class="form-grid weather-settings-grid">
+              <label>Location label <input name="weatherLabel" placeholder="Home"></label>
+              <label>ZIP / PIN / postal code <input name="weatherPostalCode" inputmode="text" autocomplete="postal-code" placeholder="60601 or 560001"></label>
+              <label>Country <select name="weatherCountryCode"><option value="US">United States</option><option value="CA">Canada</option><option value="GB">United Kingdom</option><option value="IN">India</option></select></label>
+              <label>Temperature unit <select name="weatherTemperatureUnit"><option value="fahrenheit">Fahrenheit</option><option value="celsius">Celsius</option></select></label>
+              <label>Face accessory <select name="weatherFaceAccessory"><option value="auto">Auto</option><option value="none">None</option><option value="sunglasses">Sunglasses</option><option value="umbrella">Umbrella</option></select></label>
+              <label>Refresh minutes <input name="weatherRefreshMinutes" type="number" min="5" max="120" step="1"></label>
+              <label>Dashboard seconds <input name="weatherMetricsSeconds" type="number" min="30" max="120" step="1"></label>
+              <label>Scene seconds <input name="weatherSceneSeconds" type="number" min="15" max="60" step="1"></label>
+              <details class="advanced-fields">
+                <summary>Coordinate override</summary>
+                <label>Latitude <input name="weatherLatitude" type="number" step="0.0001" placeholder="Optional"></label>
+                <label>Longitude <input name="weatherLongitude" type="number" step="0.0001" placeholder="Optional"></label>
+              </details>
+            </div>
+            <div class="weather-preview-large weather-metric-preview" aria-hidden="true">
+              <span><strong>TEMP</strong><em>72F</em></span>
+              <span><strong>UV</strong><em>4</em></span>
+              <span><strong>AQI</strong><em>38</em></span>
+              <span><strong>WIND</strong><em>8</em></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="app-config" data-config-panel="testPattern" id="advancedPanel">
+          <label>Mock output <input name="mockOutput" placeholder="Optional PNG path"></label>
+          <label class="check-row"><input name="testPattern" type="checkbox"><span>Force test pattern mode</span></label>
+        </section>
+
+        <section class="app-config" data-config-panel="text" id="textPanel">
+          <div class="form-grid text-settings-grid">
+            <label class="wide">Message <textarea name="text" rows="3" maxlength="600" autocomplete="off" placeholder="HELLO 🎵 — emoji and ASCII art welcome"></textarea></label>
+            <label>Font <select name="fontFamily"><option value="pixel">Pixel</option><option value="sans">Sans (Latin)</option><option value="mono">Mono (ASCII art)</option><option value="devanagari">Devanagari</option></select></label>
+            <label>Font size <select name="fontSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></label>
+            <label>Text color <input name="color" type="color"></label>
+            <label>Background <input name="background" type="color"></label>
+            <label>Alignment <select name="align"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select></label>
+            <label>Scroll speed <select name="scrollSpeed"><option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option></select></label>
+            <label class="check-row"><input name="bold" type="checkbox"><span>Bold</span></label>
+            <label class="check-row"><input name="italic" type="checkbox"><span>Italic</span></label>
+            <label class="check-row"><input name="wrap" type="checkbox"><span>Wrap text</span></label>
+            <label class="check-row"><input name="fit" type="checkbox"><span>Fit to screen</span></label>
+            <label class="check-row"><input name="scroll" type="checkbox"><span>Scroll long text</span></label>
+          </div>
+        </section>
+
+        <section class="app-config" data-config-panel="image" id="imagePanel">
+          <div class="image-config-layout">
+            <div class="form-grid image-settings-grid">
+              <label class="wide">Image file <input name="imageFile" id="imageFileInput" type="file" accept="image/*"></label>
+              <input name="assetPath" type="hidden">
+              <label>Fit <select name="fit"><option value="contain">Contain</option><option value="cover">Cover</option><option value="stretch">Stretch</option></select></label>
+              <label>Rotate <select name="rotate"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></label>
+              <label>Background <input name="background" type="color"></label>
+            </div>
+            <div class="image-preview-box" id="imagePreviewBox">
+              <img id="imagePreviewImg" alt="Uploaded image preview" hidden>
+              <span class="muted" id="imagePreviewEmpty">No image uploaded yet.</span>
+            </div>
+          </div>
+          <div class="gallery-head"><span class="muted">Gallery — tap to use</span></div>
+          <div class="asset-gallery" id="imageGallery"></div>
+        </section>
+
+        <section class="app-config" data-config-panel="slideshow" id="slideshowPanel">
+          <div class="form-grid">
+            <label>Seconds per image <input name="intervalSeconds" type="number" min="1" max="120" step="1"></label>
+            <label>Fit <select name="fit"><option value="contain">Contain</option><option value="cover">Cover</option><option value="stretch">Stretch</option></select></label>
+            <label>Background <input name="background" type="color"></label>
+          </div>
+          <div class="gallery-head"><span class="muted">Tap images to include</span></div>
+          <div class="asset-gallery" id="slideshowGallery"></div>
+        </section>
+
+        <section class="app-config" data-config-panel="draw" id="drawPanel">
+          <div class="form-grid draw-settings-grid">
+            <label>Background <input name="background" type="color"></label>
+            <button type="button" class="secondary" id="addShapeButton">Add shape</button>
+          </div>
+          <div class="draw-shape-list" id="drawShapeList"></div>
+        </section>
+
+        <section class="app-config" data-config-panel="external" id="externalAppPanel">
+          <div class="external-app-fields" id="externalAppFields"></div>
+        </section>
+
+        <div class="app-live-preview" id="appLivePreview" hidden>
+          <span class="eyebrow">Matrix preview</span>
+          <img id="appPreviewImg" alt="Live matrix preview" width="128" height="128">
+        </div>
+
+        <footer class="dialog-actions">
+          <button type="button" id="saveAppButton" class="secondary">Save Config</button>
+          <button type="button" id="applyAppButton">Apply App</button>
+        </footer>
+      </form>
+    </dialog>
+
+              <script src="/app.js?v=assistant-20260723i"></script>
   </body>
 </html>

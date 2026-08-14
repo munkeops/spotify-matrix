@@ -13,7 +13,7 @@ public_dir = "public"
 runtime_script = "spotify_matrix.py"
 
 [spotify]
-scope = "user-read-currently-playing"
+scope = "user-read-playback-state user-read-currently-playing"
 
 [runtime]
 python_bin = "python3"

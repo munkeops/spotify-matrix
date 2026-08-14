@@ -4,7 +4,14 @@ version = "0.2.0"
 description = "Spotify album art matrix display with FastAPI setup UI"
 readme = "README.md"
 authors = ["rohanyf <rohan@yummyfuture.wiki>"]
-packages = [{ include = "src" }]
+packages = [
+    { include = "src" },
+    { include = "assistant_matrix_sdk" },
+    { include = "matrix_games" },
+    { include = "mini_joystick" },
+    { include = "matrix_input" },
+    { include = "matrix_audio" },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.14"
@@ -16,6 +23,16 @@ uvicorn = ">=0.30.0"
 pydantic = "^2.10.0"
 toml = "^0.10.2"
 loguru = "^0.7.3"
+# I2C for the mini-joystick. Linux only, and imported lazily, so a dev install
+# on another platform is unaffected.
+smbus2 = { version = ">=0.4.3", markers = "sys_platform == 'linux'" }
+# Bluetooth and USB gamepads. Linux only, imported lazily.
+evdev = { version = ">=1.6", markers = "sys_platform == 'linux'" }
+
+[tool.poetry.scripts]
+assistant-matrix-app = "assistant_matrix_sdk.cli:main"
+# The command before apps were called apps. Kept so existing scripts run.
+assistant-matrix-widget = "assistant_matrix_sdk.cli:main"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.0.0"

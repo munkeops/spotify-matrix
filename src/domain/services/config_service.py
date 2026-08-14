@@ -8,20 +8,108 @@ import time
 from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
 from configs import base_config
 from src.domain.models.api_schemas import AppConfig, TokenStatus
+
+# Games used to be display modes of their own before they became apps. A
+# config saved by an older build still names one, so map it onto the app it
+# is now rather than refusing to start.
+LEGACY_GAME_MODES = ("tetris", "pacman", "snake", "breakout", "invaders", "flappy", "pong", "connect4")
+
+VALID_MODES = frozenset(("spotify", "clock", "agent", "weather", "text", "image", "draw", "slideshow", "testPattern", "app"))
+
+
+def migrate_config(payload: Any) -> tuple[dict[str, Any], bool]:
+    """Bring an older config file up to date. Returns the payload and whether it changed."""
+    if not isinstance(payload, dict):
+        return {}, False
+
+    changed = False
+
+    # Widgets and plugins became apps. A config written before that names the
+    # old mode, the old key and the old store index, none of which would
+    # match anything now.
+    display = payload.get("display")
+    if isinstance(display, dict):
+        if display.get("mode") == "widget":
+            display["mode"] = "app"
+            changed = True
+        if "widgetId" in display:
+            display.setdefault("appId", display.pop("widgetId"))
+            changed = True
+    store = payload.get("store")
+    if isinstance(store, dict):
+        index = store.get("indexUrl")
+        if isinstance(index, str) and index.endswith("widget_store_index.json"):
+            store["indexUrl"] = index.replace("widget_store_index.json", "app_store_index.json")
+            changed = True
+
+    controller = payload.get("controller")
+    if isinstance(controller, dict) and isinstance(controller.get("bindings"), dict):
+        # Bindings used to be one mapping per game, shared by every device.
+        # It applied to both, so both profiles inherit it and can diverge from
+        # there rather than everyone losing what they had set.
+        legacy = controller.pop("bindings")
+        profiles = controller.setdefault("profiles", {})
+        if legacy and not profiles:
+            from mini_joystick.bindings import GAMEPAD, MODULE
+
+            for name in (MODULE, GAMEPAD):
+                profiles[name] = {game: dict(controls) for game, controls in legacy.items()}
+        changed = True
+    display = payload.get("display")
+    if not isinstance(display, dict):
+        return payload, changed
+
+    mode = display.get("mode")
+    if mode in LEGACY_GAME_MODES:
+        display["mode"] = "app"
+        display["appId"] = display.get("appId") or f"core.{mode}"
+        logger.info("[spotify-matrix] migrated display mode {} to app {}", mode, display["appId"])
+        return payload, True
+    if isinstance(mode, str) and mode not in VALID_MODES:
+        # An unknown mode should not stop the service from booting.
+        logger.warning("[spotify-matrix] unknown display mode {}, falling back to spotify", mode)
+        display["mode"] = "spotify"
+        return payload, True
+    return payload, changed
 
 
 class ConfigService:
     def __init__(self) -> None:
+        # get_config() is called from the controller path and every request, so
+        # parsing the file each time is wasteful. Keyed on the file's identity
+        # so an edit from anywhere is still picked up.
+        self._cache: tuple[tuple[int, int], AppConfig] | None = None
         paths = base_config["paths"]
         self.data_dir = Path(os.environ.get("SPOTIFY_MATRIX_DATA_DIR", paths["data_dir"])).resolve()
         self.config_path = Path(os.environ.get("SPOTIFY_MATRIX_CONFIG", self.data_dir / paths["config_file"])).resolve()
         self.token_path = Path(os.environ.get("SPOTIFY_TOKEN_CACHE", self.data_dir / paths["token_file"])).resolve()
 
+    def _stamp(self) -> tuple[int, int]:
+        try:
+            info = self.config_path.stat()
+            return (info.st_mtime_ns, info.st_size)
+        except OSError:
+            return (0, 0)
+
     def get_config(self) -> AppConfig:
+        stamp = self._stamp()
+        cached = self._cache
+        if cached is not None and cached[0] == stamp:
+            # Copy so a caller mutating the result cannot poison the cache.
+            return cached[1].model_copy(deep=True)
+
         payload = self._read_json(self.config_path, {})
-        return AppConfig.model_validate(payload)
+        payload, changed = migrate_config(payload)
+        config = AppConfig.model_validate(payload)
+        if changed:
+            # Write it back so the migration happens once, not on every read.
+            self._write_json(self.config_path, config.model_dump())
+        self._cache = (self._stamp(), config)
+        return config.model_copy(deep=True)
 
     def get_public_config(self) -> AppConfig:
         config = self.get_config()
@@ -34,6 +122,7 @@ class ConfigService:
         if config.spotify.clientSecret == "********":
             config.spotify.clientSecret = current.spotify.clientSecret
         self._write_json(self.config_path, config.model_dump())
+        self._cache = (self._stamp(), config.model_copy(deep=True))
         return self.get_public_config()
 
     def token_status(self) -> TokenStatus:
@@ -56,6 +145,13 @@ class ConfigService:
 
     def missing_values(self, config: AppConfig) -> list[str]:
         missing = []
+        if config.display.mode == "weather":
+            has_coordinates = config.weather.latitude is not None and config.weather.longitude is not None
+            if not config.weather.postalCode and not has_coordinates:
+                missing.append("Weather ZIP/postal code or coordinates")
+            return missing
+        if config.display.mode != "spotify":
+            return missing
         if not config.spotify.clientId:
             missing.append("Spotify Client ID")
         if not config.spotify.clientSecret:
