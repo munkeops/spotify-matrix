@@ -76,9 +76,13 @@ DIRECT = Driver(
     name="Direct wiring",
     summary="Panel wired straight to the Pi's header, no HAT.",
     hardware_mapping="regular",
-    # Nothing sits between the Pi and the panel, so the signal is clean and
-    # the default rate usually holds. Raise it if the picture glitches.
-    gpio_slowdown=1,
+    # Two, because that is what the library itself picks on a Pi 4
+    # (options-initialize.cc: GPIO::IsPi4() ? 2 : 1). A clean direct
+    # connection does not mean a faster one: a Pi 4 switches its GPIOs
+    # quickly enough that the panel's shift registers miss edges, and the
+    # picture shakes. On a Pi 3 or older, 1 is right and costs nothing to
+    # try.
+    gpio_slowdown=2,
     # OE lands on GPIO 18, which can be driven by the hardware pulse
     # generator, so the panel gets the refresh it is capable of.
     no_hardware_pulse=False,
@@ -86,7 +90,8 @@ DIRECT = Driver(
     notes=(
         "E on GPIO 15 is what a 64x64 panel needs and a 32 row panel does not. "
         "Turn the Pi's onboard audio off (dtparam=audio=off) and blacklist "
-        "snd_bcm2835: it holds the same hardware the panel needs for timing."
+        "snd_bcm2835: it holds the same hardware the panel needs for timing. "
+        "If the picture shakes, raise the slowdown before anything else."
     ),
 )
 

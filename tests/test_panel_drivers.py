@@ -59,6 +59,13 @@ def test_no_two_signals_share_a_pin(driver):
     assert len(set(driver.pins.values())) == len(driver.pins)
 
 
+def test_direct_wiring_starts_at_the_slowdown_a_pi_4_needs():
+    """A clean direct connection is not a faster one. The library picks 2 on
+    a Pi 4 for itself (options-initialize.cc), and starting below that gave
+    a shaking picture on hardware that the standalone demo drove fine."""
+    assert drivers.DIRECT.gpio_slowdown >= 2
+
+
 def test_a_driver_carries_only_the_three_settings_that_follow_from_wiring():
     """Rows, brightness and rotation belong to the panel, not to how it is
     plugged in, and must survive switching between them."""

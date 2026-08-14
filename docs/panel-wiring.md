@@ -36,6 +36,13 @@ OE on GPIO 18 means the Pi's hardware pulse generator can drive it, so this
 wiring gets the best refresh available — around 135 Hz on a Pi 4 at the
 default settings.
 
+The slowdown starts at 2, which is what the library picks for a Pi 4 by
+itself. A direct connection is clean, not fast: a Pi 4 switches its GPIOs
+quickly enough that the panel's shift registers miss edges, and the picture
+shakes. **A shaking or tearing picture is the slowdown, nine times out of
+ten** — raise it by one before changing anything else. On a Pi 3 or older,
+1 is right and worth trying.
+
 Two things on the Pi itself, both required:
 
 ```bash
