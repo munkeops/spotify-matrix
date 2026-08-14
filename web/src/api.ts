@@ -147,6 +147,28 @@ export const sendTetrisInput = (action: TetrisAction) =>
 export const getConfig = () => apiGet<Record<string, any>>("/api/config");
 export const saveConfig = (config: Record<string, unknown>) => apiPost<Record<string, any>>("/api/config", config);
 
+/** One way of wiring the panel to the Pi. */
+export interface MatrixDriver {
+  id: string;
+  name: string;
+  summary: string;
+  hardwareMapping: string;
+  gpioSlowdown: number;
+  noHardwarePulse: boolean;
+  /** Signal name to BCM pin. */
+  pins: Record<string, number>;
+  notes: string;
+}
+
+export interface MatrixDriversResponse {
+  drivers: MatrixDriver[];
+  /** Which driver the saved settings describe, or "custom". */
+  active: string;
+  pinOrder: string[];
+}
+
+export const getMatrixDrivers = () => apiGet<MatrixDriversResponse>("/api/matrix/drivers");
+
 export const createPairing = () =>
   apiPost<{ pairingToken: string; expiresInSeconds: number; command: string }>("/api/auth/session", {});
 

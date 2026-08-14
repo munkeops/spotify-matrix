@@ -1,0 +1,132 @@
+"""Panel wiring drivers.
+
+The pin numbers here are checked against hzeller/rpi-rgb-led-matrix's own
+lib/hardware-mapping.c, because a settings page that draws a pin table is
+only useful if the table is the one the code drives.
+"""
+
+import pytest
+
+from matrix_display import drivers
+
+
+def test_direct_wiring_matches_the_libraries_regular_mapping():
+    """Taken from lib/hardware-mapping.c, "regular"."""
+    assert drivers.DIRECT.hardware_mapping == "regular"
+    assert drivers.DIRECT.pins == {
+        "R1": 11, "G1": 27, "B1": 7,
+        "R2": 8, "G2": 9, "B2": 10,
+        "A": 22, "B": 23, "C": 24, "D": 25, "E": 15,
+        "CLK": 17, "LAT": 4, "OE": 18,
+    }
+
+
+def test_the_hat_matches_the_libraries_adafruit_mapping():
+    assert drivers.ADAFRUIT_HAT.pins == {
+        "R1": 5, "G1": 13, "B1": 6,
+        "R2": 12, "G2": 16, "B2": 23,
+        "A": 22, "B": 26, "C": 27, "D": 20, "E": 24,
+        "CLK": 17, "LAT": 21, "OE": 4,
+    }
+
+
+def test_the_pwm_mod_only_moves_output_enable():
+    """That single wire is the whole modification, and the whole benefit."""
+    plain = drivers.ADAFRUIT_HAT.pins
+    modified = drivers.ADAFRUIT_HAT_PWM.pins
+
+    differences = {pin for pin in plain if plain[pin] != modified[pin]}
+
+    assert differences == {"OE"}
+    assert modified["OE"] == 18
+
+
+@pytest.mark.parametrize("driver", drivers.DRIVERS, ids=lambda d: d.id)
+def test_every_driver_wires_every_signal(driver):
+    """A 64x64 panel needs all fourteen, E included."""
+    assert set(driver.pins) == set(drivers.PIN_ORDER)
+
+
+@pytest.mark.parametrize("driver", drivers.DRIVERS, ids=lambda d: d.id)
+def test_pulsing_follows_where_output_enable_lands(driver):
+    """The Pi's pulse generator drives GPIO 18 and nothing else, so this is
+    not a preference: it is a consequence of the wiring."""
+    assert driver.no_hardware_pulse is (driver.pins["OE"] != 18)
+
+
+@pytest.mark.parametrize("driver", drivers.DRIVERS, ids=lambda d: d.id)
+def test_no_two_signals_share_a_pin(driver):
+    assert len(set(driver.pins.values())) == len(driver.pins)
+
+
+def test_a_driver_carries_only_the_three_settings_that_follow_from_wiring():
+    """Rows, brightness and rotation belong to the panel, not to how it is
+    plugged in, and must survive switching between them."""
+    assert set(drivers.settings("direct")) == {"hardwareMapping", "gpioSlowdown", "noHardwarePulse"}
+
+
+def test_switching_drivers_changes_the_mapping_and_the_pulsing():
+    hat = drivers.settings("adafruit-hat")
+    direct = drivers.settings("direct")
+
+    assert hat["hardwareMapping"] == "adafruit-hat" and hat["noHardwarePulse"] is True
+    assert direct["hardwareMapping"] == "regular" and direct["noHardwarePulse"] is False
+
+
+def test_an_unknown_driver_rewrites_nothing():
+    """Including "custom": someone hand-tuning an odd panel keeps their
+    values, rather than having a driver nobody chose applied over them."""
+    assert drivers.settings("custom") == {}
+    assert drivers.settings("nonsense") == {}
+    assert drivers.get("custom") is None
+
+
+def test_the_active_driver_is_read_back_from_the_mapping():
+    """No second copy of the choice to fall out of step with the settings."""
+    for driver in drivers.DRIVERS:
+        assert drivers.detect(driver.hardware_mapping) == driver.id
+    assert drivers.detect("regular-pi1") == drivers.CUSTOM
+    assert drivers.detect("") == drivers.CUSTOM
+
+
+def test_tuning_the_slowdown_does_not_make_a_panel_custom():
+    """Slowdown is meant to be adjusted; a panel does not stop being
+    directly wired because someone raised it by one."""
+    assert drivers.detect(drivers.DIRECT.hardware_mapping) == "direct"
+
+
+def test_changing_driver_restarts_the_runtime():
+    """Every setting a driver writes is a constructor argument to the panel;
+    saving one without a restart would move the setting and not the matrix."""
+    from src.api.http.rest.config import RESTART_ON_CHANGE
+
+    assert set(drivers.settings("direct")) <= set(RESTART_ON_CHANGE)
+
+
+def test_the_image_ships_every_top_level_package():
+    """A package the API imports but the Dockerfile does not copy works
+    everywhere except the thing that runs on the Pi."""
+    from pathlib import Path
+
+    dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+    packages = [
+        path.parent.name
+        for path in Path(".").glob("matrix_*/__init__.py")
+    ]
+
+    assert packages, "found no matrix_* packages to check"
+    for package in packages:
+        assert f"COPY {package} ./{package}" in dockerfile, f"{package} is missing from the image"
+
+
+def test_the_settings_page_offers_the_drivers_the_server_defines():
+    """The picker must not carry its own copy of the pin tables."""
+    from pathlib import Path
+
+    component = Path("web/src/components/DriverSelect.tsx").read_text(encoding="utf-8")
+
+    assert "getMatrixDrivers" in component, "the definitions are fetched"
+    for driver in drivers.DRIVERS:
+        # The library's mapping names appearing here would mean a second
+        # copy of the definitions, free to drift from the server's.
+        assert driver.hardware_mapping not in component

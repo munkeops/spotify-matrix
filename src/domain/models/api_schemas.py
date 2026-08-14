@@ -209,6 +209,28 @@ class AssetListResponse(BaseModel):
     assets: list[AssetItem] = Field(default_factory=list)
 
 
+class MatrixDriver(BaseModel):
+    """A named panel wiring, as the settings page lists it."""
+
+    id: str
+    name: str
+    summary: str = ""
+    hardwareMapping: str = ""
+    gpioSlowdown: int = 1
+    noHardwarePulse: bool = False
+    #: Signal name to BCM pin, in wiring order.
+    pins: dict[str, int] = Field(default_factory=dict)
+    notes: str = ""
+
+
+class MatrixDriversResponse(BaseModel):
+    drivers: list[MatrixDriver] = Field(default_factory=list)
+    #: The driver the saved settings describe, or "custom".
+    active: str = "custom"
+    #: Signal order, so the panel's pin table reads the way you wire it.
+    pinOrder: list[str] = Field(default_factory=list)
+
+
 class BluetoothDevice(BaseModel):
     mac: str
     name: str = ""

@@ -6,6 +6,7 @@ import JoystickPanel from "../components/JoystickPanel";
 import GamepadPanel from "../components/GamepadPanel";
 import AudioPanel from "../components/AudioPanel";
 import DisplayPreview from "../components/DisplayPreview";
+import DriverSelect from "../components/DriverSelect";
 import Field from "../components/Field";
 import SettingsSection from "../components/SettingsSection";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
@@ -73,6 +74,16 @@ export default function Settings() {
               cols={Number(config.matrix?.cols ?? 64)}
             />
           </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <DriverSelect
+              hardwareMapping={String(config.matrix?.hardwareMapping ?? "")}
+              onApply={(settings) =>
+                setConfig((prev) => (prev ? { ...prev, matrix: { ...prev.matrix, ...settings } } : prev))
+              }
+            />
+          </Box>
+
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr" }, gap: 1.5 }}>
             {MATRIX_NUMBERS.map((f) => (
               <Field key={f.key} label={f.label} help={f.help}>
