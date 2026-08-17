@@ -163,3 +163,28 @@ def test_the_app_list_does_not_render_a_frame_per_card():
     for page in ("web/src/pages/Apps.tsx", "web/src/components/AppConfigDrawer.tsx"):
         source = Path(page).read_text(encoding="utf-8")
         assert "previewApp(" not in source, f"{page} renders frames on the Pi to draw itself"
+
+
+def test_the_timing_knobs_reach_the_runtime():
+    """A setting the panel page offers but the runtime never passes is a
+    dial wired to nothing."""
+    from pathlib import Path
+
+    runtime = Path("src/domain/services/runtime_service.py").read_text(encoding="utf-8")
+    script = Path("spotify_matrix.py").read_text(encoding="utf-8")
+
+    for flag, option in (
+        ("--pwm-lsb-nanoseconds", "pwm_lsb_nanoseconds"),
+        ("--pwm-dither-bits", "pwm_dither_bits"),
+        ("--panel-type", "panel_type"),
+    ):
+        assert flag in runtime, f"{flag} is never passed to the runtime"
+        assert f"options.{option}" in script, f"{option} never reaches the panel driver"
+
+
+def test_the_timing_knobs_restart_the_matrix():
+    """They are constructor arguments like the rest; saving one without a
+    restart moves the setting and not the panel."""
+    from src.api.http.rest.config import RESTART_ON_CHANGE
+
+    assert {"pwmLsbNanoseconds", "pwmDitherBits", "panelType"} <= set(RESTART_ON_CHANGE)

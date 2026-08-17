@@ -23,6 +23,14 @@ class MatrixConfig(BaseModel):
     gpioSlowdown: int = 4
     hardwareMapping: str = "adafruit-hat"
     pwmBits: int = 11
+    #: Time given to the shortest colour pulse. The library's default; raising
+    #: it costs refresh quickly.
+    pwmLsbNanoseconds: int = 130
+    #: Spreads the lowest colour bits over successive frames, buying a lot of
+    #: refresh for a little colour depth.
+    pwmDitherBits: int = 0
+    #: Initialisation some panels need, e.g. FM6126A. Blank for most.
+    panelType: str = ""
     limitRefreshRateHz: int = 120
     noHardwarePulse: bool = True
     pollSeconds: float = 2
