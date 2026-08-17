@@ -147,6 +147,34 @@ export const sendTetrisInput = (action: TetrisAction) =>
 export const getConfig = () => apiGet<Record<string, any>>("/api/config");
 export const saveConfig = (config: Record<string, unknown>) => apiPost<Record<string, any>>("/api/config", config);
 
+/** Somebody who uses this unit. Never carries the PIN hash. */
+export interface UserProfile {
+  id: string;
+  name: string;
+  /** 16 rows of 16 base62 digits into `palette`; "." is transparent. */
+  avatar: string[];
+  palette: string[];
+  hasPin: boolean;
+  created: number;
+  lastSeen: number;
+}
+
+export interface UsersResponse {
+  profiles: UserProfile[];
+  activeId: string;
+  /** True when the unit cannot tell who is using it and has to ask. */
+  signInRequired: boolean;
+}
+
+export const getUsers = () => apiGet<UsersResponse>("/api/users");
+export const createUser = (name: string, pin?: string) =>
+  apiPost<UserProfile>("/api/users", { name, pin: pin || null });
+export const updateUser = (id: string, changes: Partial<Pick<UserProfile, "name" | "avatar" | "palette">> & { pin?: string }) =>
+  apiPost<UserProfile>(`/api/users/${encodeURIComponent(id)}`, changes);
+export const deleteUser = (id: string) => apiDelete<UsersResponse>(`/api/users/${encodeURIComponent(id)}`);
+export const signInUser = (id: string, pin = "") =>
+  apiPost<UsersResponse>(`/api/users/${encodeURIComponent(id)}/sign-in`, { pin });
+
 /** One way of wiring the panel to the Pi. */
 export interface MatrixDriver {
   id: string;

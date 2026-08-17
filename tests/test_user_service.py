@@ -105,3 +105,31 @@ def test_data_belongs_to_whoever_is_signed_in(users):
 def test_a_unit_with_nobody_signed_in_still_has_somewhere_to_put_things(users):
     """scope() feeds a directory path, so it can never be empty."""
     assert users.scope() == "owner"
+
+
+def test_the_avatar_editor_and_the_panel_agree_on_the_encoding():
+    """Both index a palette with base62 digits, the same scheme frames use.
+    If they disagreed, a face drawn in the browser would come out as noise
+    on the matrix."""
+    from pathlib import Path
+
+    editor = Path("web/src/components/AvatarEditor.tsx").read_text(encoding="utf-8")
+    avatar = Path("web/src/components/Avatar.tsx").read_text(encoding="utf-8")
+
+    assert "digit" in editor and "index" in avatar
+    # 16 across, agreed on in three places: two components and the server.
+    from matrix_users import AVATAR_SIZE
+
+    assert AVATAR_SIZE == 16
+    assert "const SIZE = 16" in editor and "const SIZE = 16" in avatar
+
+
+def test_signing_in_is_offered_where_there_is_a_keyboard():
+    """Choosing a name with a joystick is miserable, so the full sign-in
+    lives in the web UI and the panel gets the four-digit PIN."""
+    from pathlib import Path
+
+    panel = Path("web/src/components/UsersPanel.tsx").read_text(encoding="utf-8")
+
+    assert "signInUser" in panel
+    assert "hasPin" in panel, "a profile without a PIN is not interrogated"

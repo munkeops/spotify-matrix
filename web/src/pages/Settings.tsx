@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Typography, Stack, TextField, MenuItem, Switch, FormControlLabel, Button, Box, Alert, Snackbar, CircularProgress } from "@mui/material";
 import { getConfig, saveConfig } from "../api";
 import BluetoothPanel from "../components/BluetoothPanel";
+import UsersPanel from "../components/UsersPanel";
 import JoystickPanel from "../components/JoystickPanel";
 import GamepadPanel from "../components/GamepadPanel";
 import AudioPanel from "../components/AudioPanel";
@@ -65,6 +66,8 @@ export default function Settings() {
   return (
     <Stack spacing={2}>
       {error ? <Alert severity="error">{error}</Alert> : null}
+
+      <UsersPanel />
 
       <SettingsSection title="Matrix Hardware" icon={<TuneRoundedIcon fontSize="small" color="primary" />}>
 
