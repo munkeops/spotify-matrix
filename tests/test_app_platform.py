@@ -127,7 +127,9 @@ def test_store_index_can_come_from_saved_config(tmp_path, monkeypatch):
 
     apps = store_module.app_store_service.list_apps().apps
 
-    assert [app.id for app in apps] == ["example.remote"]
+    # The catalog also offers whatever ships in the image, so this checks
+    # the configured index was read - not that it was the only source.
+    assert "example.remote" in [app.id for app in apps]
 
 
 def test_install_configure_apply_and_uninstall_app(tmp_path, monkeypatch):

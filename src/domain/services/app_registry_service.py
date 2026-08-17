@@ -106,8 +106,33 @@ class AppRegistryService:
         ]
         apps.extend(app for app in self._installed_store_apps() if app.manifest.id not in builtin_ids)
         seen = {app.manifest.id for app in apps}
-        apps.extend(app for app in self._game_package_apps() if app.manifest.id not in seen)
+        apps.extend(
+            app
+            for app in self._game_package_apps()
+            if app.manifest.id not in seen
+            # A game shipped in the image is available, not installed. The
+            # files being present is what makes installing one instant and
+            # possible offline; it is not consent to have fifteen games on
+            # a unit somebody just unboxed, and it left the store with
+            # nothing to offer.
+            and (BUILTIN_MODE != "store" or app.manifest.id in installed_ids)
+        )
         return apps
+
+    def bundled_manifests(self) -> list[AppManifest]:
+        """Manifests for the app packages shipped inside the image.
+
+        These are what the store can offer on a unit with no network: the
+        files are already on disk, so installing one is a bookkeeping entry
+        rather than a download.
+        """
+        manifests: list[AppManifest] = []
+        for spec in discover(config_service.data_dir / "apps" / "packages").values():
+            manifest_path = spec.package_dir / "app.toml"
+            if not manifest_path.exists():
+                continue
+            manifests.append(_manifest_from_toml(tomllib.loads(manifest_path.read_text(encoding="utf-8"))))
+        return manifests
 
     def _game_package_apps(self) -> list[LocalApp]:
         """Game apps found on disk, bundled with the app or installed."""

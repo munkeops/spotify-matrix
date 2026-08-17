@@ -27,10 +27,38 @@ class AppStoreService:
 
     def list_apps(self) -> AppStoreIndex:
         index = self._read_index()
+        listed = {app.id for app in index.apps}
+        # Anything shipped in the image is offerable whether or not the
+        # published index knows about it. Without this, a game bundled here
+        # but missing from the index can be neither installed nor seen - it
+        # simply does not exist as far as anyone using the unit can tell.
+        index.apps.extend(app for app in self._bundled_apps() if app.id not in listed)
+
         installed_ids = {app.manifest.id for app in app_registry_service.list_local_apps()}
         for app in index.apps:
             app.installed = app.id in installed_ids
         return index
+
+    def _bundled_apps(self) -> list[StoreApp]:
+        """Store entries for the app packages that ship inside the image.
+
+        They need no archive: the files are already on disk, which is what
+        makes installing one instant and possible with no network at all.
+        """
+        apps: list[StoreApp] = []
+        for manifest in app_registry_service.bundled_manifests():
+            apps.append(
+                StoreApp(
+                    id=manifest.id,
+                    name=manifest.name,
+                    version=manifest.version,
+                    summary=manifest.summary,
+                    category=manifest.category,
+                    author=manifest.author or "Assistant Matrix",
+                    runtime="bundled",
+                )
+            )
+        return apps
 
     def get_app(self, app_id: str) -> StoreApp | None:
         for app in self.list_apps().apps:
