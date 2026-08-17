@@ -6,6 +6,7 @@ import JoystickPanel from "../components/JoystickPanel";
 import GamepadPanel from "../components/GamepadPanel";
 import AudioPanel from "../components/AudioPanel";
 import DisplayPreview from "../components/DisplayPreview";
+import DriverSelect from "../components/DriverSelect";
 import Field from "../components/Field";
 import SettingsSection from "../components/SettingsSection";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
@@ -19,7 +20,9 @@ const MATRIX_NUMBERS: { key: string; label: string; help?: string }[] = [
   { key: "brightness", label: "Brightness", help: "0-100. The panel's duty cycle." },
   { key: "gpioSlowdown", label: "GPIO slowdown", help: "Lowest value that is stable. Higher costs refresh, and so brightness." },
   { key: "pwmBits", label: "PWM bits", help: "Colour depth. 11 is richest, 8 refreshes far faster and looks brighter." },
-  { key: "limitRefreshRateHz", label: "Refresh cap", help: "0 removes the cap. A low cap dims the panel." },
+  { key: "pwmDitherBits", label: "Dither bits", help: "Spreads the lowest colour bits across frames. 1 buys a lot of refresh for little depth." },
+  { key: "pwmLsbNanoseconds", label: "LSB nanoseconds", help: "Time for the shortest colour pulse. 130 is standard; raising it costs refresh fast." },
+  { key: "limitRefreshRateHz", label: "Refresh cap", help: "0 removes the cap. A steady capped rate flickers less than a higher wandering one." },
   { key: "pollSeconds", label: "Poll seconds" },
   { key: "fps", label: "FPS" },
   { key: "rpm", label: "RPM" },
@@ -73,6 +76,14 @@ export default function Settings() {
               cols={Number(config.matrix?.cols ?? 64)}
             />
           </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <DriverSelect
+              hardwareMapping={String(config.matrix?.hardwareMapping ?? "")}
+              onSwitched={(saved) => setConfig(saved)}
+            />
+          </Box>
+
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1fr" }, gap: 1.5 }}>
             {MATRIX_NUMBERS.map((f) => (
               <Field key={f.key} label={f.label} help={f.help}>
@@ -89,6 +100,13 @@ export default function Settings() {
             <Field label="Rotation" help="Previewed above.">
               <TextField select value={String(config.matrix?.rotation ?? 0)} onChange={(e) => setMatrix("rotation", Number(e.target.value))}>
                 {[0, 90, 180, 270].map((r) => <MenuItem key={r} value={String(r)}>{r}°</MenuItem>)}
+              </TextField>
+            </Field>
+            <Field label="Panel type" help="Blank for most. FM6126A panels need naming here or they stay dark.">
+              <TextField select value={String(config.matrix?.panelType ?? "")} onChange={(e) => setMatrix("panelType", e.target.value)}>
+                <MenuItem value="">Standard</MenuItem>
+                <MenuItem value="FM6126A">FM6126A</MenuItem>
+                <MenuItem value="FM6127">FM6127</MenuItem>
               </TextField>
             </Field>
           </Box>

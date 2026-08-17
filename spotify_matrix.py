@@ -177,6 +177,9 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         "gpioSlowdown": int,
         "hardwareMapping": str,
         "pwmBits": int,
+        "pwmLsbNanoseconds": int,
+        "pwmDitherBits": int,
+        "panelType": str,
         "limitRefreshRateHz": int,
         "pollSeconds": float,
         "fps": float,
@@ -189,6 +192,9 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         "gpioSlowdown": "gpio_slowdown",
         "hardwareMapping": "hardware_mapping",
         "pwmBits": "pwm_bits",
+        "pwmLsbNanoseconds": "pwm_lsb_nanoseconds",
+        "pwmDitherBits": "pwm_dither_bits",
+        "panelType": "panel_type",
         "limitRefreshRateHz": "limit_refresh_rate_hz",
         "pollSeconds": "poll_seconds",
         "noHardwarePulse": "no_hardware_pulse",
@@ -202,6 +208,9 @@ def apply_config_defaults(args: argparse.Namespace, config: dict[str, Any]) -> N
         "gpioSlowdown": ("--gpio-slowdown",),
         "hardwareMapping": ("--hardware-mapping",),
         "pwmBits": ("--pwm-bits",),
+        "pwmLsbNanoseconds": ("--pwm-lsb-nanoseconds",),
+        "pwmDitherBits": ("--pwm-dither-bits",),
+        "panelType": ("--panel-type",),
         "limitRefreshRateHz": ("--limit-refresh-rate-hz",),
         "pollSeconds": ("--poll-seconds",),
         "fps": ("--fps",),
@@ -557,6 +566,14 @@ class MatrixDisplay:
         options.pwm_bits = args.pwm_bits
         options.limit_refresh_rate_hz = args.limit_refresh_rate_hz
         options.disable_hardware_pulsing = args.no_hardware_pulse
+        # Timing and panel quirks. Left at the library's own defaults unless
+        # configured, so a panel that never needed them is untouched.
+        if args.pwm_lsb_nanoseconds:
+            options.pwm_lsb_nanoseconds = args.pwm_lsb_nanoseconds
+        if args.pwm_dither_bits:
+            options.pwm_dither_bits = args.pwm_dither_bits
+        if args.panel_type:
+            options.panel_type = args.panel_type
 
         self.matrix = RGBMatrix(options=options)
         self.canvas = self.matrix.CreateFrameCanvas()
@@ -2443,6 +2460,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gpio-slowdown", type=int, default=2)
     parser.add_argument("--hardware-mapping", default="regular")
     parser.add_argument("--pwm-bits", type=int, default=11)
+    parser.add_argument(
+        "--pwm-lsb-nanoseconds",
+        type=int,
+        default=130,
+        help="Time given to the shortest colour pulse. Raise it if dim colours look wrong or ghost; it costs refresh quickly.",
+    )
+    parser.add_argument(
+        "--pwm-dither-bits",
+        type=int,
+        default=0,
+        help="Spread the lowest colour bits over successive frames. Buys a lot of refresh for a little colour depth.",
+    )
+    parser.add_argument(
+        "--panel-type",
+        default="",
+        help="Initialisation some panels need, e.g. FM6126A. Blank for most.",
+    )
     parser.add_argument("--limit-refresh-rate-hz", type=int, default=120)
     parser.add_argument(
         "--no-hardware-pulse",

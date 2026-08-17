@@ -23,8 +23,19 @@ class MatrixConfig(BaseModel):
     gpioSlowdown: int = 4
     hardwareMapping: str = "adafruit-hat"
     pwmBits: int = 11
+    #: Time given to the shortest colour pulse. The library's default; raising
+    #: it costs refresh quickly.
+    pwmLsbNanoseconds: int = 130
+    #: Spreads the lowest colour bits over successive frames, buying a lot of
+    #: refresh for a little colour depth.
+    pwmDitherBits: int = 0
+    #: Initialisation some panels need, e.g. FM6126A. Blank for most.
+    panelType: str = ""
     limitRefreshRateHz: int = 120
     noHardwarePulse: bool = True
+    #: Panel tuning kept per wiring, so swapping between a HAT and direct
+    #: wiring restores what was tuned for it rather than losing it.
+    profiles: dict[str, dict[str, Any]] = Field(default_factory=dict)
     pollSeconds: float = 2
     fps: float = 20
     rpm: float = 20
@@ -207,6 +218,34 @@ class AssetItem(BaseModel):
 
 class AssetListResponse(BaseModel):
     assets: list[AssetItem] = Field(default_factory=list)
+
+
+class MatrixDriver(BaseModel):
+    """A named panel wiring, as the settings page lists it."""
+
+    id: str
+    name: str
+    summary: str = ""
+    hardwareMapping: str = ""
+    gpioSlowdown: int = 1
+    noHardwarePulse: bool = False
+    #: Signal name to BCM pin, in wiring order.
+    pins: dict[str, int] = Field(default_factory=dict)
+    notes: str = ""
+
+
+class MatrixDriversResponse(BaseModel):
+    drivers: list[MatrixDriver] = Field(default_factory=list)
+    #: The driver the saved settings describe, or "custom".
+    active: str = "custom"
+    #: Signal order, so the panel's pin table reads the way you wire it.
+    pinOrder: list[str] = Field(default_factory=list)
+    #: Driver ids with tuning remembered from last time they were used.
+    remembered: list[str] = Field(default_factory=list)
+
+
+class MatrixDriverRequest(BaseModel):
+    id: str
 
 
 class BluetoothDevice(BaseModel):

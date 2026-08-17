@@ -279,6 +279,11 @@ class JoystickService:
                     started = time.monotonic()
                     for event in reader.poll(started):
                         self._dispatch(event)
+                    # The reader knows whether the module answered; events do
+                    # not say so on their own. Waiting for someone to press
+                    # something before reporting "connected" left a working
+                    # module looking exactly like a missing one.
+                    self.connected = reader.connected
                     self._stop.wait(max(0.0, interval - (time.monotonic() - started)))
             except Exception as exc:  # keep the thread alive across bus glitches
                 self.last_error = str(exc)

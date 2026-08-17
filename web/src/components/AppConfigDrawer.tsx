@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Drawer, Box, Stack, Typography, TextField, MenuItem, Switch, FormControlLabel,
   Button, IconButton, Divider, Alert,
 } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import {
-  LocalApp, getAppConfig, saveAppConfig, applyApp, previewApp, canPreview, createPairing,
+  LocalApp, getAppConfig, saveAppConfig, applyApp, createPairing,
   gameIdOf, isGame,
 } from "../api";
 import Gallery from "./Gallery";
@@ -29,35 +29,22 @@ export default function AppConfigDrawer({
   onApplied: () => void;
 }) {
   const [values, setValues] = useState<Record<string, unknown>>({});
-  const [preview, setPreview] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [pairingCmd, setPairingCmd] = useState<string>("");
-  const timer = useRef<number | undefined>(undefined);
 
   const id = app?.manifest.id ?? "";
   // Games get a Controls section; nothing else takes controller input.
   const gameId = isGame(app) ? gameIdOf(app) : "";
   const fields = app?.manifest.config ?? [];
-  const previewable = canPreview(app);
 
   useEffect(() => {
     if (!app || !open) return;
     setError("");
-    setPreview("");
     getAppConfig(id)
       .then((r) => setValues(r.config || {}))
       .catch((e) => setError((e as Error).message));
   }, [id, open, app]);
-
-  useEffect(() => {
-    if (!open || !previewable) return;
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      previewApp(id, values).then((r) => setPreview(r.dataUrl)).catch(() => undefined);
-    }, 250);
-    return () => window.clearTimeout(timer.current);
-  }, [values, open, previewable, id]);
 
   const set = (key: string, value: unknown) => setValues((prev) => ({ ...prev, [key]: value }));
 
@@ -110,16 +97,6 @@ export default function AppConfigDrawer({
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{app?.manifest.summary}</Typography>
 
       {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
-
-      {previewable ? (
-        <Box sx={{ display: "grid", placeItems: "center", mb: 2 }}>
-          {preview ? (
-            <img src={preview} width={128} height={128} style={{ imageRendering: "pixelated", borderRadius: 8, background: "#000" }} alt="preview" />
-          ) : (
-            <Box sx={{ width: 128, height: 128, borderRadius: 2, bgcolor: "background.paper" }} />
-          )}
-        </Box>
-      ) : null}
 
       <Stack spacing={2} sx={{ flex: 1, overflowY: "auto" }}>
         {id === "core.spotify" ? (
