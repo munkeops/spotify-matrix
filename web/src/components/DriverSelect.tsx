@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Chip, MenuItem, Stack, TextField, Typography } from "@mui/material";
-import { MatrixDriver, MatrixDriversResponse, getMatrixDrivers } from "../api";
+import { MatrixDriver, MatrixDriversResponse, getMatrixDrivers, switchMatrixDriver } from "../api";
 import Field from "./Field";
 import { RADIUS } from "../theme";
 
@@ -18,19 +18,20 @@ import { RADIUS } from "../theme";
  */
 export default function DriverSelect({
   hardwareMapping,
-  onApply,
+  onSwitched,
 }: {
   hardwareMapping: string;
-  /** Called with the settings the chosen driver implies. */
-  onApply: (settings: { hardwareMapping: string; gpioSlowdown: number; noHardwarePulse: boolean }) => void;
+  /** Called with the saved config after a swap, so the page can catch up. */
+  onSwitched: (config: Record<string, any>) => void;
 }) {
   const [data, setData] = useState<MatrixDriversResponse | null>(null);
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = () => getMatrixDrivers().then(setData).catch((e) => setError((e as Error).message));
 
   useEffect(() => {
-    getMatrixDrivers()
-      .then(setData)
-      .catch((e) => setError((e as Error).message));
+    load();
   }, []);
 
   if (error) return <Alert severity="warning">{error}</Alert>;
@@ -42,26 +43,35 @@ export default function DriverSelect({
     data.drivers.find((driver) => driver.hardwareMapping === hardwareMapping)?.id ?? "custom";
   const selected: MatrixDriver | undefined = data.drivers.find((driver) => driver.id === active);
 
-  const apply = (id: string) => {
-    const driver = data.drivers.find((d) => d.id === id);
-    if (!driver) return;
-    onApply({
-      hardwareMapping: driver.hardwareMapping,
-      gpioSlowdown: driver.gpioSlowdown,
-      noHardwarePulse: driver.noHardwarePulse,
-    });
+  // Swapping is one call rather than a set of fields the page assembles.
+  // It applies immediately and restarts the matrix, because a half-applied
+  // wiring - a HAT's mapping with a directly wired panel's timing - drives
+  // nothing correctly.
+  const swap = async (id: string) => {
+    if (id === active) return;
+    setBusy(true);
+    setError("");
+    try {
+      onSwitched(await switchMatrixDriver(id));
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <Stack spacing={1.5}>
       <Field
         label="Wiring"
-        help="Sets the mapping, slowdown and pulsing below. Save to apply - the matrix restarts."
+        help="Applies at once and restarts the matrix. Each wiring keeps its own tuning, so switching back returns to what you had."
       >
-        <TextField select value={active} onChange={(event) => apply(event.target.value)}>
+        <TextField select value={active} disabled={busy} onChange={(event) => swap(event.target.value)}>
           {data.drivers.map((driver) => (
             <MenuItem key={driver.id} value={driver.id}>
               {driver.name}
+              {data.remembered.includes(driver.id) && driver.id !== active ? " — tuned" : ""}
             </MenuItem>
           ))}
           {/* Only reachable by hand-editing the mapping, and not worth

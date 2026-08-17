@@ -33,6 +33,9 @@ class MatrixConfig(BaseModel):
     panelType: str = ""
     limitRefreshRateHz: int = 120
     noHardwarePulse: bool = True
+    #: Panel tuning kept per wiring, so swapping between a HAT and direct
+    #: wiring restores what was tuned for it rather than losing it.
+    profiles: dict[str, dict[str, Any]] = Field(default_factory=dict)
     pollSeconds: float = 2
     fps: float = 20
     rpm: float = 20
@@ -237,6 +240,12 @@ class MatrixDriversResponse(BaseModel):
     active: str = "custom"
     #: Signal order, so the panel's pin table reads the way you wire it.
     pinOrder: list[str] = Field(default_factory=list)
+    #: Driver ids with tuning remembered from last time they were used.
+    remembered: list[str] = Field(default_factory=list)
+
+
+class MatrixDriverRequest(BaseModel):
+    id: str
 
 
 class BluetoothDevice(BaseModel):

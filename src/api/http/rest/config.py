@@ -5,7 +5,13 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from matrix_display import drivers
-from src.domain.models.api_schemas import AppConfig, MatrixDriver, MatrixDriversResponse
+from src.domain.models.api_schemas import (
+    AppConfig,
+    MatrixConfig,
+    MatrixDriver,
+    MatrixDriverRequest,
+    MatrixDriversResponse,
+)
 from src.domain.services.config_service import config_service
 
 router = APIRouter(tags=["spotify-matrix-config"])
@@ -40,7 +46,30 @@ async def matrix_drivers() -> MatrixDriversResponse:
         ],
         active=drivers.detect(matrix.hardwareMapping),
         pinOrder=list(drivers.PIN_ORDER),
+        remembered=sorted(matrix.profiles),
     )
+
+
+@router.post("/api/matrix/driver", response_model=AppConfig)
+async def switch_matrix_driver(body: MatrixDriverRequest) -> AppConfig:
+    """Move the panel to another wiring, keeping each one's tuning.
+
+    A swap is a single step rather than five fields edited by hand, because
+    the settings are not independent: the slowdown a HAT tolerates corrupts
+    a directly wired panel, and whether the hardware can pulse at all
+    follows from where the wiring puts OE.
+    """
+    if drivers.get(body.id) is None:
+        raise ValueError(f"Unknown wiring: {body.id}")
+
+    config = config_service.get_config()
+    config.matrix = MatrixConfig.model_validate(drivers.switch(config.matrix.model_dump(), body.id))
+    saved = config_service.save_config(config)
+
+    from src.domain.services.runtime_service import runtime_service
+
+    runtime_service.apply()
+    return saved
 
 
 #: Matrix settings the runtime only reads when it starts.

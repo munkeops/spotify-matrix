@@ -165,9 +165,14 @@ export interface MatrixDriversResponse {
   /** Which driver the saved settings describe, or "custom". */
   active: string;
   pinOrder: string[];
+  /** Drivers with tuning remembered from last time they were used. */
+  remembered: string[];
 }
 
 export const getMatrixDrivers = () => apiGet<MatrixDriversResponse>("/api/matrix/drivers");
+/** Swap wiring. Saves the current tuning under the old one and restores the new one's. */
+export const switchMatrixDriver = (id: string) =>
+  apiPost<Record<string, any>>("/api/matrix/driver", { id });
 
 export const createPairing = () =>
   apiPost<{ pairingToken: string; expiresInSeconds: number; command: string }>("/api/auth/session", {});

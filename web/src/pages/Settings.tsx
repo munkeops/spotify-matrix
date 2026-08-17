@@ -80,9 +80,7 @@ export default function Settings() {
           <Box sx={{ mb: 2 }}>
             <DriverSelect
               hardwareMapping={String(config.matrix?.hardwareMapping ?? "")}
-              onApply={(settings) =>
-                setConfig((prev) => (prev ? { ...prev, matrix: { ...prev.matrix, ...settings } } : prev))
-              }
+              onSwitched={(saved) => setConfig(saved)}
             />
           </Box>
 

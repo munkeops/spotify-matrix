@@ -152,6 +152,42 @@ def settings(driver_id: str) -> dict[str, Any]:
     }
 
 
+#: The settings a wiring owns, and so the ones worth remembering per wiring.
+#: Everything else - rows, brightness, rotation - describes the panel or what
+#: is on it, and stays put when the board underneath changes.
+PROFILE_FIELDS = (
+    "hardwareMapping",
+    "gpioSlowdown",
+    "noHardwarePulse",
+    "pwmBits",
+    "pwmDitherBits",
+    "pwmLsbNanoseconds",
+    "limitRefreshRateHz",
+    "panelType",
+)
+
+
+def switch(matrix: dict[str, Any], driver_id: str) -> dict[str, Any]:
+    """Move these settings to another wiring, remembering the one being left.
+
+    Tuning a panel takes measurement and patience, and it is specific to how
+    the panel is plugged in: the slowdown that a HAT tolerates corrupts a
+    directly wired one, and the pulse setting is not even a choice. Without
+    somewhere to keep it, moving an install between boards means finding it
+    all again, so each wiring keeps its own and gets it back on return.
+
+    A wiring never used before starts from the driver's own values.
+    """
+    current = detect(str(matrix.get("hardwareMapping", "")))
+    profiles = {key: dict(value) for key, value in (matrix.get("profiles") or {}).items()}
+    profiles[current] = {field: matrix[field] for field in PROFILE_FIELDS if field in matrix}
+
+    updated = dict(matrix)
+    updated.update(profiles.get(driver_id) or settings(driver_id))
+    updated["profiles"] = profiles
+    return updated
+
+
 def detect(hardware_mapping: str) -> str:
     """Which driver these settings describe, or "custom".
 

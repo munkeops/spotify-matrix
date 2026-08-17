@@ -210,3 +210,60 @@ def test_an_idle_module_is_not_reported_as_missing():
 
     assert reader.poll(0.0) == [], "a healthy first read reports no transition"
     assert reader.connected is True, "but it knows the module answered"
+
+
+def test_switching_wiring_remembers_what_the_old_one_was_tuned_to():
+    """Tuning a panel takes measurement and patience, and it is specific to
+    how the panel is plugged in. Losing it on every swap would mean finding
+    it again each time."""
+    hat = {
+        "hardwareMapping": "adafruit-hat-pwm", "gpioSlowdown": 2, "noHardwarePulse": False,
+        "pwmBits": 10, "pwmDitherBits": 1, "pwmLsbNanoseconds": 130,
+        "limitRefreshRateHz": 250, "panelType": "", "brightness": 65, "rotation": 270,
+    }
+
+    moved = drivers.switch(hat, "direct")
+
+    assert moved["hardwareMapping"] == "regular"
+    assert moved["profiles"]["adafruit-hat-pwm"]["limitRefreshRateHz"] == 250
+    assert moved["profiles"]["adafruit-hat-pwm"]["pwmDitherBits"] == 1
+
+    back = drivers.switch(moved, "adafruit-hat-pwm")
+
+    assert back["hardwareMapping"] == "adafruit-hat-pwm"
+    assert back["limitRefreshRateHz"] == 250, "the tuning came back"
+    assert back["pwmDitherBits"] == 1
+
+
+def test_a_swap_leaves_the_panel_and_its_content_alone():
+    """Rows, brightness and rotation describe the panel and what is on it,
+    not the board underneath, and must survive changing boards."""
+    before = {
+        "hardwareMapping": "regular", "gpioSlowdown": 3, "noHardwarePulse": False,
+        "rows": 64, "cols": 64, "brightness": 42, "rotation": 270,
+    }
+
+    after = drivers.switch(before, "adafruit-hat")
+
+    assert (after["brightness"], after["rotation"], after["rows"]) == (42, 270, 64)
+    assert not set(drivers.PROFILE_FIELDS) & {"rows", "cols", "brightness", "rotation"}
+
+
+def test_a_wiring_never_used_starts_from_its_own_values():
+    before = {"hardwareMapping": "regular", "gpioSlowdown": 3, "noHardwarePulse": False}
+
+    after = drivers.switch(before, "adafruit-hat")
+
+    assert after["noHardwarePulse"] is True, "the HAT cannot pulse in hardware"
+    assert after["gpioSlowdown"] == drivers.ADAFRUIT_HAT.gpio_slowdown
+
+
+def test_switching_is_one_call_not_a_page_assembling_settings():
+    """A half-applied wiring - a HAT's mapping with a directly wired panel's
+    timing - drives nothing correctly, so it must not be possible to save
+    one without the others."""
+    from pathlib import Path
+
+    component = Path("web/src/components/DriverSelect.tsx").read_text(encoding="utf-8")
+
+    assert "switchMatrixDriver" in component
