@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
 from configs import base_config
-from src.api.http.rest import assets, audio, auth, bindings, bluetooth, commands, config, display, gamepad, games, joystick, runtime, scores, status, system_controls, tetris, apps
+from src.api.http.rest import assets, audio, auth, bindings, bluetooth, commands, config, display, gamepad, games, joystick, runtime, scores, status, system_controls, tetris, apps, users
 from src.domain.models.response import ErrorResponse, SuccessResponse
 from src.utils.logging_setup import initialize_logging
 
@@ -94,6 +94,16 @@ def create_app() -> FastAPI:
             logger.exception("[spotify-matrix] joystick startup failed, continuing without it")
 
         try:
+            # A unit that has been owned for months predates profiles and has
+            # none. Arriving at a sign-in screen would be a poor way to learn
+            # the feature exists, so one is made and signed in.
+            from src.domain.services.user_service import user_service
+
+            user_service.ensure_owner()
+        except Exception:
+            logger.exception("[spotify-matrix] could not prepare a user profile")
+
+        try:
             # BlueZ does not necessarily power the adapter at boot, and a soft
             # rfkill block survives a reboot, so the matrix could come up with
             # working hardware that finds nothing.
@@ -158,6 +168,7 @@ def create_app() -> FastAPI:
     app.include_router(system_controls.router)
     app.include_router(gamepad.router)
     app.include_router(audio.router)
+    app.include_router(users.router)
 
     public_dir = str(base_config["paths"]["public_dir"])
     web_dist = Path("web-dist")

@@ -77,6 +77,7 @@ COPY mini_joystick ./mini_joystick
 COPY matrix_input ./matrix_input
 COPY matrix_audio ./matrix_audio
 COPY matrix_display ./matrix_display
+COPY matrix_users ./matrix_users
 # Bundled game apps, discovered at runtime alongside anything installed.
 COPY store_apps ./store_apps
 COPY store_server ./store_server

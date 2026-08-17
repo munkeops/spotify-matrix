@@ -248,6 +248,46 @@ class MatrixDriverRequest(BaseModel):
     id: str
 
 
+class UserProfile(BaseModel):
+    """A person using this unit. Never carries the PIN hash or its salt."""
+
+    id: str
+    name: str
+    #: 16 rows of 16 base62 digits indexing into ``palette``; "." is
+    #: transparent. Empty means no avatar yet.
+    avatar: list[str] = Field(default_factory=list)
+    palette: list[str] = Field(default_factory=list)
+    hasPin: bool = False
+    created: float = 0.0
+    lastSeen: float = 0.0
+
+
+class UsersResponse(BaseModel):
+    profiles: list[UserProfile] = Field(default_factory=list)
+    activeId: str = ""
+    #: True when the unit cannot tell who is using it and has to ask.
+    signInRequired: bool = False
+
+
+class UserCreateRequest(BaseModel):
+    name: str
+    #: Four digits, or nothing for a profile that does not ask.
+    pin: str | None = None
+
+
+class UserUpdateRequest(BaseModel):
+    name: str | None = None
+    avatar: list[str] | None = None
+    palette: list[str] | None = None
+    #: Absent leaves the PIN alone; empty clears it. They must differ, or
+    #: a PIN could never be removed.
+    pin: str | None = None
+
+
+class UserSignInRequest(BaseModel):
+    pin: str = ""
+
+
 class BluetoothDevice(BaseModel):
     mac: str
     name: str = ""
