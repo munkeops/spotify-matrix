@@ -70,6 +70,17 @@ class JoystickReader:
         self._connected = True
         self._started = False
 
+    @property
+    def connected(self) -> bool:
+        """Whether the module answered the last read.
+
+        Events alone cannot say this. The first poll of a healthy module
+        deliberately emits nothing - there is no transition to report - so
+        anyone watching only events cannot tell a module sitting untouched
+        from one that is not there at all.
+        """
+        return self._connected
+
     def poll(self, now: float | None = None) -> list[JoystickEvent]:
         """Read once and return the events since the previous read."""
         now = time.monotonic() if now is None else now

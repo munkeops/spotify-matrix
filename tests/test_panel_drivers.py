@@ -188,3 +188,25 @@ def test_the_timing_knobs_restart_the_matrix():
     from src.api.http.rest.config import RESTART_ON_CHANGE
 
     assert {"pwmLsbNanoseconds", "pwmDitherBits", "panelType"} <= set(RESTART_ON_CHANGE)
+
+
+def test_an_idle_module_is_not_reported_as_missing():
+    """The first poll of a healthy module emits no event - there is no
+    transition to report - so a service watching only events called a
+    working joystick disconnected until someone pressed something."""
+    from mini_joystick.events import JoystickReader
+
+    from mini_joystick.device import JoystickState, Stick
+
+    class Idle:
+        """A module sitting centred, answering the bus, untouched."""
+
+        deadzone = 0.3
+
+        def read(self):
+            return JoystickState(stick=Stick(x=0.0, y=0.0, raw_x=128, raw_y=128), connected=True)
+
+    reader = JoystickReader(Idle())
+
+    assert reader.poll(0.0) == [], "a healthy first read reports no transition"
+    assert reader.connected is True, "but it knows the module answered"
